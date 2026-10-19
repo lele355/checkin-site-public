@@ -1,0 +1,258 @@
+@inject CheckinApp.Services.CurrentUser Me
+@{
+    var nav = Me.NavItems();
+    var path = Context.Request.Path.ToString().ToLowerInvariant();
+    // 首页/登录/强制改密页不显示返回按钮（首页没有“上一页”可回，改密页回退会被中间件拽回来）
+    var hideBack = path is "/" or "/index" or "/login" or "/changepassword";
+}
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="@(Me.Theme)" data-accent="@(Me.Accent)" data-tone="@(Me.Tone)">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0F6E56" />
+    <link rel="manifest" href="~/manifest.json" asp-append-version="true" />
+    <link rel="apple-touch-icon" href="~/icons/icon-192.png" />
+    <link rel="icon" type="image/png" href="~/icons/icon-192.png" />
+    <title>@(ViewData["Title"] is null ? "日常管理" : $"{ViewData["Title"]} · 日常管理")</title>
+    <script>
+        // 主题防闪白：在 CSS 绘制前先恢复偏好
+        // 本机 localStorage 优先，没存过就用服务端 Users 表里的偏好
+        (function () {
+            try {
+                var t = localStorage.getItem('theme.slug') || '@(Me.Theme)';
+                var a = localStorage.getItem('theme.accent') || '@(Me.Accent)';
+                var tn = localStorage.getItem('theme.tone') || '@(Me.Tone)';
+                var el = document.documentElement;
+                el.dataset.theme = t;
+                if (a) el.dataset.accent = a;
+                if (tn) el.dataset.tone = tn;
+                // 侧栏显隐偏好（PC 端）：预恢复防刷新闪烁
+                if (localStorage.getItem('layout.sidebar') === 'hidden') el.dataset.sidebar = 'hidden';
+            } catch (e) { }
+        })();
+    </script>
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/themes.css" asp-append-version="true" />
+</head>
+<body>
+<header class="topbar">
+    @if (Me.IsAuthenticated)
+    {
+        @if (!hideBack)
+        {
+            <button class="icon-btn back-top" type="button" aria-label="返回上一页" onclick="goBack()">
+                @Html.Raw(Icons.Svg("chevron-left"))
+            </button>
+        }
+        <button class="hamburger" type="button" aria-label="菜单"
+                onclick="toggleDrawer()">@Html.Raw(Icons.Svg("menu"))</button>
+        <button class="icon-btn sidebar-toggle" type="button" aria-label="收起/展开侧边栏"
+                onclick="toggleSidebar()" aria-expanded="true">
+            <span class="ico-collapse">@Html.Raw(Icons.Svg("panel-left-close"))</span>
+            <span class="ico-expand">@Html.Raw(Icons.Svg("panel-left-open"))</span>
+        </button>
+    }
+    <a class="brand" asp-page="/Index">
+        <img class="logo logo-img" src="~/icons/icon-192.png" alt="" width="28" height="28" asp-append-version="true" />
+        日常管理
+    </a>
+    <span class="spacer"></span>
+    @if (Me.IsAuthenticated)
+    {
+        <div class="appearance-wrap">
+            <button id="appearanceBtn" class="icon-btn" type="button" aria-label="外观与主题" aria-haspopup="true">
+                @Html.Raw(Icons.Svg("palette"))
+            </button>
+            <div class="appearance-panel" id="appearancePanel" hidden>
+                <h3>主题风格</h3>
+                <button class="theme-card" type="button" data-theme-slug="editorial">
+                    <span class="theme-chip"><i style="background:#F9F8F6"></i><i style="background:#1C1C1C"></i><i style="background:#D8D5CF"></i></span>
+                    <span>
+                        <span class="t-name">编辑杂志风</span><br />
+                        <span class="t-desc">暖米单色 · 衬线标题 · 无阴影</span>
+                    </span>
+                </button>
+                <button class="theme-card" type="button" data-theme-slug="neumorphism">
+                    <span class="theme-chip"><i style="background:#e0e5ec"></i><i style="background:#b8bcc2"></i><i style="background:#6d5dfc"></i></span>
+                    <span>
+                        <span class="t-name">新拟物派</span><br />
+                        <span class="t-desc">浅灰软塑 · 双光源阴影 · 凹凸触感</span>
+                    </span>
+                </button>
+                <button class="theme-card" type="button" data-theme-slug="natural">
+                    <span class="theme-chip"><i style="background:#faf6f1"></i><i style="background:#5c4033"></i><i style="background:#8b9d77"></i></span>
+                    <span>
+                        <span class="t-name">自然有机风</span><br />
+                        <span class="t-desc">米色大地色 · 有机圆角 · 慢节奏</span>
+                    </span>
+                </button>
+                <button class="theme-card" type="button" data-theme-slug="macos">
+                    <span class="theme-chip"><i style="background:#1c1c1e"></i><i style="background:#2c2c2e"></i><i style="background:#0a84ff"></i></span>
+                    <span>
+                        <span class="t-name">macOS 毛玻璃</span><br />
+                        <span class="t-desc">深灰系统风 · 毛玻璃侧栏（暗色档）</span>
+                    </span>
+                </button>
+                <button class="theme-card" type="button" data-theme-slug="clay">
+                    <span class="theme-chip"><i style="background:#fce7f3"></i><i style="background:#c4b5fd"></i><i style="background:#f472b6"></i></span>
+                    <span>
+                        <span class="t-name">粘土拟态</span><br />
+                        <span class="t-desc">糖果渐变 · 软糯按压 · 弹簧回弹</span>
+                    </span>
+                </button>
+                <div id="toneRow" hidden>
+                    <h3 style="margin-top:12px;">底色</h3>
+                    <div class="accent-picker" id="toneDots" style="display:flex;flex-wrap:wrap;gap:16px 13px;align-items:center;"></div>
+                </div>
+                <div id="accentRow" hidden>
+                    <h3 style="margin-top:12px;">强调色</h3>
+                    <div class="accent-picker" id="accentDots" style="display:flex;gap:14px;align-items:center;"></div>
+                </div>
+                <form id="appearanceForm" method="post" action="/Preferences" style="display:none;">
+                    @Html.AntiForgeryToken()
+                </form>
+            </div>
+        </div>
+        <a class="user-chip" asp-page="/Me" title="个人主页">
+            <span class="name">@Me.DisplayName</span>
+            <span class="role">@Me.RoleName</span>
+        </a>
+        <form asp-page="/Logout" method="post">
+            <button class="btn-ghost" type="submit">@Html.Raw(Icons.Svg("log-out", 16)) 退出</button>
+        </form>
+    }
+</header>
+
+@if (Me.IsAuthenticated)
+{
+    <div class="drawer-mask" onclick="toggleDrawer(false)"></div>
+}
+
+<div class="shell">
+    @if (Me.IsAuthenticated && nav.Count > 0)
+    {
+        <aside class="sidebar">
+            @foreach (var grp in nav.GroupBy(n => n.Group))
+            {
+                <button class="nav-group" type="button" data-group="@grp.Key" aria-expanded="true" title="折叠 / 展开「@grp.Key」">
+                    <span>@grp.Key</span>
+                    <span class="nav-caret">@Html.Raw(Icons.Svg("chevron-down", 14))</span>
+                </button>
+                <div class="nav-list" data-group="@grp.Key">
+                    @foreach (var item in grp)
+                    {
+                        <a class="nav-item @(path == item.Url.ToLowerInvariant() ? "active" : "")" href="@item.Url">
+                            <span class="ico">@Html.Raw(Icons.Svg(item.Icon))</span>
+                            <span class="label">@item.Label</span>
+                        </a>
+                    }
+                </div>
+            }
+
+            @* 侧栏底部：自定义（勾选显示哪些模块），和顶部的外观按钮一样是「设置入口」 *@
+            <div class="sidebar-foot">
+                <button class="nav-item nav-customize" type="button" onclick="openNavCustomize()" title="自定义侧栏">
+                    <span class="ico">@Html.Raw(Icons.Svg("settings-2"))</span>
+                    <span class="label">自定义侧栏</span>
+                </button>
+            </div>
+        </aside>
+    }
+    <main class="content">
+        @* 阅读进度条：宽度绑定滚动进度（CSS scroll-timeline scroll(nearest)，
+           必须放在 main.content 内——滚动容器随断点是 window 或 main.content，nearest 自动跟对；
+           旧浏览器由 site.js 写 transform 兜底） *@
+        <div class="scroll-progress" aria-hidden="true"></div>
+        @RenderBody()
+
+        @* 页面底部备案信息：备案地陕西（非广东）→ 悬挂「网站备案号」；
+           法规要求备案号必须在首页底部展示并链接到工信部备案管理系统。
+           公安联网备案下来后再在下面加一行（带公安部图标 + 详情页链接）。 *@
+        <footer class="site-foot">
+            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备00000000号-1</a>
+        </footer>
+    </main>
+</div>
+
+@if (Me.IsAuthenticated)
+{
+    <nav class="bottombar">
+        @if (!hideBack)
+        {
+            <button type="button" onclick="goBack()" aria-label="返回上一页">
+                <span class="ico">@Html.Raw(Icons.Svg("arrow-left", 18))</span><span>返回</span>
+            </button>
+        }
+        <a href="/" class="@(path == "/" ? "active" : "")">
+            <span class="ico">@Html.Raw(Icons.Svg("home", 18))</span><span>工作台</span>
+        </a>
+        <button type="button" onclick="openAppearance(event)">
+            <span class="ico">@Html.Raw(Icons.Svg("palette", 18))</span><span>外观</span>
+        </button>
+        <a href="/Me" class="@(path == "/me" ? "active" : "")">
+            <span class="ico">@Html.Raw(Icons.Svg("user-cog", 18))</span><span>我的</span>
+        </a>
+    </nav>
+}
+
+@* 侧栏自定义弹窗：勾选要显示哪些模块（隐藏只是「收起来」，权限不变） *@
+@if (Me.IsAuthenticated)
+{
+    var allNav = Me.AllNavItems();
+    var hiddenNow = Me.HiddenNavCodes;
+    <dialog class="app-modal nav-cust-modal" id="navCustomizeModal" aria-labelledby="navCustTitle">
+        <div class="modal-grip" aria-hidden="true"></div>
+        <header class="modal-head">
+            <h2 class="modal-title" id="navCustTitle">自定义侧栏</h2>
+            <button type="button" class="modal-close" aria-label="关闭"
+                    onclick="document.getElementById('navCustomizeModal').close()">@Html.Raw(Icons.Svg("x", 18))</button>
+        </header>
+        <div class="modal-body">
+            <p class="hint">勾选要显示在侧栏里的模块。取消勾选只是把它收起来，权限不受影响，直接输网址照样能打开。</p>
+            <form method="post" action="/Preferences?handler=Nav">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnUrl" value="@($"{Context.Request.Path}{Context.Request.QueryString}")" />
+                @foreach (var grp in allNav.GroupBy(n => n.Group))
+                {
+                    <div class="nav-cust-group">@grp.Key</div>
+                    <div class="nav-cust-grid">
+                        @foreach (var item in grp)
+                        {
+                            <label class="check-line">
+                                <input type="checkbox" name="visible" value="@item.Code" checked="@(!hiddenNow.Contains(item.Code))" />
+                                <span>@item.Label</span>
+                            </label>
+                        }
+                    </div>
+                }
+                <div class="form-actions">
+                    <button class="btn" type="submit">保存</button>
+                    <button class="btn secondary" type="button"
+                            onclick="document.getElementById('navCustomizeModal').close()">取消</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+}
+
+@* 弹出卡片编辑窗（modal.js 负责把 /New /Edit 表单装进来，免页面跳转） *@
+<dialog class="app-modal" id="appModal" aria-labelledby="appModalTitle">
+    <div class="modal-grip" aria-hidden="true"></div>
+    <header class="modal-head">
+        <h2 class="modal-title" id="appModalTitle"></h2>
+        <button type="button" class="modal-close" aria-label="关闭" onclick="document.getElementById('appModal').close()">@Html.Raw(Icons.Svg("x", 18))</button>
+    </header>
+    <div class="modal-body"></div>
+</dialog>
+
+@* 轻提示容器（lucianlabs 070 堆叠 Toast 动效） *@
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+<script src="~/js/theme.js" asp-append-version="true"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+<script src="~/js/modal.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

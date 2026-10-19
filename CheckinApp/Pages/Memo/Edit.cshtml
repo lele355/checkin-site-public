@@ -1,0 +1,41 @@
+@page "{id:int}"
+@model CheckinApp.Pages.Memo.EditModel
+@{
+    ViewData["Title"] = "编辑便签";
+}
+<div class="card" style="max-width:520px;margin:4vh auto 0;">
+    <h2>编辑便签</h2>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <input type="hidden" asp-for="Id" />
+        <div class="field">
+            <label>标题</label>
+            <input asp-for="Title" required autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>内容</label>
+            <textarea asp-for="Body" rows="6" autocomplete="off"></textarea>
+        </div>
+        <div class="field">
+            <label>
+                <input type="checkbox" class="switch" asp-for="Pinned" />
+                置顶（显示在工作台首页）
+            </label>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
+            <a class="btn secondary" href="/Memo">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+
+    <hr class="rule" />
+    <form method="post" asp-page-handler="Delete" onsubmit="return confirm('确认删除这张便签？此操作不可撤销。');" style="text-align:right;">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除此便签</button>
+    </form>
+</div>

@@ -1,0 +1,79 @@
+@page "{id:int}"
+@model CheckinApp.Pages.Courses.EditModel
+@{
+    ViewData["Title"] = "编辑课程";
+}
+<div class="card" style="max-width:520px;margin:4vh auto 0;">
+    <h2>编辑课程</h2>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <input type="hidden" asp-for="Id" />
+        <div class="field">
+            <label>课程名称</label>
+            <input asp-for="Name" required autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>老师</label>
+            <input asp-for="Teacher" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>地点</label>
+            <input asp-for="Location" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>星期</label>
+            <select asp-for="Weekday">
+                @for (var i = 1; i <= 7; i++)
+                {
+                    <option value="@i" selected="@(i == Model.Weekday ? "selected" : null)">周@("一二三四五六日"[i - 1])</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>开始节次</label>
+            <select asp-for="StartPeriod">
+                @for (var i = 1; i <= Model.PeriodCount; i++)
+                {
+                    <option value="@i" selected="@(i == Model.StartPeriod ? "selected" : null)">第 @i 节</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>结束节次</label>
+            <select asp-for="EndPeriod">
+                @for (var i = 1; i <= Model.PeriodCount; i++)
+                {
+                    <option value="@i" selected="@(i == Model.EndPeriod ? "selected" : null)">第 @i 节</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>上课周次</label>
+            <input asp-for="WeeksText" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>课程类别（决定卡片颜色）</label>
+            <select asp-for="Category">
+                <option value="required" selected="@(Model.Category == "required" ? "selected" : null)">必修课</option>
+                <option value="college" selected="@(Model.Category == "college" ? "selected" : null)">院级选修课</option>
+                <option value="school" selected="@(Model.Category == "school" ? "selected" : null)">校级选修课</option>
+                <option value="other" selected="@(Model.Category == "other" ? "selected" : null)">其它</option>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
+            <a class="btn secondary" href="/Courses">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+
+    <hr class="rule" />
+    <form method="post" asp-page-handler="Delete" onsubmit="return confirm('确认删除这门课？');" style="text-align:right;">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除此课程</button>
+    </form>
+</div>

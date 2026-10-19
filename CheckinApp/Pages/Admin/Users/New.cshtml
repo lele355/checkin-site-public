@@ -1,0 +1,47 @@
+@page
+@model CheckinApp.Pages.Admin.Users.NewModel
+@{
+    ViewData["Title"] = "新建用户";
+}
+<div class="card" style="max-width:480px;margin:4vh auto 0;">
+    <h2>新建用户</h2>
+    <p class="hint">建号后用户首登会被强制改密码，临时密码只是过渡。</p>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <div class="field">
+            <label>用户名</label>
+            <input asp-for="Username" required autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>显示名（留空则同用户名）</label>
+            <input asp-for="DisplayName" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>角色</label>
+            <select asp-for="RoleId">
+                @foreach (var r in Model.Roles)
+                {
+                    <option value="@r.Id">@r.Name@(r.IsBuiltin ? "（内置）" : "")</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>临时密码</label>
+            <input asp-for="Password" type="password" required autocomplete="new-password" />
+            <small class="hint" style="display:block;margin-top:4px;">至少 8 位，含字母与数字</small>
+        </div>
+        <label class="check-line">
+            <input asp-for="SeedSample" type="checkbox" />
+            <span>同时生成测试数据（每个模块 3 条，带「@CheckinApp.Services.SampleData.Mark」前缀，用户可一键清除）</span>
+        </label>
+        <div class="form-actions">
+            <button class="btn" type="submit">建号</button>
+            <a class="btn secondary" href="/Admin/Users">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+</div>

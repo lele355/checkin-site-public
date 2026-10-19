@@ -1,0 +1,27 @@
+@page "{id:int}"
+@model CheckinApp.Pages.Admin.Users.ResetModel
+@{
+    ViewData["Title"] = $"重置密码 · {Model.Username}";
+}
+<div class="card" style="max-width:480px;margin:4vh auto 0;">
+    <h2>重置密码</h2>
+    <p class="hint">为 <b>@Model.Username</b> 设置一个临时密码。该用户下次登录时会被强制改成自己的密码。</p>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <input type="hidden" asp-for="Id" />
+        <div class="field">
+            <label>新临时密码</label>
+            <input asp-for="Password" type="password" required autocomplete="new-password" />
+            <small class="hint" style="display:block;margin-top:4px;">至少 8 位，含字母与数字</small>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">重置</button>
+            <a class="btn secondary" href="/Admin/Users">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+</div>

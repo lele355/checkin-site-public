@@ -1,0 +1,132 @@
+@page
+@model CheckinApp.Pages.Admin.Invitations.IndexModel
+@{
+    ViewData["Title"] = "邀请码";
+}
+<div class="card">
+    <div class="page-head">
+        <h2>邀请码</h2>
+        <a class="btn secondary" href="/Admin/Users">@Html.Raw(Icons.Svg("users", 16)) 用户管理</a>
+    </div>
+    <p class="hint">
+        本站不做开放注册：新人必须拿到这里的邀请码，在注册页填对才能注册成功。
+        每个码只能用一次，到期自动作废，发错了可以撤销。
+    </p>
+
+    @if (TempData["Ok"] is string ok)
+    {
+        <div class="msg ok" style="margin-top:12px;">@ok</div>
+    }
+    @if (TempData["Err"] is string err)
+    {
+        <div class="msg error" style="margin-top:12px;">@err</div>
+    }
+    @if (Model.Error is string formErr)
+    {
+        <div class="msg error sticky" style="margin-top:12px;">@formErr</div>
+    }
+
+    @if (Model.NewCodes.Count > 0)
+    {
+        <div class="invite-new">
+            <strong>刚生成的邀请码（关掉就看不到了，先复制发给对方）</strong>
+            @foreach (var c in Model.NewCodes)
+            {
+                <div class="invite-line">
+                    <code>@c</code>
+                    <button class="btn secondary" type="button" data-copy="@c">复制</button>
+                </div>
+            }
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Create" class="invite-form">
+        <div class="field">
+            <label>数量</label>
+            <input asp-for="Count" type="number" min="1" max="10" required />
+        </div>
+        <div class="field">
+            <label>有效期（天）</label>
+            <input asp-for="Days" type="number" min="1" max="90" required />
+        </div>
+        <div class="field">
+            <label>角色</label>
+            <select asp-for="RoleId">
+                @foreach (var r in Model.Roles)
+                {
+                    <option value="@r.Id">@r.Name@(r.IsBuiltin ? "（内置）" : "")</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>备注（发给谁，仅管理员可见）</label>
+            <input asp-for="Note" autocomplete="off" placeholder="例如：小林" />
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("plus", 16)) 生成邀请码</button>
+        </div>
+    </form>
+</div>
+
+<div class="card scroll-x" style="padding:0;">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>邀请码</th>
+                <th>角色</th>
+                <th>备注</th>
+                <th>状态</th>
+                <th>有效期至</th>
+                <th>使用人</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (Model.Rows.Count == 0)
+        {
+            <tr><td colspan="7" class="meta">还没有邀请码，上面生成一个吧。</td></tr>
+        }
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td><code style="letter-spacing:1px;">@r.Code</code></td>
+                <td><span class="chip">@r.RoleName</span></td>
+                <td>@r.Note</td>
+                <td style="color:@(r.StatusTone == "ok" ? "var(--ok)" : r.StatusTone == "warn" ? "var(--warn)" : "var(--text-weak)");">@r.Status</td>
+                <td class="meta">@r.ExpiresAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                <td>@r.UsedBy</td>
+                <td style="white-space:nowrap;">
+                    @if (r.Status == "可用")
+                    {
+                        <button class="btn secondary" type="button" data-copy="@r.Code" style="padding:4px 10px;font-size:12px;">复制邀请码</button>
+                        <form method="post" asp-page-handler="Revoke" asp-route-id="@r.Id" style="display:inline;"
+                              onsubmit="return confirm('撤销后这个码就不能用了，确定吗？');">
+                            <button class="btn secondary" type="submit" style="padding:4px 10px;font-size:12px;">撤销</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<script>
+(function () {
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-copy]');
+        if (!btn) return;
+        var text = btn.getAttribute('data-copy');
+        var done = function () {
+            var old = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(function () { btn.textContent = old; }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, function () { window.prompt('手动复制：', text); });
+        } else {
+            window.prompt('手动复制：', text);
+        }
+    });
+})();
+</script>

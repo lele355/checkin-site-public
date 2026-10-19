@@ -1,0 +1,55 @@
+@page
+@model CheckinApp.Pages.Admin.Roles.IndexModel
+@{
+    ViewData["Title"] = "角色管理";
+}
+<div class="card">
+    <div class="page-head">
+        <h2>角色管理</h2>
+        <a class="btn" href="/Admin/Roles/New">@Html.Raw(Icons.Svg("plus", 16)) 新建角色</a>
+    </div>
+    @if (TempData["Ok"] is string ok)
+    {
+        <div class="msg ok" style="margin-top:12px;">@ok</div>
+    }
+    @if (TempData["Err"] is string err)
+    {
+        <div class="msg error" style="margin-top:12px;">@err</div>
+    }
+    <p class="hint" style="margin-top:10px;">角色决定一组权限。改完即时生效，不用让用户重新登录。</p>
+</div>
+
+<div class="card scroll-x" style="padding:0;">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>角色</th>
+                <th>说明</th>
+                <th>权限数</th>
+                <th>用户数</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Roles)
+        {
+            <tr>
+                <td style="font-weight:600;">@r.Name@(r.IsBuiltin ? " <span class=\"chip\">内置</span>" : "")</td>
+                <td class="meta">@r.Description</td>
+                <td>@r.PermCount</td>
+                <td>@r.UserCount</td>
+                <td style="white-space:nowrap;">
+                    <a href="/Admin/Roles/Edit/@r.Id" style="margin-right:8px;">编辑权限</a>
+                    @if (!r.IsBuiltin)
+                    {
+                        <form method="post" asp-page-handler="Delete" style="display:inline;" onsubmit="return confirm('确认删除角色「@r.Name」？');">
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <button type="submit" style="background:none;border:none;color:var(--danger);cursor:pointer;font:inherit;font-size:.9rem;">删除</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

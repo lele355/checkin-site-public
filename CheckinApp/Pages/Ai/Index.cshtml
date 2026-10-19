@@ -1,0 +1,192 @@
+@page
+@model CheckinApp.Pages.Ai.IndexModel
+@{
+    ViewData["Title"] = "AI 助手";
+}
+
+<div class="card">
+    <div class="page-head">
+        <h2>AI 助手</h2>
+        <form method="post" asp-page-handler="Clear" onsubmit="return confirm('清空全部对话历史？此操作不可撤销。');">
+            <button class="btn secondary" type="submit">清空历史</button>
+        </form>
+    </div>
+    <p class="hint" style="margin-top:8px;">
+        可以问问题，也可以直接说「明天下午三点开会」「记一笔午饭 15 元」——
+        AI 会给出建议单，<strong>你点了确认才会真正写入</strong>。
+    </p>
+    <p class="hint" style="margin-top:4px;">
+        今日已用 <strong>@Model.TodayTokens.ToString("N0")</strong> / @Model.TokenLimit.ToString("N0") tokens
+    </p>
+</div>
+
+@if (Model.Notice is string notice)
+{
+    <div class="msg @(Model.NoticeIsError ? "error" : "ok")">@notice</div>
+}
+
+@if (Model.History.Count == 0)
+{
+    <div class="card"><div class="empty"><span class="big">✨</span>和 AI 助手打个招呼吧，比如「今天有什么安排？」</div></div>
+}
+
+<div class="ai-chat">
+    @foreach (var item in Model.History)
+    {
+        var m = item.Msg;
+        <div class="ai-row @(m.Role == "user" ? "me" : "")">
+            <div class="ai-bubble">
+                @if (!string.IsNullOrWhiteSpace(m.ImageMime))
+                {
+                    <a class="ai-shot" href="/Ai?handler=Image&id=@m.Id" target="_blank" rel="noopener">
+                        <img src="/Ai?handler=Image&id=@m.Id" alt="随消息图片" loading="lazy" />
+                    </a>
+                }
+                @if (!string.IsNullOrWhiteSpace(m.Content))
+                {
+                    <div style="white-space:pre-wrap;">@m.Content</div>
+                }
+
+                @if (item.Cards.Count > 0)
+                {
+                    <div class="ai-suggest">
+                        <div class="ai-suggest-title">建议单（确认后才会写入）</div>
+                        @foreach (var c in item.Cards)
+                        {
+                            <div class="ai-act">
+                                <div class="ai-act-body">
+                                    <span class="chip">@c.Label</span>
+                                    <span class="ai-act-sum">@c.Summary</span>
+                                </div>
+                                <div class="ai-act-btns">
+                                    <form method="post" asp-page-handler="Execute">
+                                        <input type="hidden" name="msgId" value="@m.Id" />
+                                        <input type="hidden" name="actIndex" value="@c.Index" />
+                                        <button class="btn" type="submit" style="padding:6px 14px;font-size:.85rem;">确认执行</button>
+                                    </form>
+                                    <form method="post" asp-page-handler="Dismiss">
+                                        <input type="hidden" name="msgId" value="@m.Id" />
+                                        <button class="btn secondary" type="submit" style="padding:6px 14px;font-size:.85rem;">忽略</button>
+                                    </form>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="mini" style="margin-top:6px;">@m.CreatedAt.ToLocalTime().ToString("MM-dd HH:mm")</div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="card ai-input-card">
+    <form method="post" asp-page-handler="Send" id="aiForm">
+        @* 待发送图片预览（选图后由前端压缩成 data URL 塞进隐藏字段） *@
+        <div class="ai-preview" id="aiPreview" hidden>
+            <img id="aiPreviewImg" alt="待发送图片" />
+            <button type="button" class="ai-preview-del" id="aiPreviewDel" aria-label="移除图片">✕</button>
+        </div>
+        <div class="ai-input-row">
+            <button type="button" class="ai-attach" id="aiAttach" aria-label="添加图片" title="添加图片">@Html.Raw(Icons.Svg("paperclip", 18))</button>
+            <input type="file" id="aiFile" accept="image/*" hidden />
+            <input type="hidden" name="image" id="aiImageData" />
+            <textarea name="text" rows="2" maxlength="2000" placeholder="问点什么，或让我帮你记日程/备忘/账…"></textarea>
+            <button class="btn" type="submit" id="aiSend">发送</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        // 新消息滚进视野
+        var chat = document.querySelector('.ai-chat');
+        if (chat && document.querySelectorAll('.ai-row').length > 0) {
+            var rows = document.querySelectorAll('.ai-row');
+            rows[rows.length - 1].scrollIntoView({ block: 'nearest' });
+        }
+
+        var form = document.getElementById('aiForm');
+        if (!form) return;
+        var btn = document.getElementById('aiSend');
+        var ta = form.querySelector('textarea');
+
+        // ---------- 图片：选图 → 压缩 → 预览（只随这一轮发送） ----------
+        var fileInput = document.getElementById('aiFile');
+        var attach = document.getElementById('aiAttach');
+        var imgData = document.getElementById('aiImageData');
+        var preview = document.getElementById('aiPreview');
+        var previewImg = document.getElementById('aiPreviewImg');
+        var previewDel = document.getElementById('aiPreviewDel');
+
+        // 最长边压到 1600px、JPEG 0.82：手机原图 3-5MB → 约 100-400KB（官方上限 5MB 有余量）
+        function compress(file) {
+            return new Promise(function (resolve, reject) {
+                var url = URL.createObjectURL(file);
+                var img = new Image();
+                img.onload = function () {
+                    URL.revokeObjectURL(url);
+                    var max = 1600;
+                    var w = img.naturalWidth || img.width;
+                    var h = img.naturalHeight || img.height;
+                    var scale = Math.min(1, max / Math.max(w, h));
+                    var cw = Math.max(1, Math.round(w * scale));
+                    var ch = Math.max(1, Math.round(h * scale));
+                    var cv = document.createElement('canvas');
+                    cv.width = cw; cv.height = ch;
+                    var ctx = cv.getContext('2d');
+                    ctx.fillStyle = '#fff';                  // PNG 透明底转 JPEG 补白
+                    ctx.fillRect(0, 0, cw, ch);
+                    ctx.drawImage(img, 0, 0, cw, ch);
+                    resolve(cv.toDataURL('image/jpeg', 0.82));
+                };
+                img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('decode')); };
+                img.src = url;
+            });
+        }
+
+        if (attach && fileInput) {
+            attach.addEventListener('click', function () { fileInput.click(); });
+            fileInput.addEventListener('change', function () {
+                var f = fileInput.files && fileInput.files[0];
+                fileInput.value = '';                        // 允许重复选同一张
+                if (!f || !/^image\//.test(f.type)) return;
+                compress(f).then(function (dataUrl) {
+                    imgData.value = dataUrl;
+                    previewImg.src = dataUrl;
+                    preview.hidden = false;
+                }).catch(function () {
+                    alert('这张图片读不出来，换一张试试。');
+                });
+            });
+        }
+        if (previewDel) {
+            previewDel.addEventListener('click', function () {
+                imgData.value = '';
+                previewImg.removeAttribute('src');
+                preview.hidden = true;
+            });
+        }
+
+        // ---------- 发送：防连点 + 纯图也能发 ----------
+        form.addEventListener('submit', function (e) {
+            if (!ta.value.trim() && !imgData.value) {
+                e.preventDefault();
+                ta.focus();
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = '思考中…';
+        });
+
+        // Ctrl+Enter 发送（手机上直接点按钮）
+        ta.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                form.requestSubmit();
+            }
+        });
+    })();
+</script>
+}

@@ -1,0 +1,154 @@
+@page
+@model CheckinApp.Pages.Reminders.IndexModel
+@{
+    ViewData["Title"] = "提醒";
+}
+@if (TempData["Ok"] is string ok)
+{
+    <div class="msg ok">@ok</div>
+}
+@if (TempData["Err"] is string err)
+{
+    <div class="msg error">@err</div>
+}
+
+<div class="card">
+    <div class="page-head">
+        <h2>提醒中心</h2>
+    </div>
+    <p class="hint" style="margin-top:6px;">近 3 天的日程、7 天内的纪念日、今日打卡进度、经期预测，都汇总在这里。</p>
+
+    @if (Model.TodayHabitTotal > 0)
+    {
+        <div style="margin-top:12px;">
+            <div class="mini">今日习惯打卡</div>
+            <div class="bar-track" style="margin-top:4px;">
+                <div class="bar-fill" style="width:@(Model.TodayHabitTotal == 0 ? 0 : Model.TodayHabitDone * 100 / Model.TodayHabitTotal)%;"></div>
+            </div>
+            <div class="mini" style="margin-top:4px;">@Model.TodayHabitDone / @Model.TodayHabitTotal 已完成</div>
+        </div>
+    }
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="card"><div class="empty"><span class="big">✨</span>近期没有需要提醒的事，安心忙别的吧。</div></div>
+}
+else
+{
+    <div class="card">
+        <div class="stack">
+            @foreach (var r in Model.Items)
+            {
+                <div class="row-item" style="display:flex;align-items:center;gap:12px;">
+                    <span class="chip" style="flex-shrink:0;">@r.Kind</span>
+                    <div style="flex:1;min-width:0;font-weight:600;">@r.Title</div>
+                    <div class="mini" style="flex-shrink:0;">@r.When</div>
+                    <a class="mini" href="@r.Url">去看看</a>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@* ---------- 每日邮件提醒（可选） ---------- *@
+@if (Model.CanMail)
+{
+    <section class="card" id="mailReminder">
+        <div class="page-head">
+            <h2>每日邮件提醒</h2>
+            <span class="chip">@(Model.MailSetting?.Enabled == true ? "已开启" : "未开启")</span>
+        </div>
+        <p class="hint" style="margin-top:6px;">
+            每天到点把上面这份清单（再加置顶备忘）发到你的邮箱，不用自己想着来看。
+            发信走你已绑定的邮箱账号，只借用它的 SMTP 授权码，不额外存密码。
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(Model.MailLastError))
+        {
+            <div class="msg error">上次发送失败：@Model.MailLastError</div>
+        }
+        else if (Model.MailLastSent is DateTime lastSent)
+        {
+            <p class="mini">上次成功发送：@lastSent.ToString("M月d日")</p>
+        }
+
+        @if (Model.MailAccounts.Count == 0)
+        {
+            <div class="empty">
+                <span class="big">✉️</span>
+                还没有绑定邮箱账号 —— 发信需要它的 SMTP 授权码。<br />
+                <a class="btn secondary" asp-page="/Email/New" style="margin-top:14px;display:inline-flex;">去绑定邮箱</a>
+            </div>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="Mail">
+                <label class="check-line">
+                    <input asp-for="MailEnabled" type="checkbox" />
+                    <span>开启每日邮件提醒</span>
+                </label>
+
+                <div class="field-row" style="margin-top:14px;">
+                    <div class="field">
+                        <label asp-for="MailHour">发送时间</label>
+                        <select asp-for="MailHour">
+                            @for (var h = 0; h < 24; h++)
+                            {
+                                <option value="@h" selected="@(Model.MailHour == h)">@($"{h:00}:00")</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label asp-for="MailAccountId">用哪个邮箱发</label>
+                        <select asp-for="MailAccountId">
+                            @foreach (var a in Model.MailAccounts)
+                            {
+                                <option value="@a.Id">@a.DisplayName（@a.Address）</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label asp-for="MailToAddress">收件邮箱（留空 = 发到发信邮箱自己）</label>
+                    <input asp-for="MailToAddress" placeholder="you@example.com" autocomplete="off" />
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn" type="submit">保存设置</button>
+                    <button class="btn secondary" type="submit" formaction="?handler=SendTest">发送测试邮件</button>
+                    <button class="btn secondary" type="button" id="mailPreviewBtn">预览这封邮件</button>
+                </div>
+            </form>
+
+            <pre id="mailPreview" class="mail-preview" hidden></pre>
+        }
+    </section>
+}
+
+@section Scripts {
+    <script>
+        // 预览这封邮件：拉服务端生成的纯文本版，直接摊在页面里（不弹窗、不刷新）
+        (function () {
+            var btn = document.getElementById('mailPreviewBtn');
+            var box = document.getElementById('mailPreview');
+            if (!btn || !box) return;
+            btn.addEventListener('click', function () {
+                btn.disabled = true;
+                fetch('/Reminders?handler=Preview', { headers: { 'X-Requested-With': 'fetch' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        box.hidden = false;
+                        box.textContent = '主题：' + d.subject + '\n\n' + d.text;
+                        if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
+                        btn.disabled = false;
+                    })
+                    .catch(function () {
+                        btn.disabled = false;
+                        if (window.toast) window.toast('预览失败，请重试', 'err');
+                    });
+            });
+        })();
+    </script>
+}

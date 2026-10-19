@@ -1,0 +1,45 @@
+@page "{id:int}"
+@model CheckinApp.Pages.Admin.Users.EditModel
+@{
+    ViewData["Title"] = $"编辑 · {Model.Username}";
+}
+<div class="card" style="max-width:480px;margin:4vh auto 0;">
+    <h2>编辑用户</h2>
+    <p class="hint">用户名：<b>@Model.Username</b>@(Model.IsSelf ? "（你自己）" : "")</p>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <input type="hidden" asp-for="Id" />
+        <div class="field">
+            <label>显示名</label>
+            <input asp-for="DisplayName" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>角色@(Model.IsSelf ? "（自己不可改）" : "")</label>
+            <select asp-for="RoleId" disabled="@Model.IsSelf">
+                @foreach (var r in Model.Roles)
+                {
+                    <option value="@r.Id" selected="@(r.Id == Model.RoleId)">@r.Name@(r.IsBuiltin ? "（内置）" : "")</option>
+                }
+            </select>
+            @if (Model.IsSelf)
+            {
+                <input type="hidden" name="RoleId" value="@Model.RoleId" />
+            }
+        </div>
+        <div class="field">
+            <label>
+                <input type="checkbox" class="switch" asp-for="IsActive" />
+                启用账号@(Model.IsSelf ? "（自己不可停用）" : "")
+            </label>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
+            <a class="btn secondary" href="/Admin/Users">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+</div>

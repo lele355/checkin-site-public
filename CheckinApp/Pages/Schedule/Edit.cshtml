@@ -1,0 +1,49 @@
+@page "{id:int}"
+@model CheckinApp.Pages.Schedule.EditModel
+@{
+    ViewData["Title"] = "编辑日程";
+}
+<div class="card" style="max-width:520px;margin:4vh auto 0;">
+    <h2>编辑日程</h2>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <input type="hidden" asp-for="Id" />
+        <div class="field">
+            <label>标题</label>
+            <input asp-for="Title" required autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>
+                <input type="checkbox" class="switch" asp-for="AllDay" />
+                全天事件
+            </label>
+        </div>
+        <div class="field">
+            <label>开始时间</label>
+            <input asp-for="StartAt" type="datetime-local" required />
+        </div>
+        <div class="field">
+            <label>结束时间（可选）</label>
+            <input asp-for="EndAt" type="datetime-local" />
+        </div>
+        <div class="field">
+            <label>备注</label>
+            <textarea asp-for="Description" rows="3" autocomplete="off"></textarea>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
+            <a class="btn secondary" href="/Schedule">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+
+    <hr class="rule" />
+    <form method="post" asp-page-handler="Delete" onsubmit="return confirm('确认删除这条日程？此操作不可撤销。');" style="text-align:right;">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除此日程</button>
+    </form>
+</div>

@@ -1,0 +1,37 @@
+@page "{id:int}"
+@model CheckinApp.Pages.Habits.EditModel
+@{
+    ViewData["Title"] = "编辑习惯";
+}
+<div class="card" style="max-width:520px;margin:4vh auto 0;">
+    <h2>编辑习惯</h2>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <input type="hidden" asp-for="Id" />
+        <div class="field-row">
+            <div class="field">
+                <label>习惯名称</label>
+                <input asp-for="Name" required autocomplete="off" />
+            </div>
+            <div class="field">
+                <label>图标（一个 emoji）</label>
+                <input asp-for="Icon" autocomplete="off" maxlength="4" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
+            <a class="btn secondary" href="/Habits">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+
+    <hr class="rule" />
+    <form method="post" asp-page-handler="Delete" onsubmit="return confirm('确认删除这个习惯？历史打卡记录会一并删除。');" style="text-align:right;">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除此习惯</button>
+    </form>
+</div>

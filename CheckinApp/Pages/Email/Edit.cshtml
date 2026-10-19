@@ -1,0 +1,84 @@
+@page "{id:int}"
+@model CheckinApp.Pages.Email.EditModel
+@{
+    ViewData["Title"] = "编辑邮箱";
+}
+<div class="card" style="max-width:520px;margin:4vh auto 0;">
+    <h2>编辑邮箱账号</h2>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <div class="field">
+            <label>显示名称</label>
+            <input asp-for="DisplayName" required autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>邮箱地址</label>
+            <input asp-for="Address" required type="email" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>平台</label>
+            <select asp-for="Provider" id="providerSel">
+                @foreach (var p in Model.Presets)
+                {
+                    <option value="@p.Key" data-imap="@p.ImapHost" data-iport="@p.ImapPort" data-smtp="@p.SmtpHost" data-sport="@p.SmtpPort">@p.Label</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>授权码</label>
+            <input asp-for="AuthCode" type="password" autocomplete="off"
+                   placeholder="@(Model.HasAuthCode ? "已保存授权码，留空 = 不修改" : "还没填授权码，请补上")" />
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label>IMAP 服务器（收信）</label>
+                <input asp-for="ImapHost" id="imapHost" autocomplete="off" />
+            </div>
+            <div class="field">
+                <label>IMAP 端口</label>
+                <input asp-for="ImapPort" id="imapPort" type="number" />
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label>SMTP 服务器（发信，第二期用）</label>
+                <input asp-for="SmtpHost" id="smtpHost" autocomplete="off" />
+            </div>
+            <div class="field">
+                <label>SMTP 端口</label>
+                <input asp-for="SmtpPort" id="smtpPort" type="number" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
+            <a class="btn secondary" href="/Email/Accounts">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+
+    <hr class="rule" />
+    <form method="post" asp-page-handler="Delete" onsubmit="return confirm('确认删除这个邮箱？缓存的邮件也会一起删除，此操作不可撤销。');" style="text-align:right;">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除此账号</button>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        var sel = document.getElementById('providerSel');
+        if (!sel) return;
+        sel.addEventListener('change', function () {
+            var o = sel.options[sel.selectedIndex];
+            document.getElementById('imapHost').value = o.dataset.imap || '';
+            document.getElementById('imapPort').value = o.dataset.iport || '993';
+            document.getElementById('smtpHost').value = o.dataset.smtp || '';
+            document.getElementById('smtpPort').value = o.dataset.sport || '465';
+        });
+    })();
+</script>
+}

@@ -1,0 +1,95 @@
+@page "/Login"
+@model CheckinApp.Pages.LoginModel
+@{
+    ViewData["Title"] = "登录";
+}
+<div class="login-wrap">
+    <div class="card" style="max-width:400px;margin:8vh auto 0;">
+        <h2 style="display:flex;align-items:center;gap:9px;">
+            <img src="~/icons/icon-192.png" alt="" width="30" height="30" asp-append-version="true" style="border-radius:9px;display:block;" />
+            日常管理
+        </h2>
+        <p class="hint" style="margin-bottom:18px;">自用小站，账号由管理员开通，或凭邀请码自助注册。</p>
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="msg error sticky">@Model.Error</div>
+        }
+
+        <form method="post" id="loginForm">
+            <div class="field">
+                <label asp-for="Username">账号</label>
+                <input asp-for="Username" autocomplete="username" autofocus required />
+            </div>
+            <div class="field">
+                <label asp-for="Password">密码</label>
+                <input asp-for="Password" type="password" autocomplete="current-password" required />
+            </div>
+            <div class="remember-me" role="radiogroup" aria-label="密码保存方式">
+                <span class="rm-title">记住密码</span>
+                <label><input type="radio" name="RememberMode" value="autologin" />自动进入（下次跳过登录页）</label>
+                <label><input type="radio" name="RememberMode" value="prefill" />仅填充密码（下次仍到登录页）</label>
+                <label><input type="radio" name="RememberMode" value="none" checked />不保存</label>
+            </div>
+            <button class="btn" type="submit" style="width:100%;">登 录</button>
+        </form>
+
+        <p class="hint" style="margin:14px 0 0;">
+            有邀请码？<a href="/Register">自助注册</a>
+        </p>
+    </div>
+</div>
+
+<script>
+(function () {
+    // 密码保存方式（登录页三选一）：
+    //   autologin = 填充 + 30 天持久登录（服务端 cookie，跳过登录页）
+    //   prefill  = 仅填充密码（会话级登录，下次仍到登录页）
+    //   none     = 不保存（并清掉旧存档）
+    // 本机预填存 base64 混淆，防肩窥非加密；自用小站可接受。
+    var KEY = 'checkin_remember';          // { u, p(base64) }
+    var MODE_KEY = 'checkin_remember_mode';
+
+    function currentMode() {
+        var checked = document.querySelector('input[name="RememberMode"]:checked');
+        return checked ? checked.value : 'none';
+    }
+
+    try {
+        var mode = localStorage.getItem(MODE_KEY);
+        if (mode !== 'autologin' && mode !== 'prefill' && mode !== 'none') {
+            // 没记过偏好：有旧存档（旧版勾选=自动进入）就延续自动进入，否则不保存
+            var legacy = JSON.parse(localStorage.getItem(KEY) || 'null');
+            mode = (legacy && legacy.u) ? 'autologin' : 'none';
+        }
+        var radios = document.querySelectorAll('input[name="RememberMode"]');
+        for (var i = 0; i < radios.length; i++) radios[i].checked = (radios[i].value === mode);
+    } catch (e) { }
+
+    try {
+        var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+        if (saved && saved.u) {
+            var u = document.getElementById('Username');
+            var p = document.getElementById('Password');
+            if (u) u.value = saved.u;
+            if (p && saved.p) p.value = atob(saved.p);
+            if (u && !u.value && p) p.value = '';
+        }
+    } catch (e) { /* 忽略损坏的本地数据 */ }
+
+    document.getElementById('loginForm').addEventListener('submit', function () {
+        var m = currentMode();
+        try {
+            localStorage.setItem(MODE_KEY, m);
+            if (m === 'autologin' || m === 'prefill') {
+                localStorage.setItem(KEY, JSON.stringify({
+                    u: document.getElementById('Username').value,
+                    p: btoa(document.getElementById('Password').value)
+                }));
+            } else {
+                localStorage.removeItem(KEY);
+            }
+        } catch (e) { /* 隐私模式下 localStorage 可能不可写 */ }
+    });
+})();
+</script>

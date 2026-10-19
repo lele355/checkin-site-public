@@ -1,0 +1,171 @@
+@page
+@model CheckinApp.Pages.Courses.IndexModel
+@using CheckinApp.Services
+@{
+    ViewData["Title"] = "课程表";
+    var dayNames = new[] { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
+}
+
+<div class="card">
+    <div class="page-head">
+        <h2>课程表</h2>
+        <a class="btn" href="/Courses/New">@Html.Raw(Icons.Svg("plus", 16)) 添加课程</a>
+    </div>
+
+    @* ---- 周次导航：上一周 / 第N周 / 下一周 / 本周 ---- *@
+    <div class="tt-nav">
+        <a class="btn secondary" href="/Courses?week=@(Model.Week - 1)">‹ 上一周</a>
+        <div class="tt-week">
+            <strong>第 @Model.Week 周</strong>
+            <span class="mini">@Model.WeekStart.ToString("MM-dd") ～ @Model.WeekStart.AddDays(6).ToString("MM-dd")</span>
+        </div>
+        <a class="btn secondary" href="/Courses?week=@(Model.Week + 1)">下一周 ›</a>
+        @if (Model.Week != Model.CurrentWeek)
+        {
+            <a class="btn secondary" href="/Courses">回到本周（第 @Model.CurrentWeek 周）</a>
+        }
+    </div>
+
+    @* ---- 学期起始 + 节次时间设置 ---- *@
+    <form method="post" asp-page-handler="SemesterStart" class="tt-semester">
+        <label class="mini" for="SemesterStartInput">学期起始（第 1 周的周一）</label>
+        <input type="date" asp-for="SemesterStartInput" style="height:36px;" />
+        <button class="btn secondary" type="submit">保存</button>
+        <a class="btn secondary" href="/Courses/Periods">@Html.Raw(Icons.Svg("settings-2", 16)) 节次时间</a>
+        @if (!Model.SemesterConfigured)
+        {
+            <span class="hint">未设置过，默认把本周当第 1 周算</span>
+        }
+    </form>
+</div>
+
+<div class="card">
+    @* ---- 图例：颜色 = 课程类别 ---- *@
+    <div class="tt-legend">
+        @foreach (var (slug, label) in IndexModel.Categories)
+        {
+            <span class="tt-legend-item cat-@slug"><i></i>@label</span>
+        }
+    </div>
+
+    @* ---- 桌面：教务式大节×星期 表格 ---- *@
+    <div class="tt-wrap scroll-x">
+        <table class="tt">
+            <thead>
+                <tr>
+                    <th class="tt-time">节次</th>
+                    @for (var d = 0; d < IndexModel.DayCount; d++)
+                    {
+                        var date = Model.WeekStart.AddDays(d);
+                        var isToday = date == Model.Today;
+                        <th class="@(isToday ? "today" : "")">
+                            @dayNames[d]
+                            <div class="mini">@date.ToString("MM-dd")</div>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (var b = 0; b < Model.BlockCount; b++)
+                {
+                    <tr>
+                        <th class="tt-time">
+                            <div class="tt-block">@Model.Blocks[b].Label</div>
+                            <div class="mini">(@Model.Blocks[b].Sub)</div>
+                            <div class="mini tt-hours">🕐 @Model.Blocks[b].Hours</div>
+                        </th>
+                        @for (var d = 0; d < IndexModel.DayCount; d++)
+                        {
+                            var date = Model.WeekStart.AddDays(d);
+                            var isToday = date == Model.Today;
+                            <td class="@(isToday ? "today" : "")">
+                                @foreach (var c in Model.Cells[b][d])
+                                {
+                                    <a class="course-card cat-@c.Category" href="/Courses/Edit/@c.Id">
+                                        <div class="cc-name">@c.Name</div>
+                                        <div class="cc-meta">周次:@Weeks.Display(c.WeeksText)</div>
+                                        @if (!string.IsNullOrWhiteSpace(c.Location))
+                                        {
+                                            <div class="cc-meta">地点:@c.Location</div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(c.Teacher))
+                                        {
+                                            <div class="cc-meta">老师:@c.Teacher</div>
+                                        }
+                                    </a>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @* ---- 手机：课程格子式网格（左侧节次+时间、卡片跨节、撞课并排） ---- *@
+    <div class="ttm">
+      <div class="ttm-scroll">
+        <div class="ttm-head">
+            <div class="ttm-corner">节次</div>
+            @for (var d = 0; d < IndexModel.DayCount; d++)
+            {
+                var date = Model.WeekStart.AddDays(d);
+                var isToday = date == Model.Today;
+                <div class="ttm-dhead @(isToday ? "today" : "")">
+                    <b>@dayNames[d]</b>
+                    <span>@date.ToString("MM-dd")</span>
+                </div>
+            }
+        </div>
+        <div class="ttm-body">
+            <div class="ttm-gutter">
+                @for (var p = 0; p < Model.Periods.Count; p++)
+                {
+                    <div class="ttm-gcell">
+                        <b>@(p + 1)</b>
+                        <span>@Model.Periods[p].Start</span>
+                        <span>@Model.Periods[p].End</span>
+                    </div>
+                }
+            </div>
+            @for (var d = 0; d < IndexModel.DayCount; d++)
+            {
+                var date = Model.WeekStart.AddDays(d);
+                var isToday = date == Model.Today;
+                <div class="ttm-day @(isToday ? "today" : "")">
+                    @foreach (var g in Model.DayGrid[d])
+                    {
+                        <a class="ttm-card cat-@g.Category"
+                           style="top:calc(var(--ttm-row) * @g.Row + 2px);height:calc(var(--ttm-row) * @g.Span - 4px);left:@(g.Lane * 100.0 / g.Lanes)%;width:@(100.0 / g.Lanes)%"
+                           href="/Courses/Edit/@g.Id" title="@g.Name">
+                            <b>@g.Name</b>
+                            @if (!string.IsNullOrWhiteSpace(g.Location))
+                            {
+                                <span>@g.Location</span>
+                            }
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+      </div>
+      <div class="ttm-swipe-hint">← 左右滑动看完整一周 →</div>
+    </div>
+
+    @if (Model.Cells.SelectMany(r => r).All(cell => cell.Count == 0))
+    {
+        <div class="hint" style="margin-top:10px;">
+            @if (Model.Week == Model.CurrentWeek)
+            {
+                <text>本周没有课。可能是周次范围没覆盖第 @Model.Week 周，或还没添加课程。</text>
+            }
+            else
+            {
+                <text>第 @Model.Week 周没有课。</text>
+            }
+        </div>
+    }
+</div>
+
+@* ---- 手机右下浮动添加（参考课程格子 APP） ---- *@
+<a class="ttm-fab" href="/Courses/New" aria-label="添加课程">@Html.Raw(Icons.Svg("plus", 22))</a>

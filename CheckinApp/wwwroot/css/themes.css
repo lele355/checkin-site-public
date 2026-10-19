@@ -1,0 +1,393 @@
+/* ============================================================
+   各主题的「形态与交互」覆写
+   颜色/字体/圆角由 tokens.css 变量决定，这里只管：
+   元素长什么样（底线式输入框？凹陷？胶囊？）+ 怎么动（下划线？弹簧？）
+
+   说明：本文件允许出现少量主题专属的具体视觉参数
+   （新拟物的双光源阴影色、粘土的渐变端点、macOS 的半透白等），
+   它们无法抽象成跨主题令牌，是该主题风格本身的规定值。
+   ============================================================ */
+
+/* =========================================================
+   1. 编辑杂志风 editorial
+   纯单色 · 直角 · 无阴影 · 底线输入框 · hover 下划线动画
+   铁律：文字本体不位移，反馈只用「细线延展 + 字色加深」
+   ========================================================= */
+[data-theme="editorial"] .card { border-color: rgba(28, 28, 28, .10); }
+[data-theme="editorial"] .card:hover { border-color: rgba(28, 28, 28, .40); }
+
+/* 链接：下划线从右向左延展（:not(.btn) 排除按钮，否则黑底黑字看不清） */
+[data-theme="editorial"] .card a:not(.btn),
+[data-theme="editorial"] .content p a:not(.btn) {
+  position: relative; color: #1C1C1C;
+}
+[data-theme="editorial"] .card a:not(.btn)::after,
+[data-theme="editorial"] .content p a:not(.btn)::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 1px; background: currentColor;
+  transform: scaleX(0); transform-origin: right center;
+  transition: transform .5s cubic-bezier(.22, .61, .36, 1);
+}
+[data-theme="editorial"] .card a:not(.btn):hover::after,
+[data-theme="editorial"] .content p a:not(.btn):hover::after {
+  transform: scaleX(1); transform-origin: left center;
+}
+
+/* 标题 hover 变斜体（group-hover:italic 的站内等价物） */
+[data-theme="editorial"] .card h2 { transition: font-style .5s ease; }
+[data-theme="editorial"] .card:hover h2 { font-style: italic; }
+
+/* 底线式输入框：去掉边框，只留底线 */
+[data-theme="editorial"] .field input,
+[data-theme="editorial"] .field select,
+[data-theme="editorial"] .field textarea {
+  border: none; border-bottom: 1px solid rgba(28, 28, 28, .20);
+  border-radius: 0; background: transparent;
+  padding-left: 0; padding-right: 0;
+}
+[data-theme="editorial"] .field input:focus,
+[data-theme="editorial"] .field select:focus,
+[data-theme="editorial"] .field textarea:focus {
+  border-bottom: 1px solid #1C1C1C;
+}
+[data-theme="editorial"] .field:focus-within label { color: #1C1C1C; font-style: italic; }
+
+/* 按钮：前景/背景反转，hover 只降透明度 */
+[data-theme="editorial"] .btn { border-radius: 0; letter-spacing: .12em; }
+[data-theme="editorial"] .btn:hover { background: #1C1C1C; opacity: .9; }
+[data-theme="editorial"] .btn:active { transform: scale(.92); }   /* 统一按压语言：92% 缩放，松手弹簧回弹（文字本体仍不位移） */
+[data-theme="editorial"] .btn.secondary {
+  background: transparent; color: #1C1C1C;
+  border: 1px solid rgba(28, 28, 28, .20);
+}
+[data-theme="editorial"] .btn.secondary:hover { background: rgba(28, 28, 28, .02); opacity: 1; }
+
+[data-theme="editorial"] .chip { border-radius: 0; font-weight: 500; }
+[data-theme="editorial"] .user-chip .role { border-radius: 0; }
+
+/* 搜索框跟输入框同一形态：底线式 */
+[data-theme="editorial"] .filter-input {
+  border: none; border-bottom: 1px solid rgba(28, 28, 28, .20);
+  border-radius: 0; background: transparent; padding-left: 0; padding-right: 0;
+}
+[data-theme="editorial"] .filter-input:focus { border-bottom: 1px solid #1C1C1C; }
+
+/* =========================================================
+   2. 新拟物派 neumorphism
+   双光源阴影：左上亮 / 右下暗，光源方向锁死
+   hover 阴影缩小（手指靠近遮光），active 从凸起转凹陷（禁止位移）
+   ========================================================= */
+[data-theme="neumorphism"] .card {
+  border: none;
+  box-shadow: var(--shadow);
+}
+[data-theme="neumorphism"] .card:hover { box-shadow: var(--shadow-hover); }
+
+[data-theme="neumorphism"] .btn {
+  border: none;
+  box-shadow: 6px 6px 12px var(--neu-dark), -6px -6px 12px var(--neu-light);
+}
+[data-theme="neumorphism"] .btn:hover {
+  box-shadow: 4px 4px 8px var(--neu-dark), -4px -4px 8px var(--neu-light);
+  background: var(--accent);
+}
+[data-theme="neumorphism"] .btn:active {
+  transform: scale(.92);   /* 统一按压语言：92% 缩放；凹陷阴影保留 */
+  box-shadow: inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+}
+[data-theme="neumorphism"] .btn.secondary {
+  background: var(--card); color: var(--text); border: none;
+  box-shadow: 6px 6px 12px var(--neu-dark), -6px -6px 12px var(--neu-light);
+}
+[data-theme="neumorphism"] .btn.secondary:hover { background: var(--card); }
+
+[data-theme="neumorphism"] .field input,
+[data-theme="neumorphism"] .field select,
+[data-theme="neumorphism"] .field textarea {
+  border: none;
+  box-shadow: var(--shadow-inset);
+}
+/* focus 时内阴影变浅 = 输入通道打开（惰性收缩，非加压） */
+[data-theme="neumorphism"] .field input:focus,
+[data-theme="neumorphism"] .field select:focus,
+[data-theme="neumorphism"] .field textarea:focus {
+  box-shadow: var(--shadow-inset-sm);
+}
+
+[data-theme="neumorphism"] .nav-item.active {
+  background: var(--card); color: var(--accent);
+  box-shadow: var(--shadow-inset-sm);
+}
+[data-theme="neumorphism"] .theme-card { border: none; box-shadow: var(--shadow-inset-sm); }
+[data-theme="neumorphism"] .theme-card.active { box-shadow: var(--shadow-hover); }
+[data-theme="neumorphism"] .chip { box-shadow: var(--shadow-inset-sm); }
+/* --border 是透明的，表格/列表行需要一条极淡的分隔线才不糊成一片 */
+[data-theme="neumorphism"] .table td,
+[data-theme="neumorphism"] .row-item,
+[data-theme="neumorphism"] .list-line { border-color: rgba(107, 114, 128, .12); }
+[data-theme="neumorphism"] .filter-input {
+  border: none; box-shadow: var(--shadow-inset); background: var(--card-soft);
+}
+[data-theme="neumorphism"] .filter-input:focus { box-shadow: var(--shadow-inset-sm); }
+
+/* =========================================================
+   3. 自然有机风 natural
+   不规则圆角 · 胶囊按钮 · hover 轻微下沉（Soft Earth Press）
+   慢节奏 duration-500，像植物生长
+   ========================================================= */
+[data-theme="natural"] .card:hover { box-shadow: var(--shadow-hover); }
+
+[data-theme="natural"] .btn {
+  border-radius: 999px;
+  letter-spacing: .06em;
+}
+[data-theme="natural"] .btn:hover {
+  transform: translateY(2px);
+  background: var(--accent-strong);
+}
+[data-theme="natural"] .btn:active { transform: scale(.92); }
+[data-theme="natural"] .btn.secondary {
+  background: transparent; color: var(--accent);
+  border: 1px solid var(--border-strong);
+}
+[data-theme="natural"] .btn.secondary:hover { background: var(--card-soft); transform: translateY(2px); }
+
+[data-theme="natural"] .field input,
+[data-theme="natural"] .field select,
+[data-theme="natural"] .field textarea {
+  border-radius: 999px;
+  background: #ffffff;
+  padding-left: 18px; padding-right: 18px;
+}
+[data-theme="natural"] .field textarea { border-radius: 22px; }
+
+/* Verdant Tint：交互时文字向深绿过渡 */
+[data-theme="natural"] .nav-item:hover { color: var(--accent-2); }
+[data-theme="natural"] .nav-item.active { background: var(--accent-soft); color: var(--accent); }
+
+[data-theme="natural"] .icon-btn,
+[data-theme="natural"] .hamburger,
+[data-theme="natural"] .btn-ghost { border-radius: 999px; }
+
+[data-theme="natural"] .filter-input {
+  border-radius: 999px; background: #ffffff;
+  padding-left: 18px; padding-right: 18px;
+}
+
+/* =========================================================
+   4. macOS 毛玻璃 macos
+   三级深灰 · 1px 半透边框 · 侧栏毛玻璃 · 无阴影无渐变
+   过渡只作用颜色，duration-200，克制到底
+   ========================================================= */
+[data-theme="macos"] .topbar,
+[data-theme="macos"] .sidebar {
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+[data-theme="macos"] .sidebar { border-right: 1px solid rgba(255, 255, 255, .08); }
+
+[data-theme="macos"] .card { box-shadow: none; }
+[data-theme="macos"] .card:hover { border-color: rgba(255, 255, 255, .12); }
+
+/* 按钮：中性灰面，强调色只做文字/焦点高亮，不做大面积背景 */
+[data-theme="macos"] .btn {
+  background: var(--card-soft); color: var(--text);
+  box-shadow: none;
+}
+[data-theme="macos"] .btn:hover { background: rgba(255, 255, 255, .12); }
+[data-theme="macos"] .btn:active { background: rgba(255, 255, 255, .06); transform: scale(.92); }
+[data-theme="macos"] .btn.secondary {
+  background: transparent; color: var(--text-sub);
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+[data-theme="macos"] .btn.danger { background: #ff453a; color: #fff; }
+
+[data-theme="macos"] .field input,
+[data-theme="macos"] .field select,
+[data-theme="macos"] .field textarea {
+  background: var(--bg);
+  border-color: rgba(255, 255, 255, .10);
+}
+[data-theme="macos"] .field input:focus,
+[data-theme="macos"] .field select:focus,
+[data-theme="macos"] .field textarea:focus {
+  border-color: rgba(255, 255, 255, .25);
+}
+
+[data-theme="macos"] .nav-item:hover { background: rgba(255, 255, 255, .05); }
+[data-theme="macos"] .nav-item.active {
+  background: rgba(255, 255, 255, .10); color: var(--text);
+}
+[data-theme="macos"] .chip { background: rgba(255, 255, 255, .10); color: var(--text); border-radius: 6px; }
+[data-theme="macos"] .user-chip .role { background: rgba(255, 255, 255, .10); color: var(--text-sub); border-radius: 6px; }
+[data-theme="macos"] .theme-card { background: var(--bg); }
+[data-theme="macos"] .theme-card.active { border-color: var(--accent); }
+[data-theme="macos"] .appearance-panel { box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+
+/* 课程类别配色进暗色档：色相保留（语义色铁律），只抬明度/降底色饱和 */
+[data-theme="macos"] .cat-required { --cat: #c4b5fd; --cat-bg: rgba(167, 139, 250, .16); }
+[data-theme="macos"] .cat-college  { --cat: #93c5fd; --cat-bg: rgba(96, 165, 250, .16); }
+[data-theme="macos"] .cat-school   { --cat: #86efac; --cat-bg: rgba(74, 222, 128, .15); }
+[data-theme="macos"] .cat-other    { --cat: #ddd6fe; --cat-bg: rgba(196, 181, 253, .14); }
+[data-theme="macos"] .tt th, [data-theme="macos"] .tt td { border-color: rgba(255, 255, 255, .10); }
+[data-theme="macos"] .tt .tt-time { background: var(--bg); }
+[data-theme="macos"] .tt thead .tt-time { background: var(--card-soft, var(--bg-soft)); }
+
+/* =========================================================
+   5. 粘土拟态 clay
+   超大圆角 · 内外阴影组合 · 按压 Squash & Stretch · 弹簧回弹
+   光照：内侧高光（白）+ 外侧柔影（黑），像捏出来的软垫
+   ========================================================= */
+[data-theme="clay"] .card {
+  border: none;
+  border-radius: 32px;
+  background: var(--card);
+}
+[data-theme="clay"] .card:hover {
+  box-shadow: 8px 8px 18px rgba(0, 0, 0, .12), inset 6px 6px 12px rgba(255, 255, 255, .7), inset -5px -5px 10px rgba(0, 0, 0, .06);
+}
+
+[data-theme="clay"] .btn {
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: 8px 8px 16px rgba(0, 0, 0, .10), inset 4px 4px 8px rgba(255, 255, 255, .4), inset -2px -2px 4px rgba(0, 0, 0, .1);
+}
+[data-theme="clay"] .btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+}
+/* 按下：粘土被捏扁 —— 统一 92% 缩放，同时加深内阴影 */
+[data-theme="clay"] .btn:active {
+  transform: scale(.92);
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, .05), inset 8px 8px 16px rgba(0, 0, 0, .15), inset -4px -4px 8px rgba(255, 255, 255, .5);
+}
+[data-theme="clay"] .btn.secondary {
+  background: var(--card-soft); color: var(--text);
+  border: none;
+}
+[data-theme="clay"] .btn.danger { background: linear-gradient(180deg, #fb7185, #f43f5e); }
+
+[data-theme="clay"] .field input,
+[data-theme="clay"] .field select,
+[data-theme="clay"] .field textarea {
+  border: none; border-radius: 20px;
+  background: var(--clay-in);
+  box-shadow: var(--shadow-inset);
+}
+[data-theme="clay"] .field input:focus,
+[data-theme="clay"] .field select:focus,
+[data-theme="clay"] .field textarea:focus {
+  box-shadow: var(--shadow-inset-sm);
+}
+
+[data-theme="clay"] .icon-btn,
+[data-theme="clay"] .hamburger,
+[data-theme="clay"] .btn-ghost {
+  border: none; border-radius: 999px;
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, .08), inset 2px 2px 4px rgba(255, 255, 255, .5), inset -1px -1px 2px rgba(0, 0, 0, .05);
+}
+[data-theme="clay"] .theme-card {
+  border: none; border-radius: 24px;
+  background: var(--card);
+  box-shadow: 6px 6px 12px rgba(0, 0, 0, .08), inset 3px 3px 6px rgba(255, 255, 255, .5), inset -2px -2px 4px rgba(0, 0, 0, .05);
+}
+[data-theme="clay"] .theme-card.active { box-shadow: var(--shadow-inset); }
+[data-theme="clay"] .chip { border-radius: 999px; }
+/* 粘土同样 --border 透明，补极淡分隔线 */
+[data-theme="clay"] .table td,
+[data-theme="clay"] .row-item,
+[data-theme="clay"] .list-line { border-color: rgba(190, 24, 93, .10); }
+[data-theme="clay"] .filter-input {
+  border: none; border-radius: 20px;
+  background: var(--clay-in);
+  box-shadow: var(--shadow-inset);
+}
+
+
+/* =========================================================
+   6. 统一小控件（视图切换 / 日历翻页 / AI 输入 / 日期）
+   与各主题的 .field / .btn.secondary 形态语言保持同源
+   ========================================================= */
+
+/* --- editorial：直角、线条感、无阴影 --- */
+[data-theme="editorial"] .view-switch { border-radius: 0; border-color: rgba(28, 28, 28, .40); background: transparent; }
+[data-theme="editorial"] .vs-btn { border-radius: 0; }
+[data-theme="editorial"] .vs-btn.on { background: #1C1C1C; color: #F9F8F6; }
+[data-theme="editorial"] .cal-btn { border-radius: 0; background: transparent; border-color: rgba(28, 28, 28, .40); }
+[data-theme="editorial"] .cal-btn:hover { background: #1C1C1C; color: #F9F8F6; border-color: #1C1C1C; }
+[data-theme="editorial"] .cal-btn:active { transform: scale(.92); }
+[data-theme="editorial"] .ai-input-row textarea {
+  border: none; border-bottom: 1px solid rgba(28, 28, 28, .40);
+  border-radius: 0; background: transparent;
+}
+[data-theme="editorial"] .ai-input-row textarea:focus { border-bottom-color: #1C1C1C; border-color: transparent transparent #1C1C1C; }
+[data-theme="editorial"] .tt-semester input[type="date"] { border-radius: 0; background: transparent; border-color: rgba(28, 28, 28, .40); }
+
+/* --- neumorphism：双光源阴影，容器凹陷、按钮凸起 --- */
+[data-theme="neumorphism"] .view-switch { border: none; background: var(--card); box-shadow: var(--shadow-inset-sm); border-radius: 12px; }
+[data-theme="neumorphism"] .vs-btn { border-radius: 9px; }
+[data-theme="neumorphism"] .vs-btn:hover { background: var(--card-soft); box-shadow: 3px 3px 6px var(--neu-dark), -3px -3px 6px var(--neu-light); }
+[data-theme="neumorphism"] .vs-btn.on {
+  background: var(--accent); color: var(--on-accent);
+  box-shadow: 3px 3px 6px var(--neu-dark), -3px -3px 6px var(--neu-light);
+}
+[data-theme="neumorphism"] .cal-btn {
+  border: none; background: var(--card); border-radius: 10px;
+  box-shadow: 4px 4px 8px var(--neu-dark), -4px -4px 8px var(--neu-light);
+}
+[data-theme="neumorphism"] .cal-btn:hover { background: var(--card); box-shadow: 2px 2px 5px var(--neu-dark), -2px -2px 5px var(--neu-light); }
+[data-theme="neumorphism"] .cal-btn:active { transform: scale(.92); box-shadow: inset 3px 3px 6px var(--neu-dark), inset -3px -3px 6px var(--neu-light); }
+[data-theme="neumorphism"] .ai-input-row textarea { border: none; box-shadow: var(--shadow-inset); background: var(--card-soft); border-radius: 14px; }
+[data-theme="neumorphism"] .ai-input-row textarea:focus { box-shadow: var(--shadow-inset-sm); border-color: transparent; }
+[data-theme="neumorphism"] .tt-semester input[type="date"] { border: none; box-shadow: var(--shadow-inset-sm); background: var(--card-soft); }
+
+/* --- natural：胶囊形、白底、轻快 --- */
+[data-theme="natural"] .view-switch { border-radius: 999px; background: var(--card-soft); border-color: var(--border); }
+[data-theme="natural"] .vs-btn { border-radius: 999px; }
+[data-theme="natural"] .vs-btn.on { background: var(--accent); color: var(--on-accent); }
+[data-theme="natural"] .cal-btn { border-radius: 999px; background: #ffffff; padding: 0 16px; }
+[data-theme="natural"] .cal-btn:hover { background: var(--accent-soft); transform: translateY(1px); }
+[data-theme="natural"] .cal-btn:active { transform: scale(.92); }
+[data-theme="natural"] .ai-input-row textarea { border-radius: 22px; background: #ffffff; padding-left: 18px; padding-right: 18px; }
+[data-theme="natural"] .tt-semester input[type="date"] { border-radius: 999px; background: #ffffff; padding-left: 16px; padding-right: 16px; }
+
+/* --- macos：1px 半透边框、中性灰面、无阴影（暗色 color-scheme 见 site.css） --- */
+[data-theme="macos"] .view-switch { border-color: rgba(255, 255, 255, .12); background: var(--bg); border-radius: 9px; }
+[data-theme="macos"] .vs-btn { border-radius: 7px; }
+[data-theme="macos"] .vs-btn:hover { background: rgba(255, 255, 255, .08); color: var(--text); }
+[data-theme="macos"] .vs-btn.on { background: var(--accent); color: var(--on-accent); }
+[data-theme="macos"] .cal-btn { background: var(--card-soft); border-color: rgba(255, 255, 255, .12); border-radius: 8px; color: var(--text-sub); }
+[data-theme="macos"] .cal-btn:hover { background: rgba(255, 255, 255, .10); color: var(--text); border-color: rgba(255, 255, 255, .22); }
+[data-theme="macos"] .cal-btn:active { transform: scale(.92); }
+[data-theme="macos"] .ai-input-row textarea { background: var(--bg); border-color: rgba(255, 255, 255, .10); }
+[data-theme="macos"] .ai-input-row textarea:focus { border-color: rgba(255, 255, 255, .25); }
+[data-theme="macos"] .tt-semester input[type="date"] { background: var(--bg); border-color: rgba(255, 255, 255, .10); }
+
+/* --- clay：软垫、超大圆角、内外阴影 --- */
+[data-theme="clay"] .view-switch {
+  border: none; border-radius: 999px; background: var(--card-soft);
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, .08), inset -2px -2px 4px rgba(255, 255, 255, .8);
+}
+[data-theme="clay"] .vs-btn { border-radius: 999px; }
+[data-theme="clay"] .vs-btn:hover { background: rgba(255, 255, 255, .5); }
+[data-theme="clay"] .vs-btn.on {
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%); color: var(--on-accent);
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, .10), inset 2px 2px 4px rgba(255, 255, 255, .4), inset -1px -1px 2px rgba(0, 0, 0, .08);
+}
+[data-theme="clay"] .cal-btn {
+  border: none; border-radius: 20px; background: var(--card-soft); color: var(--text);
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, .08), inset 2px 2px 4px rgba(255, 255, 255, .5), inset -1px -1px 2px rgba(0, 0, 0, .05);
+}
+[data-theme="clay"] .cal-btn:hover { background: var(--accent-soft); }
+[data-theme="clay"] .cal-btn:active { transform: scale(.92); box-shadow: inset 3px 3px 6px rgba(0, 0, 0, .12), inset -2px -2px 4px rgba(255, 255, 255, .5); }
+[data-theme="clay"] .ai-input-row textarea {
+  border: none; border-radius: 20px;
+  background: var(--clay-in);
+  box-shadow: var(--shadow-inset);
+}
+[data-theme="clay"] .ai-input-row textarea:focus { box-shadow: var(--shadow-inset-sm); border-color: transparent; }
+[data-theme="clay"] .tt-semester input[type="date"] {
+  border: none; border-radius: 20px;
+  background: var(--clay-in);
+  box-shadow: var(--shadow-inset-sm);
+}

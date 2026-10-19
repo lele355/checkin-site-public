@@ -1,0 +1,68 @@
+@page "/Register"
+@model CheckinApp.Pages.RegisterModel
+@{
+    ViewData["Title"] = "注册";
+}
+<div class="login-wrap">
+    <div class="card" style="max-width:430px;margin:6vh auto 0;">
+        <h2 style="display:flex;align-items:center;gap:9px;">
+            <img src="~/icons/icon-192.png" alt="" width="30" height="30" asp-append-version="true" style="border-radius:9px;display:block;" />
+            @(Model.Done ? "注册成功" : "注册新账号")
+        </h2>
+
+        @if (Model.Done)
+        {
+            <p class="hint" style="margin-bottom:16px;">
+                「@Model.DoneName」注册成功，现在就可以用刚才的账号和密码登录了。
+            </p>
+            <a class="btn" href="/Login" style="width:100%;text-align:center;">去登录</a>
+        }
+        else
+        {
+            <p class="hint" style="margin-bottom:16px;">
+                本站只对受邀者开放。请填写管理员发给你的一次性邀请码（12 位，短横可省略），一个码只能用一次。
+            </p>
+
+            @if (!string.IsNullOrEmpty(Model.Error))
+            {
+                <div class="msg error sticky">@Model.Error</div>
+            }
+
+            <form method="post">
+                @* 蜜罐：真人看不见（挪到屏幕外），自动填表的脚本会填 —— 提交时判有值即拒 *@
+                <input asp-for="Homepage" tabindex="-1" autocomplete="off" aria-hidden="true"
+                       style="position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;overflow:hidden;" />
+                <input type="hidden" asp-for="FormToken" />
+                <input type="hidden" asp-for="FormStamp" />
+
+                <div class="field">
+                    <label asp-for="Code">邀请码（必填）</label>
+                    <input asp-for="Code" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters"
+                           spellcheck="false" required style="text-transform:uppercase;letter-spacing:1px;font-family:var(--font-mono,monospace);" />
+                </div>
+                <div class="field">
+                    <label asp-for="Username">账号</label>
+                    <input asp-for="Username" autocomplete="username" required />
+                </div>
+                <div class="field">
+                    <label asp-for="DisplayName">昵称（可留空）</label>
+                    <input asp-for="DisplayName" autocomplete="nickname" />
+                </div>
+                <div class="field">
+                    <label asp-for="Password">密码</label>
+                    <input asp-for="Password" type="password" autocomplete="new-password" required />
+                </div>
+                <div class="field">
+                    <label asp-for="Password2">确认密码</label>
+                    <input asp-for="Password2" type="password" autocomplete="new-password" required />
+                </div>
+
+                <button class="btn" type="submit" style="width:100%;">提交注册</button>
+            </form>
+
+            <p class="hint" style="margin:14px 0 0;">
+                已有账号？<a href="/Login">去登录</a>
+            </p>
+        }
+    </div>
+</div>
