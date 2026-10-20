@@ -198,7 +198,7 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape') togglePanel(false); });
   });
 
-  // 对外暴露（底部快捷栏等处会调用）
+  // 对外暴露（控制台调试 / 其他脚本想直接换主题时用）
   window.applyTheme = function (slug) {
     apply(slug, THEMES[slug] ? THEMES[slug].def : '', currentTone(), true);
     wash(innerWidth / 2, innerHeight / 3);   // 无点击坐标时从屏幕中上部起波

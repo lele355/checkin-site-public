@@ -489,6 +489,13 @@ $RECYCLE.BIN/
 
 # 测试截图（目检用，不入库）
 _shots/
+qa/shots/
 
 # 本地私密配置（AI API Key 等）—— 绝不入库
 appsettings.Local.json
+
+# 安卓安装包（二进制，不入库；放上去后由发版脚本带上服务器）
+CheckinApp/wwwroot/download/*.apk
+
+# PyLab 上传的课件（原始 ppt + 逐页 PNG，体积大，绝不入库）
+CheckinApp/data/pylab/

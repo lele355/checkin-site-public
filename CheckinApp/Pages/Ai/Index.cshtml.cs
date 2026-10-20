@@ -34,7 +34,7 @@ public class IndexModel(AppDbContext db, CurrentUser me, AiClient ai, AiActionEx
     public bool NoticeIsError { get; set; }
     /// <summary>今天已消耗的 token（提问 + 回答合计）</summary>
     public long TodayTokens { get; set; }
-    /// <summary>每日 token 上限（appsettings 的 Ai.DailyTokenLimit，默认 1 亿）</summary>
+    /// <summary>每日 token 上限（appsettings 的 Ai.DailyTokenLimit，默认 100 万）</summary>
     public long TokenLimit => _opt.DailyTokenLimit;
 
     private void Load()

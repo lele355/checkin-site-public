@@ -132,7 +132,7 @@ button { font: inherit; color: inherit; }
   display: none;              /* 手机默认收进抽屉 */
   width: var(--sidebar-w);
   flex-shrink: 0;
-  padding: 16px 12px;
+  padding: 16px 12px 0;       /* 底部留白交给 .sidebar-foot（吸底条自带安全区） */
   border-right: 1px solid var(--border);
   background: var(--sidebar-bg);
   flex-direction: column; gap: 4px;
@@ -160,13 +160,21 @@ button { font: inherit; color: inherit; }
 .sidebar .nav-list { display: flex; flex-direction: column; gap: 4px; }
 .sidebar .nav-list.folded { display: none; }
 
-/* 侧栏底部：自定义入口贴底 */
+/* 侧栏底部：我的 / 自定义侧栏。
+   吸底（sticky）而不是靠 margin-top:auto——侧栏项多时单靠 auto 会把它们顶到
+   滚动区最下面，得滚到底才看得见；吸底则无论滚到哪儿都常驻。
+   底色用 sidebar-bg + 毛玻璃，滚动的内容不会从下面透上来。 */
 .sidebar .sidebar-foot {
+  position: sticky; bottom: 0; z-index: 2;
   margin-top: auto;
-  padding-top: 10px;
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
+  background: var(--sidebar-bg);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
-.sidebar .nav-customize { width: 100%; border: 0; background: none; cursor: pointer; text-align: left; }
+/* 侧栏底部两个「非模块」入口（我的 / 自定义侧栏）：a 和 button 长一样 */
+.sidebar .nav-foot-item { width: 100%; border: 0; background: none; cursor: pointer; text-align: left; }
 .sidebar .nav-item {
   display: flex; align-items: center; gap: 10px;
   min-height: 44px; padding: 0 12px;
@@ -196,18 +204,27 @@ button { font: inherit; color: inherit; }
     overflow-y: auto;                 /* 菜单太长时侧栏自己滚 */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;     /* 滚到顶/底不再把滚动传给页面 */
-    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    padding-bottom: 0;                /* 吸底条自己带安全区 */
+    /* 部分主题的 --sidebar-bg 是半透明（rgba(…,.7)），桌面端背后是纯色看不出问题，
+       但抽屉背后是整页内容——不换成实色会跟正文叠成一团糊。吸底条同理。 */
+    background: var(--card);
   }
+  body.drawer-open .sidebar .sidebar-foot { background: var(--card); }
 }
 
 /* ---------- 内容区 ----------
    min-width:0 防止宽表格把弹性布局撑破；
-   margin auto 让内容列在宽屏上居中，不再死贴左侧留大白边；
-   env() 给刘海/圆角屏留出安全边 */
+   **不设 max-width**：以前卡在 1200px 居中，收起侧栏后左右各空 150px、
+   连竖向滚动条都被推到离屏幕右边一大截的位置（滚动条跟着元素右缘走）。
+   现在宽度吃满剩余视口，留白改由 --content-pad 随视口伸缩控制——
+   窄屏 16px 保命，超宽屏最多 56px，再多就让内容铺开而不是继续留白。
+   换行可读性交给正文段落自己的 max-width（见下方 .card > p 规则）。
+   env() 给刘海/圆角屏留出安全边（底部由 body 的 padding 管，不重复加） */
 .content {
-  flex: 1; min-width: 0; max-width: 1200px; margin: 0 auto;
-  /* env() 给刘海/圆角屏留出安全边（底部由 body 的 padding 管，不重复加） */
-  padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
+  --content-pad: 16px;
+  flex: 1; min-width: 0;
+  padding: 16px max(var(--content-pad), env(safe-area-inset-right))
+           16px max(var(--content-pad), env(safe-area-inset-left));
 }
 
 .card {
@@ -236,8 +253,55 @@ button { font: inherit; color: inherit; }
   transition: color var(--dur) var(--easing);
 }
 .site-foot a:hover { color: var(--accent-strong); text-decoration: underline; }
+/* 页脚文档入口：三个链接一行，用中点分隔，窄屏自动换行 */
+.site-foot .foot-links {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 4px 14px; margin-bottom: 2px;
+}
+.site-foot .foot-links a { position: relative; }
+.site-foot .foot-links a + a::before {
+  content: "·"; position: absolute; left: -8px; color: var(--border-strong);
+}
+
+/* 站内文档互链（关于 / 隐私 / 协议）：整行可点，右侧箭头，
+   分隔线画在行底而不是用 border-bottom 的最后一行——最后一行去线。 */
+.doc-links { display: flex; flex-direction: column; }
+.doc-links a {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 2px; font-size: .94rem; font-weight: 500;
+  color: var(--text); text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  transition: color var(--dur) var(--easing), padding-left var(--dur) var(--easing);
+}
+.doc-links a:last-child { border-bottom: 0; }
+.doc-links a:hover { color: var(--accent-strong); padding-left: 5px; }
+.doc-links .chev { color: var(--text-sub); font-size: 1.1rem; line-height: 1; }
+
+/* 页面内浅提示条（区别于浮层 Toast）：左竖线 + 柔和底色，说明「为什么/稍后会怎样」 */
+.note {
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent-strong);
+  border-radius: 0 10px 10px 0;
+  background: var(--card-soft);
+  color: var(--text-sub);
+  font-size: .9rem;
+  line-height: 1.75;
+}
 .card h2 { font-size: 1.15rem; margin-bottom: 8px; }
 .card .hint { color: var(--text-sub); font-size: .88rem; }
+/* 内容区铺满宽屏后，长正文会拉成一行上百字（眼睛回行会串行）。
+   卡片本身照旧铺满，只给「整块文字」设个可读上限（92ch ≈ 46 个汉字一行）——
+   比这窄的屏完全不受影响（max-width 只在真超宽时才生效）。
+   注意：只限 .hint 和裸 <p>，不管 .field-row / .stack 这类布局容器。 */
+.card > p, .card .hint { max-width: 92ch; }
+
+/* 文档页（关于 / 隐私政策 / 用户协议）：整篇是一大块连续文字，
+   光限行宽会让卡片铺满而文字只管左半边，右半边空得像没做完。
+   这类页面改成「窄列居中」——行宽天然受控，两侧留白看着是有意为之。 */
+.card.doc {
+  max-width: 880px; margin-left: auto; margin-right: auto;
+}
+.card.doc > p, .card.doc .hint { max-width: none; }
 
 .grid-cards { display: grid; grid-template-columns: 1fr; gap: 16px; }
 
@@ -428,13 +492,13 @@ button { font: inherit; color: inherit; }
 }
 .appearance-panel[hidden] { display: none; }
 /* 手机上外观面板改为 fixed 左右对称：顶栏里 wrap 右边还有 user-chip/退出按钮，
-   absolute right:0 锚点偏左会让面板左边出屏；同时让出底部快捷栏(52px)+安全区（须写在基础定义之后才生效） */
+   absolute right:0 锚点偏左会让面板左边出屏（须写在基础定义之后才生效） */
 @media (max-width: 767px) {
   .appearance-panel {
     position: fixed;
     left: 12px; right: 12px; width: auto;
     top: calc(var(--topbar-h) + env(safe-area-inset-top) + 8px);
-    max-height: calc(100vh - var(--topbar-h) - env(safe-area-inset-top) - 52px - env(safe-area-inset-bottom) - 16px);
+    max-height: calc(100vh - var(--topbar-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
     max-height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top) - 52px - env(safe-area-inset-bottom) - 16px);
   }
 }
@@ -461,34 +525,23 @@ button { font: inherit; color: inherit; }
 }
 .theme-chip i { flex: 1; }
 
-/* ---------- 手机底部快捷栏 ---------- */
-.bottombar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
-  display: flex; background: var(--card); border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom);   /* 给 iPhone 底部横条让位 */
-}
-.bottombar a, .bottombar button {
-  flex: 1; min-height: 52px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 1px; background: none; border: none; cursor: pointer;
-  color: var(--text-sub); font-size: .68rem;
-}
-.bottombar .ico { font-size: 1.15rem; color: var(--text); }
-.bottombar .active { color: var(--accent-strong); }
-
+/* ---------- 手机底部安全区 ----------
+   底部快捷栏已取消（外观在顶栏、个人主页进侧栏），
+   只留 iPhone 横条的安全区让位，避免最后一行贴着屏幕边。 */
 body {
-  /* 给底部栏让位（手机）；横条安全区一起算，否则最后一行被 iPhone 底部横条压住 */
-  padding-bottom: calc(52px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ---------- 平板断点 ---------- */
 @media (min-width: 768px) {
   .content {
-    padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left));
+    /* 平板起留白随视口长大（1.6vw），上下仍固定 24px——
+       下面的 .group-head 用负 top 抵消 padding-top，改这里要同步改它 */
+    --content-pad: clamp(20px, 1.6vw, 40px);
+    padding-top: 24px; padding-bottom: 24px;
   }
   .grid-cards { grid-template-columns: repeat(2, 1fr); }
   body { padding-bottom: 0; }
-  .bottombar { display: none; }
   .hamburger { display: none; }   /* 侧栏已常驻，汉堡只属于手机抽屉 */
 
   /* 应用式布局：窗口本体不滚动，侧栏与主内容区各自独立滚动（互不牵扯） */
@@ -536,8 +589,23 @@ body {
   .sidebar .nav-item .label { display: inline; }
   .sidebar .nav-group { display: block; }
   .content {
-    padding: 28px max(28px, env(safe-area-inset-right)) 28px max(28px, env(safe-area-inset-left));
+    --content-pad: clamp(24px, 2vw, 56px);
+    padding-top: 28px; padding-bottom: 28px;
   }
+}
+
+/* ---------- 超宽屏断点 ----------
+   以前内容列锁死 1200px，屏幕再宽也只是把两侧的白边加粗；
+   现在宽度吃满，多出来的空间应该多塞几列卡片，而不是把三张卡拉成窗帘。
+   阈值取「加上侧栏后单卡仍有 ~300px」的视口宽度。 */
+@media (min-width: 1440px) {
+  .grid-cards { grid-template-columns: repeat(4, 1fr); }
+}
+@media (min-width: 1840px) {
+  .grid-cards { grid-template-columns: repeat(5, 1fr); }
+}
+@media (min-width: 2300px) {
+  .grid-cards { grid-template-columns: repeat(6, 1fr); }
 }
 
 /* ---------- 尊重系统的「减少动画」偏好 ---------- */
@@ -1067,11 +1135,10 @@ label:has(input.switch) { display: flex; align-items: center; gap: 10px; cursor:
 .btn:active, .icon-btn:active, .btn-ghost:active, .theme-card:active, .hamburger:active {
   transform: scale(.92);
 }
-.sidebar .nav-item, .bottombar a, .bottombar button, .row-item {
+.sidebar .nav-item, .row-item {
   transition: background var(--dur) var(--easing), color var(--dur) var(--easing),
               transform .3s var(--spring);
 }
-.bottombar a:active, .bottombar button:active { transform: scale(.92); }
 
 /* ---------- 连续打卡火焰（379 streak-flame） ---------- */
 .flame-badge {
@@ -1091,7 +1158,7 @@ label:has(input.switch) { display: flex; align-items: center; gap: 10px; cursor:
   input[type="checkbox"].switch, input[type="checkbox"].switch::after,
   .sidebar .nav-item .label::after, .btn, .icon-btn, .btn-ghost,
   .theme-card, .hamburger, .modal-close, .sidebar .nav-item,
-  .bottombar a, .bottombar button, .row-item {
+  .row-item {
     animation: none !important;
     transition: none !important;
   }
@@ -1716,10 +1783,6 @@ main.content { scroll-timeline: --main-scroll block; }
   .stat-box { padding: 7px; min-width: 0; }
   .stat-num { font-size: 16px; }
   .table { font-size: .82rem; }
-
-  /* 底部快捷栏矮一档（同步 body 的让位 padding） */
-  .bottombar a, .bottombar button { min-height: 48px; }
-  body { padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
 
   /* 工作台自定义 */
   .dash-grid > .card > h2 { padding-right: 30px; }
