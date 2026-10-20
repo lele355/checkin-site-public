@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CheckinApp.Data;
 
-public class AppDbContext : DbContext
+public partial class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -179,5 +179,12 @@ public class AppDbContext : DbContext
             e.HasIndex(x => new { x.Enabled, x.Hour });
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
+
+        // PyLab 临时模块的模型配置在 Data/AppDbContext.PyLab.cs（partial），
+        // 拆模块时整个文件删掉，这里一行不用改。
+        OnModelCreatingPyLab(m);
     }
+
+    /// <summary>PyLab 模块的模型配置挂载点（实现见 AppDbContext.PyLab.cs）。</summary>
+    partial void OnModelCreatingPyLab(ModelBuilder m);
 }

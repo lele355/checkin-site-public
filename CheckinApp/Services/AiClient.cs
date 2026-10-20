@@ -22,9 +22,9 @@ public class AiOptions
     public int DailyRequestLimit { get; set; } = 60;
     /// <summary>
     /// 每用户每天的 token 总用量上限（提问 + 回答都算）。超过后当天不能再发消息。
-    /// 默认 1 亿（按用户 2026-10-19 的要求）；想收紧直接改 appsettings 的 Ai.DailyTokenLimit。
+    /// 默认 100 万（2026-10-20 从 1 亿收紧）；想再改直接改 appsettings 的 Ai.DailyTokenLimit。
     /// </summary>
-    public long DailyTokenLimit { get; set; } = 100_000_000;
+    public long DailyTokenLimit { get; set; } = 1_000_000;
 }
 
 // 注意：API 要求小写 role/content，不加 JsonPropertyName 会序列化成 PascalCase 被打回 400

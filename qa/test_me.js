@@ -81,8 +81,8 @@ async function sampleCount(page) {
         const meName = (await pL.locator('.me-name').textContent() || '').trim();
         T('名片显示昵称', meName.length > 0, meName);
         T('名片显示角色 chip', await pL.locator('.me-hero .chip').count() === 1);
-        T('顶栏「我的」在手机上可达（底栏含 /Me 链接）',
-            await pL.locator('.bottombar a[href="/Me"]').count() === 1);
+        T('侧栏底部有「我的」入口（底栏已移除）',
+            await pL.locator('.sidebar-foot a[href="/Me"]').count() === 1);
 
         const stats = await readStats(pL);
         T('我的数据格子渲染 ≥ 8 个', Object.keys(stats).length >= 8, JSON.stringify(stats));
@@ -236,7 +236,17 @@ async function sampleCount(page) {
         await mob.setViewportSize({ width: 390, height: 844 });
         await mob.goto(BASE + '/Me');
         await mob.waitForTimeout(500);
-        T('手机底栏有「我的」入口', await mob.locator('.bottombar a[href="/Me"]').count() === 1);
+        T('手机底栏已移除', await mob.locator('.bottombar').count() === 0);
+        // 抽屉里「我的」要在，且点得到（吸底条不该被列表顶出视口）
+        await mob.click('.hamburger');
+        await mob.waitForTimeout(450);
+        const footInView = await mob.evaluate(() => {
+            const f = document.querySelector('.sidebar-foot a[href="/Me"]');
+            if (!f) return false;
+            const b = f.getBoundingClientRect();
+            return b.width > 0 && b.bottom <= window.innerHeight + 1;
+        });
+        T('抽屉里「我的」可见（吸底）', footInView);
         const ovf = await mob.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         T('手机无横向溢出', ovf <= 1, String(ovf));
         const statCols = await mob.evaluate(() =>

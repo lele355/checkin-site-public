@@ -13,14 +13,7 @@
     document.body.classList.toggle('drawer-open', open);
   };
 
-  // ---- 底部快捷栏「外观」按钮 ----
-  // 必须拦住冒泡：否则点击传到 document 后会被 theme.js 的“点外面关闭”逻辑立刻关掉
-  window.openAppearance = function (e) {
-    if (e && e.stopPropagation) e.stopPropagation();
-    if (window.toggleAppearancePanel) window.toggleAppearancePanel();   // 开/关切换
-  };
-
-  // ---- 返回上一页（顶栏 / 底部栏共用） ----
+  // ---- 返回上一页（顶栏返回按钮用） ----
   // 站内点进来的 → history.back() 回真实的上一页；
   // 直接输网址 / 新标签页打开 / 从站外进来 → 回工作台，避免“后退”把人退出网站
   window.goBack = function () {
@@ -430,7 +423,7 @@ document.addEventListener('page:load', initViewSwitch);   // 无刷新换主区�
 })();
 
 // ===== 无刷新页面切换（fetch 主区替换 + pushState；方案3 SPA 的轻量替代）=====
-// 点站内链接不再整页刷新：只换 main.content，顶栏/侧栏/底栏同步高亮，页面脚本重放；
+// 点站内链接不再整页刷新：只换 main.content，顶栏/侧栏同步高亮，页面脚本重放；
 // 弹窗链接（/New /Edit /Reset）仍归 modal.js；fetch 失败自动回落整页跳转。
 (function () {
   'use strict';
@@ -461,10 +454,10 @@ document.addEventListener('page:load', initViewSwitch);   // 无刷新换主区�
     return true;
   }
 
-  // 顶栏返回按钮 / 侧栏与底栏高亮：主区换血后同步（它们在 main.content 外面）
+  // 顶栏返回按钮 / 侧栏高亮：主区换血后同步（它们在 main.content 外面）
   function syncChrome(url) {
     var path = normPath(new URL(url, location.origin).pathname);
-    Array.prototype.forEach.call(document.querySelectorAll('.sidebar .nav-item, .bottombar a'), function (a) {
+    Array.prototype.forEach.call(document.querySelectorAll('.sidebar .nav-item'), function (a) {
       var href = a.getAttribute('href') || '';
       if (!href || href.charAt(0) === '#') return;
       var on = false;
@@ -477,8 +470,6 @@ document.addEventListener('page:load', initViewSwitch);   // 无刷新换主区�
     var hide = path === '/' || path === '/login' || path === '/changepassword';
     var back = document.querySelector('.back-top');
     if (back) back.hidden = hide;
-    var back2 = document.querySelector('.bottombar button[onclick*="goBack"]');
-    if (back2) back2.hidden = hide;
   }
 
   // 重放新页面自己的脚本（布局壳的三个全局脚本除外；含 @section Scripts 里的）

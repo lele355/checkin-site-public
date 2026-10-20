@@ -142,16 +142,28 @@ app.UseResponseCompression();
 // - css/js 都带 asp-append-version（URL 后缀内容哈希），改了文件 URL 就变，
 //   所以敢给 max-age=1 年 + immutable —— 翻页时浏览器直接用本地缓存，不发请求。
 // - 其余（图标/manifest）给 7 天，浏览器回来不用重拉但也不会改了图看不到。
+// .apk 不在 ASP.NET 默认 MIME 表里，不显式登记会直接 404（下载页按钮点了没反应）
+var staticTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+staticTypes.Mappings[".apk"] = "application/vnd.android.package-archive";
+
 app.UseStaticFiles(new StaticFileOptions
 {
+    ContentTypeProvider = staticTypes,
     OnPrepareResponse = ctx =>
     {
         var path = ctx.File.Name;
         var isVersioned = path.EndsWith(".css", StringComparison.OrdinalIgnoreCase)
                        || path.EndsWith(".js", StringComparison.OrdinalIgnoreCase);
-        ctx.Context.Response.Headers.CacheControl = isVersioned
-            ? "public, max-age=31536000, immutable"
-            : "public, max-age=604800";
+        // Service Worker 不进长缓存：它自己就是"检查更新"的入口，必须每次回源验证，
+        // 否则改完 sw.js 可能一年都不生效（浏览器虽默认绕过 HTTP 缓存，但不该依赖这个默认值）
+        var isServiceWorker = path.Equals("sw.js", StringComparison.OrdinalIgnoreCase);
+        // 安装包也不能吃缓存：换了包还用旧缓存装，等于白升级
+        var isApk = path.EndsWith(".apk", StringComparison.OrdinalIgnoreCase);
+        ctx.Context.Response.Headers.CacheControl = isServiceWorker || isApk
+            ? "no-cache"
+            : isVersioned
+                ? "public, max-age=31536000, immutable"
+                : "public, max-age=604800";
     }
 });
 app.UseRouting();

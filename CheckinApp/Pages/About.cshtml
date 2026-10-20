@@ -1,0 +1,59 @@
+@page
+@model CheckinApp.Pages.AboutModel
+@{
+    ViewData["Title"] = "关于";
+}
+<div class="card doc">
+    <div class="page-head">
+        <h2>关于「日常管理」</h2>
+        <span class="chip">v@(Model.Version)</span>
+    </div>
+    <p class="hint" style="margin-top:6px;">一个几个人自用的生活管理小站：打卡、日程、备忘、记账、课程表、纪念日、邮件收件箱，外加一个会记账的 AI 助手。</p>
+
+    <div class="stack" style="margin-top:14px;">
+        <div class="field-row">
+            <div class="field"><label>应用名称</label><div>日常管理</div></div>
+            <div class="field"><label>版本</label><div>@Model.Version（versionCode @Model.VersionCode）</div></div>
+        </div>
+        <div class="field-row">
+            <div class="field"><label>运行平台</label><div>网页（PWA）· 安卓客户端</div></div>
+            <div class="field"><label>服务地址</label><div><a href="https://example.com" target="_blank" rel="noopener">example.com</a></div></div>
+        </div>
+
+        <div>
+            <label>备案信息</label>
+            <div class="hint" style="margin-top:4px;">
+                网站备案：京ICP备00000000号-1
+                <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">工信部备案查询</a>
+            </div>
+            <div class="hint">
+                App 备案：@(string.IsNullOrEmpty(Model.AppBeiAn) ? "办理中" : Model.AppBeiAn)
+            </div>
+        </div>
+
+        <div>
+            <label>开源</label>
+            <div class="hint" style="margin-top:4px;">
+                源码（脱敏版）：<a href="https://github.com/Lele355/checkin-site-public" target="_blank" rel="noopener noreferrer">github.com/Lele355/checkin-site-public</a>（MIT）
+            </div>
+        </div>
+
+        <div>
+            <label>技术栈</label>
+            <div class="hint" style="margin-top:4px;">ASP.NET Core Razor Pages · EF Core · SQLite · MailKit · 原生 JS/CSS</div>
+        </div>
+
+        <div>
+            <label>联系</label>
+            <div class="hint" style="margin-top:4px;">本站为邀请制小范围使用，如需联系请通过站内「留言板」或「邮件」模块。</div>
+        </div>
+    </div>
+</div>
+
+<div class="card doc">
+    <div class="page-head"><h2>相关文档</h2></div>
+    <div class="doc-links">
+        <a href="/Privacy">隐私政策<span class="chev">›</span></a>
+        <a href="/Terms">用户协议<span class="chev">›</span></a>
+    </div>
+</div>
