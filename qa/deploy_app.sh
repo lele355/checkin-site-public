@@ -38,6 +38,12 @@ for f in /tmp/checkin-keep/appsettings.Local.json /tmp/checkin-keep/appsettings.
 done
 chown -R www-data:www-data /var/www/checkin
 
+echo "=== 6.5 清 Python 编译产物 / 沙箱残留 ==="
+# 发布包里不该有 __pycache__（沙箱已用 -B 压住，这里是兜历史残留）
+find /var/www/checkin -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+find /var/www/checkin -name '*.pyc' -type f -delete 2>/dev/null || true
+echo "剩余 __pycache__ 目录数：$(find /var/www/checkin -name '__pycache__' -type d | wc -l)"
+
 echo "=== 7. 起服务（启动时自动跑迁移） ==="
 systemctl start checkin
 sleep 6

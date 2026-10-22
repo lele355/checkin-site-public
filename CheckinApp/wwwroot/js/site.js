@@ -456,12 +456,35 @@ document.addEventListener('page:load', initViewSwitch);   // 无刷新换主区�
 
   // 顶栏返回按钮 / 侧栏高亮：主区换血后同步（它们在 main.content 外面）
   function syncChrome(url) {
-    var path = normPath(new URL(url, location.origin).pathname);
-    Array.prototype.forEach.call(document.querySelectorAll('.sidebar .nav-item'), function (a) {
+    var target = new URL(url, location.origin);
+    var path = normPath(target.pathname);
+    var curSearch = (target.search || '').toLowerCase();
+
+    var links = Array.prototype.slice.call(document.querySelectorAll('.sidebar .nav-item'));
+
+    // 同一路径下是否存在「带查询串」的入口？
+    // 有的话必须连 search 一起比，否则无参数那个会一直亮、把子项盖住。
+    // 没有这种入口的普通页面仍按「只看路径」走，避免 ?pageNo=2 之类把高亮打掉。
+    // （曾经 PyLab 单机版把四个视图拆成 /PyLab、/PyLab?view=... 四个入口，
+    //   模块 2026-10-22 已删；这套判定留着，是「同路径多入口」场景的通用兜底。）
+    var strict = links.some(function (a) {
+      var h = a.getAttribute('href') || '';
+      if (!h || h.charAt(0) === '#') return false;
+      try {
+        var u0 = new URL(h, location.origin);
+        return normPath(u0.pathname) === path && !!u0.search;
+      } catch (e) { return false; }
+    });
+
+    links.forEach(function (a) {
       var href = a.getAttribute('href') || '';
       if (!href || href.charAt(0) === '#') return;
       var on = false;
-      try { on = normPath(new URL(href, location.origin).pathname) === path; } catch (e) { }
+      try {
+        var u = new URL(href, location.origin);
+        on = normPath(u.pathname) === path
+          && (!strict || (u.search || '').toLowerCase() === curSearch);
+      } catch (e) { }
       a.classList.toggle('active', on);
       // 清焦点残留：焦点留在旧栏目上时 :focus-visible 下划线会一直亮着
       if (!on && document.activeElement === a && a.blur) a.blur();

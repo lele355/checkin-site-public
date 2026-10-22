@@ -15,16 +15,9 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
   </ItemGroup>
 
-  <!--
-    PyLab 临时模块（Python 教学平台）：只让 main.py 随发布一起走。
-    .py 不在 Web SDK 的默认内容里，不声明的话线上会「找不到脚本」。
-    开发时读的是源码目录，所以改 Python 不需要重新编译。
-  -->
-  <ItemGroup>
-    <Content Include="tools\pylab\main.py" CopyToPublishDirectory="PreserveNewest" />
-    <!-- 外部片段库（书例导入）：.json 已被 SDK 默认包含成 Content，这里只补「发布时带上」，
-         用 Update 而不是 Include，否则报 NETSDK1022 重复项 -->
-    <Content Update="tools\pylab\snippets_extra.json" CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
+  <!-- 2026-10-22：PyLab（Python 教学平台）整块删除，
+       原先把 tools\pylab\** 复制到发布目录的三条 Content 一并去掉。
+       Python 模块留档在 git 分支 pylab-local / tag pylab-standalone-2026-10-22，
+       本地单机版工作副本在 D:/projects/pylab-local。 -->
 
 </Project>

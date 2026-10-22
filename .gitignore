@@ -499,3 +499,6 @@ CheckinApp/wwwroot/download/*.apk
 
 # PyLab 上传的课件（原始 ppt + 逐页 PNG，体积大，绝不入库）
 CheckinApp/data/pylab/
+
+# 数据保护密钥（含私钥！放在 data/keys 是为了让发版脚本保留，绝不能入库）
+CheckinApp/data/keys/

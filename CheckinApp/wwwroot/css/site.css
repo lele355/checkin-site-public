@@ -262,6 +262,15 @@ button { font: inherit; color: inherit; }
 .site-foot .foot-links a + a::before {
   content: "·"; position: absolute; left: -8px; color: var(--border-strong);
 }
+/* 备案号一行：ICP 备案 + 公安联网备案。两者都是法规要求必须展示的，
+   窄屏自动折行；公安那个图标必须排在编号之前（平台明确要求），
+   所以用 inline-flex 把图标和文字锁在一起，不会在中间换行。 */
+.site-foot .foot-beian {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 2px 14px; margin-top: 2px;
+}
+.site-foot .foot-beian a { display: inline-flex; align-items: center; gap: 5px; }
+.site-foot .foot-beian img { height: 16px; width: auto; flex: 0 0 auto; }
 
 /* 站内文档互链（关于 / 隐私 / 协议）：整行可点，右侧箭头，
    分隔线画在行底而不是用 border-bottom 的最后一行——最后一行去线。 */

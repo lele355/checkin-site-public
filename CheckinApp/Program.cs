@@ -2,6 +2,7 @@ using CheckinApp.Data;
 using CheckinApp.Security;
 using CheckinApp.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +13,24 @@ var builder = WebApplication.CreateBuilder(args);
 // 本地私密配置（API Key 等）：gitignored，绝不入库。
 // 也支持环境变量覆盖（Ai__ApiKey 或 MIMO_API_KEY），服务器部署用环境变量更省事。
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+// 单机模式配置：只有本地打包分发时才存在这个文件，线上没有 → 行为完全不变
+builder.Configuration.AddJsonFile("appsettings.LocalMode.json", optional: true, reloadOnChange: false);
+
+// ---------- 单机（本地部署）模式 ----------
+// 环境变量 CHECKIN_LOCAL=1 或 Local:Enabled=true 时打开（免登录 + 可收窄侧栏）。
+// 必须在这里做：任何请求进来之前。
+LocalMode.Init(builder.Configuration);
+
+// ---------- 数据保护密钥 ----------
+// 默认落在「应用根目录/.aspnet/DataProtection-Keys」，而线上一发版就是整目录替换，
+// 于是每次部署密钥环都被换掉：所有人登录态失效、表单防伪令牌解不开，
+// 日志里刷一串 "The key {…} was not found in the key ring"。
+// 改放到 data/keys —— 部署脚本会把 data/ 原样保留，从此发版不再踢人下线。
+// SetApplicationName 固定下来，避免将来程序集改名后找不到旧密钥。
+builder.Services.AddDataProtection()
+    .SetApplicationName("anlele-checkin")
+    .PersistKeysToFileSystem(new DirectoryInfo(
+        Path.Combine(builder.Environment.ContentRootPath, "data", "keys")));
 
 // ---------- 服务注册 ----------
 // Razor 默认只把 ASCII 当「安全字符」，中文会被转义成 &#x5B89; 这类实体。
@@ -108,12 +127,22 @@ builder.Services.AddScoped<AiActionExecutor>();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
 builder.Services.AddSingleton<EmailCrypto>();
 builder.Services.AddScoped<EmailSyncService>();
-builder.Services.AddHostedService<EmailSyncBackgroundService>();
+
+// 两个后台轮询服务只在多用户线上版有意义：单机教学机里没有邮箱配置，
+// 起来只会每 30 秒空转一次、还可能刷「未配置」日志。服务本身仍注册（页面不崩），
+// 只是不让它常驻跑。
+if (!LocalMode.Enabled)
+{
+    builder.Services.AddHostedService<EmailSyncBackgroundService>();
+}
 
 // 每日邮件提醒：摘要构建 + SMTP 发信 + 每分钟轮询到点发送
 builder.Services.AddScoped<MailSender>();
 builder.Services.AddScoped<DailyReminderMailer>();
-builder.Services.AddHostedService<DailyMailBackgroundService>();
+if (!LocalMode.Enabled)
+{
+    builder.Services.AddHostedService<DailyMailBackgroundService>();
+}
 
 var app = builder.Build();
 
@@ -167,7 +196,17 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 app.UseRouting();
+
 app.UseAuthentication();
+
+// 单机模式：Cookie 认证没认出人时，直接注入管理员身份。
+// 必须夹在 UseAuthentication 之后、UseAuthorization 之前 —— 授权读的是 ctx.User。
+// 三重判断（开关 + 回环 IP + 本机 Host）都在 LocalMode 里，线上不会触发。
+if (LocalMode.Enabled)
+{
+    app.UseMiddleware<LocalAutoLoginMiddleware>();
+}
+
 app.UseAuthorization();
 app.UseMiddleware<MustChangePasswordMiddleware>();
 app.MapRazorPages();

@@ -27,6 +27,9 @@
                 <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">工信部备案查询</a>
             </div>
             <div class="hint">
+                公安联网备案：<a href="https://beian.mps.gov.cn/#/query/webSearch?code=61010302001655" target="_blank" rel="noreferrer noopener"><img src="~/icons/beian-gongan.png" alt="公安备案图标" width="14" height="16" style="height:16px;width:auto;vertical-align:-3px;margin-right:4px;" asp-append-version="true" />陕公网安备61010302001655号</a>
+            </div>
+            <div class="hint">
                 App 备案：@(string.IsNullOrEmpty(Model.AppBeiAn) ? "办理中" : Model.AppBeiAn)
             </div>
         </div>
