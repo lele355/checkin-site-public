@@ -30,8 +30,6 @@ public static class PermissionCatalog
         new("ai.use",          "ai",         "AI 助手（聊天 + 建议单，写操作需确认）"),
         // ---------- M7 邮件 ----------
         new("email.use",       "email",      "邮件（多邮箱收件箱，授权码加密存储）"),
-        // ---------- 临时模块：Python 教学平台 ----------
-        new("pylab.use",       "pylab",      "Python 教学平台（课件播放与代码演示）"),
     ];
 
     /// <summary>普通用户角色的默认权限包（管理员=全部）。
@@ -41,7 +39,7 @@ public static class PermissionCatalog
         "workbench.view", "schedule.use", "memo.use",
         "habits.use", "courses.use", "anniversary.use", "board.use",
         "expense.use", "export.use", "reminders.use", "stats.use", "ai.use",
-        "email.use", "pylab.use",
+        "email.use",
     ];
 
     /// <summary>「情侣」内置角色 = 普通默认包 + 情侣空间 + 经期助手（给伴侣账号用）</summary>
@@ -66,7 +64,6 @@ public static class PermissionCatalog
         ["stats"]       = "统计年报",
         ["ai"]          = "AI 助手",
         ["email"]       = "邮件",
-        ["pylab"]       = "Python 教学",
     };
 
     /// <summary>权限码 → 短中文名（工作台徽标等展示用，别把 code 原文甩给用户）</summary>
@@ -89,6 +86,5 @@ public static class PermissionCatalog
         ["stats.use"]       = "统计",
         ["ai.use"]          = "AI 助手",
         ["email.use"]       = "邮件",
-        ["pylab.use"]       = "Python 教学",
     };
 }

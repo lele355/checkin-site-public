@@ -27,9 +27,21 @@ public static class NavCatalog
         new("reminders",   "提醒",   "bell",     "/Reminders",   "reminders.use",  GroupTool, true),
         new("stats",       "统计",   "chart",    "/Stats",       "stats.use",      GroupTool, true),
         new("export",      "导出",   "download", "/Export",      "export.use",     GroupTool, true),
-        new("pylab",       "Python 教学", "list", "/PyLab",     "pylab.use",      GroupTool, true),
         new("admin-users", "用户管理", "users",  "/Admin/Users", "admin.users",    GroupAdmin, true),
         new("admin-invites","邀请码", "ticket", "/Admin/Invitations", "admin.users", GroupAdmin, true),
         new("admin-roles", "角色管理", "role",   "/Admin/Roles", "admin.roles",    GroupAdmin, true),
     ];
+
+    /// <summary>
+    /// 侧栏高亮判定：只比路径。
+    /// （2026-10-22 PyLab 删除后恢复了「不比查询串」的朴素规则 —— 带参页面
+    ///   比如 /Expenses?month=2026-10 也能正常亮起来，不会因为 query 不同就灭掉。）
+    /// </summary>
+    public static bool IsActive(NavItem item, string path, string? query)
+    {
+        var url = item.Url;
+        var q = url.IndexOf('?');
+        var urlPath = q < 0 ? url : url[..q];
+        return string.Equals(urlPath, path, StringComparison.OrdinalIgnoreCase);
+    }
 }
