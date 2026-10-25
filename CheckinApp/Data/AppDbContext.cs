@@ -29,6 +29,10 @@ public partial class AppDbContext : DbContext
     public DbSet<MailReminderSetting> MailReminderSettings => Set<MailReminderSetting>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<AiUsageDaily> AiUsageDailies => Set<AiUsageDaily>();
+    /// <summary>App 接口令牌（Bearer），见 Models/ApiToken.cs</summary>
+    public DbSet<ApiToken> ApiTokens => Set<ApiToken>();
+    /// <summary>通知设置（本地提醒），一人一行</summary>
+    public DbSet<NotifySetting> NotifySettings => Set<NotifySetting>();
 
     protected override void OnModelCreating(ModelBuilder m)
     {
@@ -177,6 +181,21 @@ public partial class AppDbContext : DbContext
             // 一人一行：UserId 唯一，后台轮询直接按 Enabled + Hour 取
             e.HasIndex(x => x.UserId).IsUnique();
             e.HasIndex(x => new { x.Enabled, x.Hour });
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // App 接口令牌：按哈希查（唯一索引，验证只走一次索引扫描）；用户删号级联清令牌
+        m.Entity<ApiToken>(e =>
+        {
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => x.UserId);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 通知设置：一人一行，删号级联
+        m.Entity<NotifySetting>(e =>
+        {
+            e.HasIndex(x => x.UserId).IsUnique();
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }

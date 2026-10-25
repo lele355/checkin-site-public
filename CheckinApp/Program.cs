@@ -83,7 +83,35 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.Cookie.SameSite = SameSiteMode.Lax;      // 防 CSRF 基础
         o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // 本地 http / 生产 https 自动适配
         o.Cookie.Name = "checkin_auth";
+        // App 走 Bearer，不是浏览器：未登录/无权限时必须回 JSON，不能 302 到登录页的 HTML
+        o.Events.OnRedirectToLogin = ctx =>
+        {
+            if (ctx.Request.Path.StartsWithSegments("/api"))
+            {
+                ctx.Response.StatusCode = 401;
+                return ctx.Response.WriteAsJsonAsync(new { ok = false, error = "登录已过期，请重新登录" });
+            }
+            ctx.Response.Redirect(ctx.RedirectUri);
+            return Task.CompletedTask;
+        };
+        o.Events.OnRedirectToAccessDenied = ctx =>
+        {
+            if (ctx.Request.Path.StartsWithSegments("/api"))
+            {
+                ctx.Response.StatusCode = 403;
+                return ctx.Response.WriteAsJsonAsync(new { ok = false, error = "没有权限" });
+            }
+            ctx.Response.Redirect(ctx.RedirectUri);
+            return Task.CompletedTask;
+        };
     });
+
+// App 接口的跨域白名单：为将来「网页版 SPA / 本地调试页」留口子。
+// 原生 App（OkHttp）不是浏览器，本来不受同源限制，所以这里只放必要来源，不开 AllowAnyOrigin。
+builder.Services.AddCors(o => o.AddPolicy("app", p => p
+    .WithOrigins("https://localhost", "capacitor://localhost", "http://localhost")
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
 
 builder.Services.AddAuthorization(o =>
 {
@@ -101,6 +129,9 @@ builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUser>();
 builder.Services.AddSingleton<LoginRateLimiter>();
+
+// App 接口令牌（Bearer）：与网站 Cookie 认证并行的第二条通道
+builder.Services.AddScoped<CheckinApp.Security.ApiTokenService>();
 
 // ---------- 注册防护 ----------
 // 邀请码 + 一次性表单令牌 + 填写时长校验（见 Services/RegistrationGuard.cs）。
@@ -167,6 +198,12 @@ if (!app.Environment.IsDevelopment())
 // 响应压缩要放在管线最前面（在静态文件之前），压缩才有机会作用于所有响应
 app.UseResponseCompression();
 
+// API 异常统一翻成 JSON（放最外层，才能兜住后面所有中间件与端点抛的错）
+app.UseMiddleware<CheckinApp.Api.ApiExceptionMiddleware>();
+
+// 跨域：只给 App 的本地来源开（原生 OkHttp 本来不受同源限制，这条是给将来的 Web SPA / 调试页留的）
+app.UseCors("app");
+
 // 静态文件缓存策略：
 // - css/js 都带 asp-append-version（URL 后缀内容哈希），改了文件 URL 就变，
 //   所以敢给 max-age=1 年 + immutable —— 翻页时浏览器直接用本地缓存，不发请求。
@@ -199,6 +236,10 @@ app.UseRouting();
 
 app.UseAuthentication();
 
+// App 令牌：Cookie 没认出人时，用 Authorization: Bearer 认一次
+// （必须在 UseAuthentication 之后、UseAuthorization 之前 —— 授权读 ctx.User）
+app.UseMiddleware<CheckinApp.Security.ApiTokenMiddleware>();
+
 // 单机模式：Cookie 认证没认出人时，直接注入管理员身份。
 // 必须夹在 UseAuthentication 之后、UseAuthorization 之前 —— 授权读的是 ctx.User。
 // 三重判断（开关 + 回环 IP + 本机 Host）都在 LocalMode 里，线上不会触发。
@@ -210,5 +251,16 @@ if (LocalMode.Enabled)
 app.UseAuthorization();
 app.UseMiddleware<MustChangePasswordMiddleware>();
 app.MapRazorPages();
+
+// ---------- App 原生接口（/api/v1） ----------
+// 网站的 Razor 页面一行没动：App 只走这套 JSON 接口，两边共用同一个库、同一套权限码。
+CheckinApp.Api.AuthApi.Map(app);
+CheckinApp.Api.CoreApi.Map(app);
+CheckinApp.Api.LifeApi.Map(app);
+CheckinApp.Api.SocialApi.Map(app);
+CheckinApp.Api.AiApi.Map(app);
+CheckinApp.Api.EmailApi.Map(app);
+CheckinApp.Api.AdminApi.Map(app);
+CheckinApp.Api.NotifyApi.Map(app);
 
 app.Run();

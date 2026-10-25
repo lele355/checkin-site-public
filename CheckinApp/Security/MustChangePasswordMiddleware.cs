@@ -9,7 +9,10 @@ namespace CheckinApp.Security;
 public class MustChangePasswordMiddleware(RequestDelegate next)
 {
     private static readonly string[] WhitelistPrefixes =
-        ["/login", "/changepassword", "/logout", "/preferences", "/css/", "/js/", "/lib/", "/favicon"];
+        ["/login", "/changepassword", "/logout", "/preferences", "/css/", "/js/", "/lib/", "/favicon",
+         // App 接口不能 302：前端期望 JSON。是否强制改密由 /api/v1/me 的 mustChangePassword 字段告诉它，
+         // 由客户端自己跳到改密页（服务端仍只放行 /api/v1/auth 与 /api/v1/me 两类端点，其它端点照样 409）。
+         "/api/"];
 
     public async Task InvokeAsync(HttpContext ctx, IServiceScopeFactory scopeFactory)
     {

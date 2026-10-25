@@ -1924,3 +1924,73 @@ main.content { scroll-timeline: --main-scroll block; }
 .btn:disabled, .btn[disabled] {
   opacity: .45; cursor: not-allowed; box-shadow: none; transform: none;
 }
+
+/* =========================================================
+   原生壳（Capacitor / Android WebView）性能优化 —— 视觉零改动
+   =========================================================
+   现象：同一页面桌面 Chrome 顺滑、App 里的 WebView 一顿一顿。
+   差别不在「用了哪些样式」，而在「这些绘制的结果能不能留住」——
+   桌面 Chrome 把卡片光栅化成瓦片缓进显存，滚动只是搬纹理；
+   Android WebView 的瓦片预算小，滚一屏就淘汰上一屏，下一屏从头重画。
+
+   所以这里不砍任何视觉效果，只做三件不改变像素的事：
+   ① 删掉「算了也看不见」的绘制（模糊纯色 = 纯色；模糊被不透明底盖住）
+   ② 让贵的绘制「画一次就存住」（提升为独立合成层，绕开瓦片淘汰）
+   ③ 去掉「本来就不可能生效」的过渡（渐变无法插值）
+   外加 ④：触屏上永远不会跑的东西，别让它参与样式计算。
+
+   ⚠ 改这块之前先记住：themes.css 在 site.css 之后加载，
+     若要盖住 themes.css 里的同名规则，选择器必须带 html 前缀提权。
+   ========================================================= */
+
+/* ---------- ① 删掉算了也看不见的模糊 ---------- */
+
+/* macos 的侧栏毛玻璃：背后只有 body 铺的一层纯色 --bg，
+   对纯色做高斯模糊，结果还是那个纯色 —— 等于每帧白算一遍全高模糊。
+   （顶栏那层不能删，它背后是真的有内容在滚。） */
+html[data-theme="macos"] .sidebar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* 侧栏底部那条毛玻璃同理：--sidebar-bg 不透明的主题里（default /
+   editorial / neumorphism / natural 全家），模糊结果被不透明背景盖得严严实实。
+   clay 和 macos 的 sidebar-bg 是半透明，那两套保留原样。 */
+html:not([data-theme="clay"]):not([data-theme="macos"]) .sidebar .sidebar-foot {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* ---------- ② 让贵的绘制只画一次 ---------- */
+
+/* 原生壳里把「渐变底 + 32px 圆角 + 三层阴影」的卡片提升为独立合成层，
+   光栅化结果当成层纹理留住，滚动时只移动纹理，不再随瓦片淘汰重画。
+   只给工作台卡片（6~8 张、面积大、最划算）；长列表页卡片太多，
+   逐张成层要吃掉几十 MB 显存，反而更卡，所以不碰那一类。
+   这里只声明 will-change，不加 translateZ(0) —— 3D 变换会把文字从
+   亚像素抗锯齿降成灰度抗锯齿，字会发虚，那就等于改像素了。 */
+html.is-native .dash-grid > .card {
+  will-change: transform;
+}
+
+/* ---------- ③ 去掉不可能生效的过渡 ---------- */
+
+/* .card 的 transition 里挂着 background，但 clay 的 --card 是渐变，
+   渐变之间无法插值，这条 transition 从上线起就没生效过；留着只是让每次
+   状态变化多做一轮样式计算 + 整卡重绘。删掉 = 视觉零变化。 */
+[data-theme="clay"] .card {
+  transition: box-shadow var(--dur) var(--easing), border-color var(--dur) var(--easing);
+}
+
+/* ---------- ④ 触屏上本来就不该跑的东西 ---------- */
+
+/* 磁吸位移只在细指针设备生效，WebView 里永远不触发，
+   但 .btn 上那条含 translate / transform 的过渡链仍在参与样式计算。 */
+html.is-native .btn,
+html.is-native .btn.mag-live {
+  transition: background var(--dur) var(--easing), color var(--dur) var(--easing), transform .2s var(--spring);
+}
+
+/* 触屏惯性滚动：WebView 里要显式声明，否则内部滚动容器的惯性是断的 */
+html.is-native .sidebar,
+html.is-native main.content { -webkit-overflow-scrolling: touch; }

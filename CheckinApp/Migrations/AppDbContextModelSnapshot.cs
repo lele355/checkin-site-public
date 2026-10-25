@@ -123,6 +123,45 @@ namespace CheckinApp.Migrations
                     b.ToTable("Anniversaries");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.ApiToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Device")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Revoked")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ApiTokens");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.AppSetting", b =>
                 {
                     b.Property<int>("Id")
@@ -623,6 +662,75 @@ namespace CheckinApp.Migrations
                     b.ToTable("Memos");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.NotifySetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AllDayMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AnnivEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AnnivMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("DigestEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DigestMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("DndEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DndEndMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DndStartMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HabitEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HabitMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PeriodDaysBefore")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("PeriodEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ScheduleEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ScheduleLeads")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("UnreadHint")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("NotifySettings");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.PeriodRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -871,6 +979,17 @@ namespace CheckinApp.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.ApiToken", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.BoardMessage", b =>
                 {
                     b.HasOne("CheckinApp.Models.User", "User")
@@ -1012,6 +1131,17 @@ namespace CheckinApp.Migrations
                 });
 
             modelBuilder.Entity("CheckinApp.Models.MemoItem", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.NotifySetting", b =>
                 {
                     b.HasOne("CheckinApp.Models.User", "User")
                         .WithMany()

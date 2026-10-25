@@ -3,6 +3,13 @@
 // （主题逻辑在 theme.js，本文件只管布局壳的交互）
 // ============================================================
 (function () {
+  // 原生壳标记：CSS 里 html.is-native 那一档降级全靠这个类。
+  // Capacitor 会在页面脚本执行前注入 window.Capacitor，所以这里能提前判定，
+  // 不必等 app-shell.js（它在本文件之后加载），否则首屏会先按网页版渲染一下。
+  var NATIVE = !!(window.Capacitor
+    && typeof window.Capacitor.isNativePlatform === 'function'
+    && window.Capacitor.isNativePlatform());
+  if (NATIVE) document.documentElement.classList.add('is-native');
   // ---- 手机抽屉开关（汉堡 / 遮罩共用） ----
   window.toggleDrawer = function (show) {
     var open = (typeof show === 'boolean')
@@ -205,13 +212,25 @@ document.addEventListener('page:load', initViewSwitch);   // 无刷新换主区�
   if (bar && !cssTimeline) {
     // 兜底：哪条滚动链动了就重算进度（手机=window，PC=main.content）
     // 进度条在 main.content 里，无刷新换主区后是新节点——每次重取，不闭包抓旧节点
-    var tick = function () {
+    var tickQueued = false;
+    var pickScrollEl = function () {
       var m = document.querySelector('main.content');
-      var el = (m && m.scrollHeight > m.clientHeight + 5) ? m : document.documentElement;
-      var max = el.scrollHeight - el.clientHeight;
-      var p = max > 0 ? Math.min(1, Math.max(0, el.scrollTop / max)) : 0;
-      var b2 = document.querySelector('.scroll-progress');
-      if (b2) b2.style.transform = 'scaleX(' + p + ')';
+      return (m && m.scrollHeight > m.clientHeight + 5) ? m : document.documentElement;
+    };
+    var tick = function () {
+      // 读 scrollHeight / clientHeight / scrollTop 都会强制同步布局；滚动时 scroll
+      // 事件一帧可能触发多次，不合并就是每帧多次 layout thrashing —— 桌面 Chrome
+      // 扛得住，Android WebView 上直接掉帧。合并到下一帧只算一次。
+      if (tickQueued) return;
+      tickQueued = true;
+      requestAnimationFrame(function () {
+        tickQueued = false;
+        var el = pickScrollEl();
+        var max = el.scrollHeight - el.clientHeight;
+        var p = max > 0 ? Math.min(1, Math.max(0, el.scrollTop / max)) : 0;
+        var b2 = document.querySelector('.scroll-progress');
+        if (b2) b2.style.transform = 'scaleX(' + p + ')';
+      });
     };
     window.addEventListener('scroll', tick, { passive: true });
     window.addEventListener('resize', tick);
@@ -244,21 +263,35 @@ document.addEventListener('page:load', initViewSwitch);   // 无刷新换主区�
       else card.classList.add('reveal');
       marks.push(card);
     });
+    // 观察器的回调跑在浏览器的布局阶段里，这时候改 class 会当场触发一次样式重算；
+    // 一屏进来十几张卡片就是十几次。攒到下一帧一次性加完，只重算一轮。
+    var pending = [];
+    var flushQueued = false;
+    var flush = function () {
+      flushQueued = false;
+      var batch = pending;
+      pending = [];
+      for (var i = 0; i < batch.length; i++) batch[i].classList.add('is-in');
+    };
+    // rootMargin 往下外扩 280px（约手机半屏）：元素还在视口外就开始淡入，
+    // 等它真滚到眼前，动画早走完了 —— 用户看到的是「稳稳在那儿的内容」，
+    // 而不是「滚一屏、冒一批、再滚一屏、又冒一批」。
+    // 原来的 -4% 是往视口里收，等于等元素探进视口才起跑，顿挫感最重。
     var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) {
-        if (!en.isIntersecting) return;
-        en.target.classList.add('is-in');
-        io.unobserve(en.target);                             // 只触发一次
-      });
-    }, { threshold: 0.08, rootMargin: '0px 0px -4% 0px' });
+      for (var i = 0; i < entries.length; i++) {
+        if (!entries[i].isIntersecting) continue;
+        pending.push(entries[i].target);
+        io.unobserve(entries[i].target);                     // 只触发一次
+      }
+      if (!pending.length || flushQueued) return;
+      flushQueued = true;
+      requestAnimationFrame(flush);
+    }, { threshold: 0, rootMargin: '0px 0px 280px 0px' });
     marks.forEach(function (el) { io.observe(el); });
-    // 兜底：万一 observe 后某元素仍在屏外且用户从不滚动（短页），1s 后全亮
-    setTimeout(function () {
-      marks.forEach(function (el) {
-        var r = el.getBoundingClientRect();
-        if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('is-in');
-      });
-    }, 1000);
+    // 原来这里还有个 1s 兜底：遍历所有标记逐个 getBoundingClientRect() 补亮。
+    // 但 observe() 时浏览器就会对每个目标做一次初始相交计算，屏内的元素早被
+    // 观察器自己标好了；屏外的元素用户没滚到也看不见。那次遍历纯属白做一次
+    // 全量强制布局，而且卡在「点开页面 1 秒」这个最要命的时机，删掉。
   };
   window.initReveal(document);
   document.addEventListener('page:load', function (e) { window.initReveal(e.detail || document); });
