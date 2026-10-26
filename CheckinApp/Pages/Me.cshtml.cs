@@ -35,8 +35,8 @@ public class MeModel(AppDbContext db, CurrentUser me) : PageModel
     public User? Row { get; private set; }
     public string Username => Row?.Username ?? "";
     public string RoleName => Row?.Role?.Name ?? "-";
-    public DateTime CreatedAt => Row?.CreatedAt.ToLocalTime() ?? DateTime.Now;
-    public DateTime? LastLoginAt => Row?.LastLoginAt?.ToLocalTime();
+    public DateTime CreatedAt => Row is { } r ? SiteClock.ToLocal(r.CreatedAt) : DateTime.Now;
+    public DateTime? LastLoginAt => Row?.LastLoginAt is DateTime t ? SiteClock.ToLocal(t) : null;
     public bool CanUsePeriod { get; private set; }
     public List<MeStat> Stats { get; private set; } = [];
     public int SampleRows { get; private set; }

@@ -96,6 +96,10 @@ button { font: inherit; color: inherit; }
 .btn-ghost:hover { color: var(--danger); border-color: var(--danger); }
 
 /* 窄屏顶栏拥挤：身份信息先收起来（工作台问候卡里已有姓名/角色），保操作 */
+/* 顶部「添加」只在桌面出现：手机用右下角 FAB，两个入口重复 */
+@media (max-width: 640px) {
+  .tt-pc-only { display: none !important; }
+}
 @media (max-width: 640px) {
   .user-chip { display: none; }
   .topbar { gap: 8px; padding: 0 max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); }
@@ -684,11 +688,57 @@ body {
 /* ---------- 课程表周视图（大节 × 星期，照教务课表） ---------- */
 .tt-nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
 .tt-week { display: flex; flex-direction: column; align-items: center; min-width: 118px; line-height: 1.35; }
-.tt-semester { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
 
-.tt-legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 2px 0 12px; }
-.tt-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; }
-.tt-legend-item i { width: 14px; height: 14px; border-radius: 3px; background: var(--cc); }
+/* ---- 顶部工具条：‹ 第 N 周 › + 右侧两个图标按钮 ----
+   学期起始 / 节次 / 非本周开关都收进「设置」二级页了，首屏只剩三件事：
+   换周、进设置、加课。 */
+.tt-top { padding: 8px 10px; }
+.tt-head { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.tt-head-main { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.tt-head-side { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.tt-arrow {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  font-size: 1.35rem; line-height: 1; text-decoration: none;
+  color: var(--text-sub); background: var(--card-soft, var(--bg-soft));
+  transition: background var(--dur) var(--easing), color var(--dur) var(--easing);
+}
+.tt-arrow:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.tt-arrow:active { transform: scale(.94); }
+.tt-week { min-width: 0; flex: 1; text-align: center; }
+.tt-week strong { font-size: 1.02rem; letter-spacing: .02em; }
+.tt-back {
+  font-size: .74rem; padding: 3px 9px; border-radius: 999px;
+  text-decoration: none; white-space: nowrap;
+  color: var(--accent-strong); background: var(--accent-soft);
+}
+.tt-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%; text-decoration: none;
+  color: var(--text-sub); background: var(--card-soft, var(--bg-soft));
+  transition: background var(--dur) var(--easing), color var(--dur) var(--easing);
+}
+.tt-icon-btn:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.tt-icon-btn.primary { background: var(--accent); color: var(--on-accent, #fff); }
+.tt-icon-btn.primary:hover { filter: brightness(1.06); color: var(--on-accent, #fff); }
+/* svg 的 stroke 是 presentation attribute，样式表里的 color 有时压不住它
+   （实测主色按钮上的加号会被画成和底色一样的深色，看起来是个空的圆）。
+   直接给 svg 指定 stroke，比靠 currentColor 稳。 */
+.tt-icon-btn svg { stroke: currentColor; }
+.tt-icon-btn.primary svg { stroke: var(--on-accent, #fff); }
+
+/* ---- 课表卡片：手机上贴边，让表格占满整屏（参考课程格子 APP 的形态） ---- */
+.tt-board { padding: 10px 12px 12px; }
+
+/* ---- 设置页（二级） ---- */
+.cs-block {
+  margin-top: 14px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-in);
+  background: var(--card-soft, var(--bg-soft));
+}
+.cs-block-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.cs-block-head b { font-size: .95rem; }
+.cs-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .tt-wrap { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
 .tt { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 880px; }
@@ -831,6 +881,15 @@ body {
 .ttm-dhead b { display: block; font-size: .72rem; }
 .ttm-dhead span { font-size: .6rem; color: var(--text-weak); }
 .ttm-dhead.today { background: var(--accent-soft); border-radius: 6px 6px 0 0; }
+/* 今天：日期做成反白小胶囊。
+   只用淡底色 + 加粗隔得太远看不见（editorial 主题的强调色本身就是墨黑，
+   和正文几乎同色）；反白胶囊在任何主题下都是「这一格不一样」。 */
+.ttm-dhead.today b { font-weight: 700; }
+.ttm-dhead.today span {
+  display: inline-block; padding: 0 5px; border-radius: 999px;
+  background: var(--accent); color: var(--on-accent, #fff);
+  font-weight: 600;
+}
 .ttm-body { display: grid; grid-template-columns: var(--ttm-gut) repeat(7, var(--ttm-col)); }
 .ttm-gutter { border-right: 1px solid var(--border); }
 .ttm-gcell {
@@ -850,8 +909,12 @@ body {
 .ttm-day.today { background-color: var(--accent-soft); }
 .ttm-card {
   position: absolute; display: block; overflow: hidden;
-  padding: 2px 3px; border-radius: 6px; text-decoration: none;
-  background: var(--cc-bg); color: var(--cc);
+  padding: 3px 4px; border-radius: 7px; text-decoration: none;
+  /* 半透明底 + 同色细边：底色压薄一点，课程名读起来更轻，
+     也让「今天列」的淡底能透出来（纯实色会把整列的高亮盖掉）。 */
+  background: color-mix(in srgb, var(--cc-bg) 74%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cc) 22%, transparent);
+  color: var(--cc);
   font-size: .58rem; line-height: 1.25;
 }
 .ttm-card b { display: block; font-size: .62rem; word-break: break-all; }

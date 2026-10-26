@@ -40,7 +40,7 @@ else
                     <div style="flex:1;min-width:160px;">
                         @if (a.LastSyncAt is DateTime t)
                         {
-                            <div class="mini">上次同步：@t.ToLocalTime().ToString("MM-dd HH:mm")</div>
+                            <div class="mini">上次同步：@CheckinApp.Services.SiteClock.ToLocal(t).ToString("MM-dd HH:mm")</div>
                         }
                         else
                         {

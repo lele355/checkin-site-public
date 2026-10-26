@@ -45,7 +45,7 @@ else
                         {
                             <div class="mr-snippet">@(m.Content.Length > 80 ? m.Content.Substring(0, 80) + "…" : m.Content)</div>
                         }
-                        <span class="mini mr-time">@m.UpdatedAt.ToLocalTime().ToString("MM-dd HH:mm")</span>
+                        <span class="mini mr-time">@CheckinApp.Services.SiteClock.ToLocal(m.UpdatedAt).ToString("MM-dd HH:mm")</span>
                     </a>
                 </div>
             }
@@ -71,7 +71,7 @@ else
                     <div class="hint" style="white-space:pre-wrap;flex:1;">@(m.Content.Length > 200 ? m.Content.Substring(0, 200) + "…" : m.Content)</div>
                 }
                 <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span class="mini">@m.UpdatedAt.ToLocalTime().ToString("MM-dd HH:mm")</span>
+                    <span class="mini">@CheckinApp.Services.SiteClock.ToLocal(m.UpdatedAt).ToString("MM-dd HH:mm")</span>
                     <a href="/Memo/Edit/@m.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
                 </div>
             </div>

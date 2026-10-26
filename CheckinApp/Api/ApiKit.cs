@@ -37,6 +37,22 @@ internal static class ApiKit
     public static string? TN(DateTime? d) => d?.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
     public static string Stamp(DateTime d) => d.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// UTC 时间戳 → 「业务时区的墙钟时间」字符串。**给 CreatedAt / UpdatedAt 这类字段用。**
+    ///
+    /// 【为什么不能直接用 Stamp】SQLite 不保存 DateTime 的 Kind，从库里读出来一律是
+    /// Unspecified。写库时存的是 DateTime.UtcNow（UTC 数值），直接格式化就是对着一串
+    /// UTC 数字说「这是本地时间」——客户端按本地解析，正好差 8 小时（留言板时间对不上就是这个）。
+    ///
+    /// 输出仍不带时区后缀，客户端按本地墙钟解析；因为值本身已经是换算过的本地时间，
+    /// 两边就一致了。不要给它加 "Z"——加了客户端会再转一次，变成 +8。
+    /// </summary>
+    public static string StampUtc(DateTime utc) =>
+        Stamp(SiteClock.ToLocal(DateTime.SpecifyKind(utc, DateTimeKind.Utc)));
+
+    /// <summary>可空版：null 输出空串（App 端按「暂无」处理）</summary>
+    public static string StampUtc(DateTime? utc) => utc is null ? "" : StampUtc(utc.Value);
+
     /// <summary>"2026-10-23" / "2026-10-23T09:30" / ISO 带 Z 都能吃。
     /// 带 Z 的按 UTC 转本地；不带时区的当本地墙钟时间（与用户输入的语义一致）。</summary>
     public static DateTime? ParseDT(string? s)
@@ -144,8 +160,8 @@ internal static class ApiDtos
             accent = Allowed(u.Accent, AccentSet, ""),
             tone = Allowed(u.Tone, ToneSet, ""),
             mustChangePassword = u.MustChangePassword,
-            createdAt = ApiKit.Stamp(u.CreatedAt),
-            lastLoginAt = u.LastLoginAt is null ? "" : ApiKit.Stamp(u.LastLoginAt.Value),
+            createdAt = ApiKit.StampUtc(u.CreatedAt),
+            lastLoginAt = u.LastLoginAt is null ? "" : ApiKit.StampUtc(u.LastLoginAt.Value),
             permissions = perms,
             // 权限码的短中文名（顺序与 permissions 一致）——App「我的」页要直接展示，不想在客户端再维护一份映射
             permissionLabels = perms.Select(c => CheckinApp.Security.PermissionCatalog.PermLabels.GetValueOrDefault(c, c)).ToList(),

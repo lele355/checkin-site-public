@@ -54,7 +54,7 @@ public static class AuthApi
             return ApiKit.Ok(new
             {
                 token,
-                expiresAt = ApiKit.Stamp(row.ExpiresAt),
+                expiresAt = ApiKit.StampUtc(row.ExpiresAt),
                 user = ApiDtos.Me(db, user.Id),
             });
         }).AllowAnonymous();

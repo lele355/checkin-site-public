@@ -37,7 +37,7 @@ public static class EmailApi
                     imapHost = a.ImapHost, imapPort = a.ImapPort,
                     smtpHost = a.SmtpHost, smtpPort = a.SmtpPort,
                     hasAuthCode = a.AuthCodeEnc.Length > 0,
-                    lastSyncAt = ApiKit.Stamp(a.LastSyncAt ?? default),
+                    lastSyncAt = ApiKit.StampUtc(a.LastSyncAt ?? default),
                     lastSyncError = a.LastSyncError,
                     unread = db.EmailMessages.Count(m => m.AccountId == a.Id && !m.IsRead),
                 }).ToList();
@@ -109,7 +109,7 @@ public static class EmailApi
                 {
                     id = m.Id, account = labels.GetValueOrDefault(m.AccountId, "已删除账号"),
                     fromName = m.FromName, fromAddress = m.FromAddress, subject = m.Subject,
-                    snippet = m.Snippet, sentAt = ApiKit.Stamp(m.SentAt),
+                    snippet = m.Snippet, sentAt = ApiKit.StampUtc(m.SentAt),
                     isRead = m.IsRead, hasAttachment = m.HasAttachment, sizeBytes = m.SizeBytes,
                 }).ToList();
 
@@ -139,7 +139,7 @@ public static class EmailApi
             {
                 id = m.Id,
                 fromName = m.FromName, fromAddress = m.FromAddress, toAddress = m.ToAddress,
-                subject = m.Subject, sentAt = ApiKit.Stamp(m.SentAt),
+                subject = m.Subject, sentAt = ApiKit.StampUtc(m.SentAt),
                 hasAttachment = m.HasAttachment, body, bodyError = err,
             });
         });

@@ -93,7 +93,7 @@
                 <td><span class="chip">@r.RoleName</span></td>
                 <td>@r.Note</td>
                 <td style="color:@(r.StatusTone == "ok" ? "var(--ok)" : r.StatusTone == "warn" ? "var(--warn)" : "var(--text-weak)");">@r.Status</td>
-                <td class="meta">@r.ExpiresAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                <td class="meta">@CheckinApp.Services.SiteClock.ToLocal(r.ExpiresAt).ToString("yyyy-MM-dd HH:mm")</td>
                 <td>@r.UsedBy</td>
                 <td style="white-space:nowrap;">
                     @if (r.Status == "可用")

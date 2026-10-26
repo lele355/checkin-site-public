@@ -31,8 +31,8 @@ public static class AdminApi
                     roleId = u.RoleId, roleName = u.Role?.Name ?? "-",
                     isActive = u.IsActive, mustChangePassword = u.MustChangePassword,
                     isSelf = u.Id == meId,
-                    createdAt = ApiKit.Stamp(u.CreatedAt),
-                    lastLoginAt = u.LastLoginAt is null ? "" : ApiKit.Stamp(u.LastLoginAt.Value),
+                    createdAt = ApiKit.StampUtc(u.CreatedAt),
+                    lastLoginAt = u.LastLoginAt is null ? "" : ApiKit.StampUtc(u.LastLoginAt.Value),
                 }).ToList();
             var roles = db.Roles.OrderBy(r => r.Id).Select(r => new { id = r.Id, name = r.Name }).ToList();
             return ApiKit.Ok(new { items, roles });
@@ -209,11 +209,11 @@ public static class AdminApi
                 {
                     id = i.Id, code = i.Code, note = i.Note,
                     roleId = i.RoleId, roleName = i.Role?.Name ?? "-",
-                    createdAt = ApiKit.Stamp(i.CreatedAt),
-                    expiresAt = ApiKit.Stamp(i.ExpiresAt),
+                    createdAt = ApiKit.StampUtc(i.CreatedAt),
+                    expiresAt = ApiKit.StampUtc(i.ExpiresAt),
                     used = i.UsedAt is not null,
                     usedBy = i.UsedBy?.DisplayName ?? "",
-                    usedAt = i.UsedAt is null ? "" : ApiKit.Stamp(i.UsedAt.Value),
+                    usedAt = i.UsedAt is null ? "" : ApiKit.StampUtc(i.UsedAt.Value),
                     revoked = i.Revoked,
                     expired = i.ExpiresAt <= DateTime.UtcNow,
                     usable = i.UsedAt is null && !i.Revoked && i.ExpiresAt > DateTime.UtcNow,
@@ -239,7 +239,7 @@ public static class AdminApi
             };
             db.Invitations.Add(row);
             db.SaveChanges();
-            return ApiKit.Ok(new { id = row.Id, code, expiresAt = ApiKit.Stamp(row.ExpiresAt) });
+            return ApiKit.Ok(new { id = row.Id, code, expiresAt = ApiKit.StampUtc(row.ExpiresAt) });
         });
 
         iv.MapPost("/{id:int}/revoke", (int id, AppDbContext db) =>

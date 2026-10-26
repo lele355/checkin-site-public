@@ -74,7 +74,7 @@
                     </div>
                 }
 
-                <div class="mini" style="margin-top:6px;">@m.CreatedAt.ToLocalTime().ToString("MM-dd HH:mm")</div>
+                <div class="mini" style="margin-top:6px;">@CheckinApp.Services.SiteClock.ToLocal(m.CreatedAt).ToString("MM-dd HH:mm")</div>
             </div>
         </div>
     }

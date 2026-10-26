@@ -97,7 +97,7 @@ public static class SocialApi
                     id = b.Id, content = b.Content,
                     author = b.User?.DisplayName ?? "?",
                     authorId = b.UserId, mine = b.UserId == uid,
-                    createdAt = ApiKit.Stamp(b.CreatedAt),
+                    createdAt = ApiKit.StampUtc(b.CreatedAt),
                 }).ToList();
             return ApiKit.Ok(new { items, hasMore = items.Count == 50 });
         });
@@ -145,7 +145,7 @@ public static class SocialApi
                     id = n.Id, content = n.Content,
                     from = n.FromUser?.DisplayName ?? "?",
                     fromId = n.FromUserId, mine = n.FromUserId == uid,
-                    createdAt = ApiKit.Stamp(n.CreatedAt),
+                    createdAt = ApiKit.StampUtc(n.CreatedAt),
                 }).ToList();
 
             var today = DateTime.Today;
@@ -316,7 +316,7 @@ public static class SocialApi
                 schedules = db.Schedules.Where(x => x.UserId == uid).OrderBy(x => x.StartAt).ToList()
                     .Select(x => new { x.Title, x.Description, startAt = ApiKit.T(x.StartAt), endAt = ApiKit.TN(x.EndAt), x.AllDay }),
                 memos = db.Memos.Where(x => x.UserId == uid).ToList()
-                    .Select(x => new { x.Title, x.Content, x.Pinned, createdAt = ApiKit.Stamp(x.CreatedAt) }),
+                    .Select(x => new { x.Title, x.Content, x.Pinned, createdAt = ApiKit.StampUtc(x.CreatedAt) }),
                 habits = db.Habits.Where(x => x.UserId == uid).ToList()
                     .Select(h => new
                     {
@@ -333,7 +333,7 @@ public static class SocialApi
                 period = db.PeriodRecords.Where(x => x.UserId == uid).ToList()
                     .Select(x => new { startDate = ApiKit.D(x.StartDate), endDate = ApiKit.DN(x.EndDate), x.Note }),
                 board = db.BoardMessages.Where(x => x.UserId == uid).ToList()
-                    .Select(x => new { x.Content, createdAt = ApiKit.Stamp(x.CreatedAt) }),
+                    .Select(x => new { x.Content, createdAt = ApiKit.StampUtc(x.CreatedAt) }),
             };
 
             var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions

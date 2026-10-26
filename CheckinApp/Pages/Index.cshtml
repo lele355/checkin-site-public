@@ -265,7 +265,7 @@
                                 <div style="flex:1;min-width:0;">
                                     <div style="font-weight:600;@(m.IsRead ? "" : "font-weight:700;")">
                                         @(string.IsNullOrWhiteSpace(m.FromName) ? m.FromAddress : m.FromName)
-                                        <span class="mini" style="font-weight:400;">@m.SentAt.ToLocalTime().ToString("MM-dd HH:mm")</span>
+                                        <span class="mini" style="font-weight:400;">@CheckinApp.Services.SiteClock.ToLocal(m.SentAt).ToString("MM-dd HH:mm")</span>
                                     </div>
                                     <div class="hint" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@m.Subject</div>
                                 </div>
@@ -299,7 +299,7 @@
                         <div class="list-line" style="display:block;">
                             <div style="font-weight:600;">
                                 @(b.User?.DisplayName ?? "某人")
-                                <span class="mini" style="font-weight:400;">@b.CreatedAt.ToLocalTime().ToString("MM-dd HH:mm")</span>
+                                <span class="mini" style="font-weight:400;">@CheckinApp.Services.SiteClock.ToLocal(b.CreatedAt).ToString("MM-dd HH:mm")</span>
                             </div>
                             <div class="hint" style="margin-top:2px;">@(b.Content.Length > 60 ? b.Content.Substring(0, 60) + "…" : b.Content)</div>
                         </div>

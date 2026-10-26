@@ -201,7 +201,7 @@ public static class AiApi
             content = m.Content,
             imageMime = m.ImageMime,
             hasImage = m.ImageMime.Length > 0,
-            createdAt = ApiKit.Stamp(m.CreatedAt),
+            createdAt = ApiKit.StampUtc(m.CreatedAt),
             actions = Cards(m.ActionsJson),
         }).ToList();
 

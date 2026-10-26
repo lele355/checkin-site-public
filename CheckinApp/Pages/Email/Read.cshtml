@@ -19,7 +19,7 @@
     <div class="mail-meta">
         <div><span class="mini">发件人</span> <b>@(string.IsNullOrWhiteSpace(m.FromName) ? m.FromAddress : m.FromName)</b> <span class="mini">@m.FromAddress</span></div>
         <div><span class="mini">收件人</span> @m.ToAddress</div>
-        <div><span class="mini">时间</span> @m.SentAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+        <div><span class="mini">时间</span> @CheckinApp.Services.SiteClock.ToLocal(m.SentAt).ToString("yyyy-MM-dd HH:mm")</div>
         <div style="display:flex;gap:8px;align-items:center;">
             <span class="chip">@Model.AccountLabel</span>
             @if (m.HasAttachment)

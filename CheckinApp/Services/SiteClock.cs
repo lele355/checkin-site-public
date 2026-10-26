@@ -77,10 +77,17 @@ public static class SiteClock
     /// <summary>今天（零点，业务时区）</summary>
     public static DateTime Today => Now.Date;
 
-    /// <summary>UTC 时间戳 → 业务时区墙钟时间</summary>
+    /// <summary>
+    /// UTC 时间戳 → 业务时区墙钟时间。
+    ///
+    /// 【为什么无条件按 UTC 处理】SQLite 不保存 DateTimeKind，读出来可能是 Unspecified，
+    /// 也可能是 Local（取决于 provider 与存储格式）。库里的时间戳是 DateTime.UtcNow 写进去的
+    /// 「UTC 数值」，如果因为 Kind 被标成 Local 就直接返回，等于把 UTC 数字当本地时间用 ——
+    /// 留言板时间差 8 小时就是这么来的。所以这里一律 SpecifyKind(Utc) 再换算。
+    /// 调用方（时间戳字段）语义统一，不会误伤「本地墙钟」字段 —— 那些不走这个方法。
+    /// </summary>
     public static DateTime ToLocal(DateTime utc) =>
-        utc.Kind == DateTimeKind.Local ? utc
-        : TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Zone);
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Zone);
 
     /// <summary>「2026-10-26」—— 给 input[type=date] 的默认值用</summary>
     public static string IsoToday => Today.ToString("yyyy-MM-dd");

@@ -67,7 +67,7 @@ else
                             <span title="带附件">@Html.Raw(Icons.Svg("paperclip", 13))</span>
                         }
                         <span class="chip">@row.AccountLabel</span>
-                        <span class="mini">@m.SentAt.ToLocalTime().ToString("MM-dd HH:mm")</span>
+                        <span class="mini">@CheckinApp.Services.SiteClock.ToLocal(m.SentAt).ToString("MM-dd HH:mm")</span>
                     </span>
                 </a>
             }

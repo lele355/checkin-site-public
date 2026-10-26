@@ -40,7 +40,7 @@ public static class CoreApi
             var pinned = db.Memos
                 .Where(m => m.UserId == uid && m.Pinned)
                 .OrderByDescending(m => m.UpdatedAt).Take(3).ToList()
-                .Select(m => new { id = m.Id, title = m.Title, content = m.Content, pinned = m.Pinned, updatedAt = ApiKit.Stamp(m.UpdatedAt) })
+                .Select(m => new { id = m.Id, title = m.Title, content = m.Content, pinned = m.Pinned, updatedAt = ApiKit.StampUtc(m.UpdatedAt) })
                 .ToList();
 
             // ---- 打卡 ----
@@ -129,7 +129,7 @@ public static class CoreApi
                     .Select(m => new
                     {
                         id = m.Id, from = m.FromName.Length > 0 ? m.FromName : m.FromAddress,
-                        subject = m.Subject, sentAt = ApiKit.Stamp(m.SentAt), isRead = m.IsRead, hasAttachment = m.HasAttachment,
+                        subject = m.Subject, sentAt = ApiKit.StampUtc(m.SentAt), isRead = m.IsRead, hasAttachment = m.HasAttachment,
                     }).ToList();
                 mails = new { hasAccounts, unread, recent };
             }
@@ -144,7 +144,7 @@ public static class CoreApi
                     {
                         id = b.Id, content = b.Content,
                         author = b.User?.DisplayName ?? "?",
-                        createdAt = ApiKit.Stamp(b.CreatedAt),
+                        createdAt = ApiKit.StampUtc(b.CreatedAt),
                     }));
             }
 
@@ -182,7 +182,7 @@ public static class CoreApi
                         {
                             id = lastNote.Id, content = lastNote.Content,
                             from = lastNote.FromUser?.DisplayName ?? "?",
-                            createdAt = ApiKit.Stamp(lastNote.CreatedAt),
+                            createdAt = ApiKit.StampUtc(lastNote.CreatedAt),
                         },
                     };
                 }
@@ -275,7 +275,7 @@ public static class CoreApi
                 {
                     id = s.Id, title = s.Title, description = s.Description,
                     startAt = ApiKit.T(s.StartAt), endAt = ApiKit.TN(s.EndAt), allDay = s.AllDay,
-                    updatedAt = ApiKit.Stamp(s.UpdatedAt),
+                    updatedAt = ApiKit.StampUtc(s.UpdatedAt),
                 }).ToList();
             return ApiKit.Ok(new { items, from = ApiKit.D(from), to = ApiKit.D(to) });
         });
@@ -342,7 +342,7 @@ public static class CoreApi
                 .Select(m => new
                 {
                     id = m.Id, title = m.Title, content = m.Content, pinned = m.Pinned,
-                    createdAt = ApiKit.Stamp(m.CreatedAt), updatedAt = ApiKit.Stamp(m.UpdatedAt),
+                    createdAt = ApiKit.StampUtc(m.CreatedAt), updatedAt = ApiKit.StampUtc(m.UpdatedAt),
                 }).ToList();
             return ApiKit.Ok(new { items });
         });

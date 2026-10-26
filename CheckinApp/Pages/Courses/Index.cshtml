@@ -6,88 +6,34 @@
     var dayNames = new[] { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
 }
 
-<div class="card">
-    <div class="page-head">
-        <h2>课程表</h2>
-        @* 截图导入：跳到 AI 页并带上提示，用户在那边选一张课表截图，
-           AI 识别后生成「导入 N 条课程」的建议卡，点确认就落库 *@
-        <div class="head-actions">
-            <a class="btn secondary" href="/Ai?hint=courses">@Html.Raw(Icons.Svg("spark", 16)) 从截图导入</a>
-            <a class="btn" href="/Courses/New">@Html.Raw(Icons.Svg("plus", 16)) 添加课程</a>
-        </div>
-    </div>
-
-    @* ---- 周次导航：上一周 / 第N周 / 下一周 / 本周 ---- *@
-    <div class="tt-nav">
-        <a class="btn secondary" href="/Courses?week=@(Model.Week - 1)">‹ 上一周</a>
-        <div class="tt-week">
-            <strong>第 @Model.Week 周</strong>
-            <span class="mini">@Model.WeekStart.ToString("MM-dd") ～ @Model.WeekStart.AddDays(6).ToString("MM-dd")</span>
-        </div>
-        <a class="btn secondary" href="/Courses?week=@(Model.Week + 1)">下一周 ›</a>
-        @if (Model.Week != Model.CurrentWeek)
-        {
-            <a class="btn secondary" href="/Courses">回到本周（第 @Model.CurrentWeek 周）</a>
-        }
-    </div>
-
-    @* ---- 学期起始 + 节次时间设置 ---- *@
-    <form method="post" asp-page-handler="SemesterStart" class="tt-semester">
-        <label class="mini" for="SemesterStartInput">学期起始</label>
-        <input type="date" asp-for="SemesterStartInput" />
-        <button class="btn secondary" type="submit">保存</button>
-        <a class="btn secondary" href="/Courses/Periods">@Html.Raw(Icons.Svg("settings-2", 16)) 节次时间</a>
-        @if (!Model.SemesterConfigured)
-        {
-            <span class="hint">未设置，默认按本周算第 1 周</span>
-        }
-    </form>
-
-    @* ---- 显示非本周课程：本周要上的课和「只是排在这学期」的课分开看 ---- *@
-    <div class="tt-opts">
-        <form method="post" asp-page-handler="ToggleOffWeek">
-            <input type="hidden" name="week" value="@Model.Week" />
-            <input type="hidden" name="show" value="@(Model.ShowOffWeek ? "0" : "1")" />
-            <button class="tt-opt-toggle @(Model.ShowOffWeek ? "on" : "")" type="submit"
-                    aria-pressed="@(Model.ShowOffWeek ? "true" : "false")">
-                <span class="tt-opt-dot" aria-hidden="true"></span>
-                @(Model.ShowOffWeek ? "显示非本周课程" : "只看本周课程")
-            </button>
-        </form>
-        <span class="hint">
-            @if (Model.ShowOffWeek)
+<div class="card tt-top">
+    @* ---- 顶部：只有周次切换 + 设置 + 添加。学期起始/节次/非本周显示都收进「设置」二级页 ---- *@
+    <div class="tt-head">
+        <div class="tt-head-main">
+            <a class="tt-arrow" href="/Courses?week=@(Model.Week - 1)" aria-label="上一周">‹</a>
+            <div class="tt-week">
+                <strong>第 @Model.Week 周</strong>
+                <span class="mini">@Model.WeekStart.ToString("MM-dd") ～ @Model.WeekStart.AddDays(6).ToString("MM-dd")</span>
+            </div>
+            <a class="tt-arrow" href="/Courses?week=@(Model.Week + 1)" aria-label="下一周">›</a>
+            @if (Model.Week != Model.CurrentWeek)
             {
-                <text>淡色虚线的课本周不上。点左侧按钮只看本周。</text>
+                <a class="tt-back" href="/Courses">回到本周</a>
             }
-            else
-            {
-                <text>已收起非本周的课。点左侧按钮把它们淡画出来。</text>
-            }
-        </span>
+        </div>
+        <div class="tt-head-side">
+            @* 截图导入：跳到 AI 页并带上提示，用户在那边选一张课表截图，AI 生成「导入 N 条」建议卡 *@
+            <a class="tt-icon-btn" href="/Ai?hint=courses" title="从截图导入" aria-label="从截图导入">@Html.Raw(Icons.Svg("spark", 18))</a>
+            <a class="tt-icon-btn" href="/Courses/Settings" title="课表设置" aria-label="课表设置">@Html.Raw(Icons.Svg("settings-2", 18))</a>
+            @* 手机上右下角有浮动加号，顶部再放一个是重复入口；桌面没有 FAB，所以要留 *@
+            <a class="tt-icon-btn primary tt-pc-only" href="/Courses/New" title="添加课程" aria-label="添加课程">@Html.Raw(Icons.Svg("plus", 18))</a>
+        </div>
     </div>
 </div>
 
-<div class="card">
-    @* ---- 图例：颜色 = 课程（同名同色），不再按类别 ---- *@
-    @if (Model.DayGrid.SelectMany(x => x).Any())
-    {
-        var seen = new List<(string Color, string Name)>();
-        foreach (var g in Model.DayGrid.SelectMany(x => x).Where(x => !x.OffWeek))
-        {
-            var key = g.Color;
-            if (seen.Any(s => s.Color == key)) continue;
-            seen.Add((key, g.Name));
-        }
-        if (seen.Count > 0)
-        {
-            <div class="tt-legend">
-                @foreach (var (color, name) in seen.Take(12))
-                {
-                    <span class="tt-legend-item cs-@color"><i></i>@name</span>
-                }
-            </div>
-        }
-    }
+<div class="card tt-board">
+    @* 图例已删除：颜色现在区分的是「哪门课」，一门课一个色，
+       列一排「紫=高等数学、蓝=机械CAD」等于把课程名又抄一遍，白白多占一行。 *@
 
     @* ---- 桌面：教务式大节×星期 表格 ---- *@
     <div class="tt-wrap scroll-x">
@@ -147,7 +93,7 @@
     <div class="ttm">
       <div class="ttm-scroll">
         <div class="ttm-head">
-            <div class="ttm-corner">节次</div>
+            <div class="ttm-corner" aria-hidden="true"></div>
             @for (var d = 0; d < IndexModel.DayCount; d++)
             {
                 var date = Model.WeekStart.AddDays(d);
@@ -210,3 +156,31 @@
 
 @* ---- 手机右下浮动添加（参考课程格子 APP） ---- *@
 <a class="ttm-fab" href="/Courses/New" aria-label="添加课程">@Html.Raw(Icons.Svg("plus", 22))</a>
+
+<script>
+    // 打开课表就把「今天」那一列滚进视野。
+    // 手机上 7 列是横滑的，默认停在周一 —— 周三有课也要先往右划两下才看得见，
+    // 而「今天上什么」才是打开课表最想看的。节次列是吸左的，所以要扣掉它的宽度再留一点余量。
+    (function () {
+        var scroll = document.querySelector('.ttm-scroll');
+        if (!scroll) return;
+        var head = scroll.querySelector('.ttm-dhead.today');
+        if (!head) return;
+        var corner = scroll.querySelector('.ttm-corner');
+        var gutter = corner ? corner.getBoundingClientRect().width : 0;
+
+        // 让今天那列停在「第二节次列」的位置：左边留出一列（通常是昨天），
+        // 右边还能看到后面两天。贴死最左边的话周一的课会被推出视野，反而看不到「昨天上了什么」。
+        var colW = head.getBoundingClientRect().width || 78;
+
+        function locate() {
+            var sr = scroll.getBoundingClientRect();
+            var hr = head.getBoundingClientRect();
+            var delta = (hr.left - sr.left) - gutter - colW;
+            if (Math.abs(delta) > 2) scroll.scrollLeft = Math.max(0, scroll.scrollLeft + delta);
+        }
+        locate();
+        // web font / 异步布局会让宽度晚一步确定，再补一次；用户已经开始滑就不动他了
+        setTimeout(locate, 120);
+    })();
+</script>

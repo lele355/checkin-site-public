@@ -41,7 +41,7 @@
                 <td>@u.DisplayName</td>
                 <td><span class="chip">@u.RoleName</span></td>
                 <td style="color:@(u.IsActive ? "var(--ok)" : "var(--text-weak)");">@(u.IsActive ? "启用" : "停用")</td>
-                <td class="meta">@u.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                <td class="meta">@CheckinApp.Services.SiteClock.ToLocal(u.CreatedAt).ToString("yyyy-MM-dd")</td>
                 <td style="white-space:nowrap;">
                     <a href="/Admin/Users/Edit/@u.Id" style="margin-right:8px;">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
                     <a href="/Admin/Users/Reset/@u.Id" style="margin-right:8px;">重置密码</a>

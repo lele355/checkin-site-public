@@ -36,7 +36,7 @@ else
                         @(string.IsNullOrEmpty(m.User?.DisplayName) ? "?" : m.User!.DisplayName.Substring(0, 1))
                     </div>
                     <div style="flex:1;min-width:0;">
-                        <div class="mini">@m.User?.DisplayName · @m.CreatedAt.ToLocalTime().ToString("M月d日 HH:mm")</div>
+                        <div class="mini">@m.User?.DisplayName · @CheckinApp.Services.SiteClock.ToLocal(m.CreatedAt).ToString("M月d日 HH:mm")</div>
                         <div style="white-space:pre-wrap;margin-top:2px;">@m.Content</div>
                     </div>
                     @if (m.UserId == Me.UserId)
