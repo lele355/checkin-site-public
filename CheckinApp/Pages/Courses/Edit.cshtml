@@ -57,13 +57,42 @@
             <input asp-for="WeeksText" autocomplete="off" />
         </div>
         <div class="field">
-            <label>课程类别（决定卡片颜色）</label>
+            <label>课程类别</label>
             <select asp-for="Category">
                 <option value="required" selected="@(Model.Category == "required" ? "selected" : null)">必修课</option>
                 <option value="college" selected="@(Model.Category == "college" ? "selected" : null)">院级选修课</option>
                 <option value="school" selected="@(Model.Category == "school" ? "selected" : null)">校级选修课</option>
                 <option value="other" selected="@(Model.Category == "other" ? "selected" : null)">其它</option>
             </select>
+        </div>
+        @* 颜色按「课程」分，不再按类别分：同一门课整学期同一个色，一周里分散的几次课能顺着颜色串起来。
+           「自动」= 不落库，读的时候按课名算，所以同名课天然同色，也不用为每门课存一个值。 *@
+        <div class="field">
+            <label>卡片颜色</label>
+            @{
+                var autoColor = string.IsNullOrEmpty(Model.Color)
+                    ? CoursePalette.DefaultFor(Model.Name)
+                    : Model.Color;
+            }
+            <div class="cc-swatches" id="ccSwatches" data-auto="@autoColor">
+                <label class="cc-swatch @(string.IsNullOrEmpty(Model.Color) ? "on" : "")"
+                       title="自动（按课程名分配）" data-key="auto">
+                    <span class="cc-dot"></span>
+                    <input type="radio" name="Color" value="" checked="@(string.IsNullOrEmpty(Model.Color) ? "checked" : null)" />
+                </label>
+                @foreach (var (key, label) in CoursePalette.All)
+                {
+                    var on = Model.Color == key;
+                    <label class="cc-swatch cs-@key @(on ? "on" : "")" title="@label" data-key="@key">
+                        <span class="cc-dot"></span>
+                        <input type="radio" name="Color" value="@key" checked="@(on ? "checked" : null)" />
+                    </label>
+                }
+            </div>
+            <p class="cc-hint">默认自动：同名课程自动同色（「高等数学（上）」和「高等数学 上」算同一门）。</p>
+            <div class="cc-preview cs-@autoColor" id="ccPreview">
+                <span>@(string.IsNullOrWhiteSpace(Model.Name) ? "课程名" : Model.Name)</span>
+            </div>
         </div>
         <div class="form-actions">
             <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
@@ -77,3 +106,24 @@
         <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除课程</button>
     </form>
 </div>
+
+<script>
+    // 选色即时反馈：点色块 → 选中态跟着走（纯 CSS 做不了，因为选中态要标在 label 上而不是 radio 上）
+    (function () {
+        var box = document.getElementById('ccSwatches');
+        var prev = document.getElementById('ccPreview');
+        if (!box) return;
+        box.addEventListener('change', function (ev) {
+            if (ev.target.name !== 'Color') return;
+            var picked = ev.target.closest('.cc-swatch');
+            [].forEach.call(box.querySelectorAll('.cc-swatch'), function (el) {
+                el.classList.toggle('on', el === picked);
+            });
+            // 预览条换成实际会用的颜色：选了具体色就用它，选「自动」用服务端算好的默认色
+            if (prev && picked) {
+                var key = picked.dataset.key === 'auto' ? box.dataset.auto : picked.dataset.key;
+                prev.className = 'cc-preview cs-' + key;
+            }
+        });
+    })();
+</script>

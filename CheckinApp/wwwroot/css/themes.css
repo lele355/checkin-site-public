@@ -16,19 +16,22 @@
 [data-theme="editorial"] .card { border-color: rgba(28, 28, 28, .10); }
 [data-theme="editorial"] .card:hover { border-color: rgba(28, 28, 28, .40); }
 
-/* 链接：下划线从右向左延展（:not(.btn) 排除按钮，否则黑底黑字看不清） */
-[data-theme="editorial"] .card a:not(.btn),
+/* 链接：下划线从右向左延展（:not(.btn) 排除按钮，否则黑底黑字看不清）
+   也排除 .course-card：课程卡片是「有底色的块」，它的文字色要跟着配色走
+   （.cs-* 的 --cc）。不排除的话这条 [data-theme] .card a:not(.btn) 特异性
+   高于 .course-card，会把卡片文字统一压成黑色，看着像「配色只染了底、没染字」。 */
+[data-theme="editorial"] .card a:not(.btn):not(.course-card),
 [data-theme="editorial"] .content p a:not(.btn) {
   position: relative; color: #1C1C1C;
 }
-[data-theme="editorial"] .card a:not(.btn)::after,
+[data-theme="editorial"] .card a:not(.btn):not(.course-card)::after,
 [data-theme="editorial"] .content p a:not(.btn)::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -1px;
   height: 1px; background: currentColor;
   transform: scaleX(0); transform-origin: right center;
   transition: transform .5s cubic-bezier(.22, .61, .36, 1);
 }
-[data-theme="editorial"] .card a:not(.btn):hover::after,
+[data-theme="editorial"] .card a:not(.btn):not(.course-card):hover::after,
 [data-theme="editorial"] .content p a:not(.btn):hover::after {
   transform: scaleX(1); transform-origin: left center;
 }
@@ -234,11 +237,18 @@
 [data-theme="macos"] .theme-card.active { border-color: var(--accent); }
 [data-theme="macos"] .appearance-panel { box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
 
-/* 课程类别配色进暗色档：色相保留（语义色铁律），只抬明度/降底色饱和 */
-[data-theme="macos"] .cat-required { --cat: #c4b5fd; --cat-bg: rgba(167, 139, 250, .16); }
-[data-theme="macos"] .cat-college  { --cat: #93c5fd; --cat-bg: rgba(96, 165, 250, .16); }
-[data-theme="macos"] .cat-school   { --cat: #86efac; --cat-bg: rgba(74, 222, 128, .15); }
-[data-theme="macos"] .cat-other    { --cat: #ddd6fe; --cat-bg: rgba(196, 181, 253, .14); }
+/* 课程配色进暗色档：色相保留（语义色铁律），只抬明度/降底色饱和。
+   macos 是唯一的暗色主题，site.css 里那 8 个浅底色（#f3e8ff 之类）在深灰卡面上
+   会像贴了一张亮纸片，所以这里统一换成「同色相 16% 透明」的底 + 抬到 400 档的前景。
+   8 个键必须与 CoursePalette.Keys 一一对应，漏一个那门课在暗色主题下就是白底黑字。 */
+[data-theme="macos"] .cs-violet { --cc: #c4b5fd; --cc-bg: rgba(167, 139, 250, .16); }
+[data-theme="macos"] .cs-blue   { --cc: #93c5fd; --cc-bg: rgba(96, 165, 250, .16); }
+[data-theme="macos"] .cs-teal   { --cc: #5eead4; --cc-bg: rgba(45, 212, 191, .15); }
+[data-theme="macos"] .cs-amber  { --cc: #fcd34d; --cc-bg: rgba(251, 191, 36, .15); }
+[data-theme="macos"] .cs-rose   { --cc: #fda4af; --cc-bg: rgba(251, 113, 133, .16); }
+[data-theme="macos"] .cs-green  { --cc: #86efac; --cc-bg: rgba(74, 222, 128, .15); }
+[data-theme="macos"] .cs-indigo { --cc: #a5b4fc; --cc-bg: rgba(129, 140, 248, .16); }
+[data-theme="macos"] .cs-orange { --cc: #fdba74; --cc-bg: rgba(251, 146, 60, .15); }
 [data-theme="macos"] .tt th, [data-theme="macos"] .tt td { border-color: rgba(255, 255, 255, .10); }
 [data-theme="macos"] .tt .tt-time { background: var(--bg); }
 [data-theme="macos"] .tt thead .tt-time { background: var(--card-soft, var(--bg-soft)); }

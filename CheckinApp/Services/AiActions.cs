@@ -491,6 +491,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
                 EndPeriod = ep,
                 WeeksText = weeks,
                 Category = category,
+                // 颜色先留空，等下面整批分配完再回填
             });
         }
 
@@ -498,6 +499,21 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         {
             if (duplicate > 0) return new(false, $"这 {duplicate} 条课表里都已经有了，没导入新的");
             return new(false, "没解析出可用课程（课程名 / 星期 / 节次得齐全）");
+        }
+
+        // ---------- 配色分配 ----------
+        // 导入是一次性拿到整张课表，此时不给颜色，十门课里撞色两三对很常见。
+        // 规则：① 课表里已有的同名课沿用既有色（本来蓝色的高数不会因为重导一次变紫）；
+        //       ② 全新的课优先挑「这次还没用到的」颜色；③ 同名必修同色（硬约束）。
+        var known = CoursePalette.ExistingByKey(db, uid);
+        var fresh = CoursePalette.AssignFor(add.Select(c => c.Name)
+                                               .Where(n => !known.ContainsKey(CoursePalette.NameKey(n))));
+        foreach (var c in add)
+        {
+            var key = CoursePalette.NameKey(c.Name);
+            if (known.TryGetValue(key, out var old)) c.Color = old;
+            else if (fresh.TryGetValue(key, out var got)) c.Color = got;
+            // 两边都没有（课名为空或全符号）→ 留空，读的时候按名字现算，不落库
         }
 
         db.Courses.AddRange(add);

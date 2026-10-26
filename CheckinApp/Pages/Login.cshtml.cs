@@ -20,14 +20,17 @@ public class LoginModel(AppDbContext db, LoginRateLimiter limiter) : PageModel
     [BindProperty] public string Password { get; set; } = "";
     /// <summary>密码保存方式：autologin=下次自动进入跳过登录页；prefill=仅填充密码；none=不保存</summary>
     [BindProperty] public string RememberMode { get; set; } = "none";
+    /// <summary>从「切换账号」过来时置 1：登录页把「本机账号」列表提前到最上面</summary>
+    public bool PickMode { get; private set; }
     public string? Error { get; private set; }
     public int Remaining { get; private set; } = -1;      // 还可尝试次数；-1 = 不提示
     public int? LockMinutes { get; private set; }          // 锁定剩余分钟
 
-    public IActionResult OnGet()
+    public IActionResult OnGet(int? pick = null)
     {
         // 已登录再来登录页 = 直接进工作台（登录进去后的默认落地页固定为主界面工作台）
         if (User.Identity?.IsAuthenticated == true) return RedirectToPage("/Index");
+        PickMode = pick == 1;
         return Page();
     }
 

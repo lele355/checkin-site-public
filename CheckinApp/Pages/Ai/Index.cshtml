@@ -100,11 +100,13 @@
 @section Scripts {
 <script>
     (function () {
-        // 新消息滚进视野
         var chat = document.querySelector('.ai-chat');
-        if (chat && document.querySelectorAll('.ai-row').length > 0) {
-            var rows = document.querySelectorAll('.ai-row');
-            rows[rows.length - 1].scrollIntoView({ block: 'nearest' });
+
+        // 新消息滚进视野（无历史时 .ai-chat 是空的，直接跳过）
+        function scrollToLast() {
+            if (!chat) return;
+            var rows = chat.querySelectorAll('.ai-row');
+            if (rows.length) rows[rows.length - 1].scrollIntoView({ block: 'nearest' });
         }
 
         var form = document.getElementById('aiForm');
@@ -177,15 +179,147 @@
             try { fileInput.click(); } catch (e) { /* 被拦就靠呼吸灯 */ }
         }
 
-        // ---------- 发送：防连点 + 纯图也能发 ----------
+        // ---------- 发送等待：本地回显 + 分段文案 ----------
+        // 这轮请求后端要 17~40 秒（整张课表截图更久），整页 POST 期间浏览器一直停在
+        // 当前页面，什么也不给就会让人以为没按上 → 连点几次就是几条重复消息 + 几倍 token。
+        // 所以：按下就把「我发的这条」画进列表，再挂一条带秒数的状态行。
+        var pending = null;      // { row, wait, timer, secs }
+        var sent = false;        // 已提交，等新页面到达
+
+        // 与 App 侧同一套分段（App: waited &lt; 3 / &lt; 10 / &lt; 25 / else）
+        function stageText(secs) {
+            if (secs < 3) return '已发送，正在等 AI 回应…';
+            if (secs < 10) return 'AI 正在读你的问题…';
+            if (secs < 25) return '正在生成回复，这一步稍慢…';
+            return '还在算，网络或长截图会让它更久…';
+        }
+        // 提示要跟着「这条到底带没带图」走：纯文字说「带图片要 20~40 秒」纯属误导
+        function tipText(secs, hasImg) {
+            if (secs >= 45) return '已经比较久了，可以继续等，也可以刷新页面放弃后换个问法。';
+            if (secs >= 8 && hasImg) return '带图片的请求要逐行识别，通常 20~40 秒。';
+            if (secs >= 20 && !hasImg) return '纯文字一般十几秒，这会儿可能是服务器在排队。';
+            return '';
+        }
+
+        function drawPending(text, imgUrl) {
+            var wrap = document.createElement('div');
+            wrap.className = 'ai-row me';
+            var bubble = document.createElement('div');
+            bubble.className = 'ai-bubble';
+
+            if (imgUrl) {
+                var shot = document.createElement('a');
+                shot.className = 'ai-shot';
+                shot.href = imgUrl;                      // data URL，新标签里直接能看
+                var im = document.createElement('img');
+                im.src = imgUrl;
+                im.alt = '随消息图片';
+                shot.appendChild(im);
+                bubble.appendChild(shot);
+            }
+            if (text) {
+                var body = document.createElement('div');
+                body.style.whiteSpace = 'pre-wrap';
+                body.textContent = text;                 // 保住换行，不解析 HTML
+                bubble.appendChild(body);
+            }
+            var tag = document.createElement('div');
+            tag.className = 'ai-sent-tag';
+            tag.textContent = '已发出，等回复…';
+            bubble.appendChild(tag);
+            wrap.appendChild(bubble);            // 气泡必须挂进行里，否则行是空的
+
+            var wait = document.createElement('div');
+            wait.className = 'ai-row';
+            wait.innerHTML =
+                '<div class="ai-bubble">' +
+                  '<div class="ai-wait">' +
+                    '<div class="ai-wait-top">' +
+                      '<span class="ai-spin"></span>' +
+                      '<span class="ai-wait-text"></span>' +
+                      '<span class="ai-wait-sec"></span>' +
+                    '</div>' +
+                    '<div class="ai-wait-tip" hidden></div>' +
+                  '</div>' +
+                '</div>';
+
+            if (!chat) {                                  // 无历史时页面里没有 .ai-chat 容器
+                chat = document.createElement('div');
+                chat.className = 'ai-chat';
+                var anchor = document.querySelector('.ai-input-card');
+                anchor.parentNode.insertBefore(chat, anchor);
+            }
+            chat.appendChild(wrap);
+            chat.appendChild(wait);
+
+// 空状态卡（「和 AI 助手打个招呼吧」）在回显出现后就该收起来。
+            // 站点 CSS 会盖掉 [hidden]（.card 有 display 规则），所以直接写 style。
+            var empty = chat.parentNode.querySelector('.empty');
+            if (empty) empty.closest('.card').style.display = 'none';
+
+            pending = {
+                row: wrap, wait: wait, secs: 0, hasImg: !!imgUrl,
+                textEl: wait.querySelector('.ai-wait-text'),
+                secEl: wait.querySelector('.ai-wait-sec'),
+                tipEl: wait.querySelector('.ai-wait-tip'),
+                tagEl: tag,
+            };
+            tick();
+            pending.timer = setInterval(tick, 1000);
+            wrap.scrollIntoView({ block: 'nearest' });
+        }
+
+        function tick() {
+            if (!pending) return;
+            var s = pending.secs++;
+            pending.textEl.textContent = stageText(s);
+            pending.secEl.textContent = s + 's';
+            var tip = tipText(s, pending.hasImg);
+            if (tip) {
+                pending.tipEl.textContent = tip;
+                pending.tipEl.hidden = false;
+            }
+        }
+
+        function cancelPending() {
+            if (!pending) return;
+            clearInterval(pending.timer);
+            if (pending.row.parentNode) pending.row.parentNode.removeChild(pending.row);
+            if (pending.wait.parentNode) pending.wait.parentNode.removeChild(pending.wait);
+            pending = null;
+        }
+
+        function resetButton() {
+            btn.disabled = false;
+            btn.classList.remove('is-loading');
+            btn.textContent = '发送';
+        }
+
         form.addEventListener('submit', function (e) {
-            if (!ta.value.trim() && !imgData.value) {
+            var text = ta.value.trim();
+            if (!text && !imgData.value) {
                 e.preventDefault();
                 ta.focus();
                 return;
             }
+            if (sent) {                                  // 已经提交过，连点直接忽略
+                e.preventDefault();
+                return;
+            }
+            sent = true;
+
+            drawPending(text, imgData.value || '');
+
             btn.disabled = true;
-            btn.textContent = '思考中…';
+            btn.classList.add('is-loading');             // 复用全站的按钮转圈（::after 圆环）
+            btn.textContent = '发送';
+
+            // 输入框先清空，但保留在变量里：万一用户用浏览器「返回」回到这一页，
+            // 缓存的页面会把输入框恢复成清空态，不会重复发一遍。
+            ta.value = '';
+            imgData.value = '';
+            previewImg.removeAttribute('src');
+            preview.hidden = true;
         });
 
         // Ctrl+Enter 发送（手机上直接点按钮）
@@ -195,6 +329,17 @@
                 form.requestSubmit();
             }
         });
+
+        // 从 bfcache 返回（点了浏览器后退 / 页面被缓存恢复）：这一页的请求早已结束，
+        // 等待行和禁用状态都得撤掉，否则看起来像永远卡住。
+        window.addEventListener('pageshow', function (ev) {
+            if (!ev.persisted && !sent) return;
+            sent = false;
+            cancelPending();
+            resetButton();
+        });
+
+        scrollToLast();
     })();
 </script>
 }

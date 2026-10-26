@@ -405,6 +405,52 @@ button { font: inherit; color: inherit; }
 .btn.danger { background: var(--danger); color: #fff; }
 .btn.block { width: 100%; }
 
+/* ---------- 登录页「本机账号」快捷行 ----------
+   点一行就用存好的密码登进去（不再要求点一次登录按钮）。
+   视觉上比表单轻一档：软底、无阴影，避免和主按钮抢注意力。 */
+.acct-block { margin: 0 0 18px; }
+.acct-block[hidden] { display: none; }
+.acct-title {
+  font-size: .78rem; color: var(--text-weak); font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; margin-bottom: 8px;
+}
+.acct-list { display: flex; flex-direction: column; gap: 7px; }
+.acct-row {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 8px 10px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--card-soft); color: var(--text);
+  transition: border-color var(--dur) var(--easing), background var(--dur) var(--easing);
+}
+.acct-row:hover, .acct-row:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-soft));
+  outline: none;
+}
+.acct-av {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent-soft, var(--card)); color: var(--accent-strong);
+  font-size: .88rem; font-weight: 600;
+}
+.acct-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.acct-name {
+  font-size: .9rem; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.acct-sub {
+  font-size: .76rem; color: var(--text-weak);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.acct-del {
+  flex: none; width: 26px; height: 26px; margin-left: auto;
+  display: grid; place-items: center; cursor: pointer;
+  border: none; background: transparent; border-radius: 50%;
+  color: var(--text-weak); font-size: 1.16rem; line-height: 1;
+}
+.acct-del:hover { color: var(--danger); background: var(--danger-soft); }
+.acct-note { margin: 8px 0 0; font-size: .76rem; color: var(--text-weak); line-height: 1.6; }
+
 /* 消息条（语义色，跨主题保留） */
 .msg {
   border-radius: var(--radius-sm); padding: 11px 15px; margin-bottom: 16px;
@@ -642,7 +688,7 @@ body {
 
 .tt-legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 2px 0 12px; }
 .tt-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; }
-.tt-legend-item i { width: 14px; height: 14px; border-radius: 3px; background: var(--cat); }
+.tt-legend-item i { width: 14px; height: 14px; border-radius: 3px; background: var(--cc); }
 
 .tt-wrap { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
 .tt { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 880px; }
@@ -662,18 +708,119 @@ body {
 .course-card {
   display: block; padding: 8px; margin-bottom: 6px; border-radius: var(--radius-in);
   text-decoration: none;
-  background: var(--cat-bg); color: var(--cat);
+  background: var(--cc-bg); color: var(--cc);
 }
 .course-card:last-child { margin-bottom: 0; }
 .course-card:hover { filter: brightness(.96); }
 .course-card .cc-name { font-weight: 600; margin-bottom: 2px; }
 .course-card .cc-meta { font-size: .78rem; opacity: .92; line-height: 1.5; }
 
-/* 课程类别配色（语义色，跨主题保留；暗色档在 themes.css 里覆写明度） */
-.cat-required { --cat: #7c3aed; --cat-bg: #f3e8ff; }   /* 必修课·紫 */
-.cat-college  { --cat: #2563eb; --cat-bg: #dbeafe; }   /* 院级选修课·蓝 */
-.cat-school   { --cat: #16a34a; --cat-bg: #dcfce7; }   /* 校级选修课·绿 */
-.cat-other    { --cat: #6d28d9; --cat-bg: #ede9fe; }   /* 其它·淡紫 */
+/* ---------- 课程配色：按「课程」而不是「类别」 ----------
+   同名课程同色（服务端 CoursePalette 归一化课名后算出来），一门课整学期一个色，
+   顺着颜色就能把一周里分散的几次课串起来。CSS 变量两个：
+   --cc 前景（文字/图标）、--cc-bg 底色。风味主题可在 themes.css 里覆盖明度。 */
+.cs-violet { --cc: #6d28d9; --cc-bg: #f3e8ff; }
+.cs-blue   { --cc: #1d4ed8; --cc-bg: #dbeafe; }
+.cs-teal   { --cc: #0f766e; --cc-bg: #ccfbf1; }
+.cs-amber  { --cc: #a16207; --cc-bg: #fef3c7; }
+.cs-rose   { --cc: #be123c; --cc-bg: #ffe4e6; }
+.cs-green  { --cc: #15803d; --cc-bg: #dcfce7; }
+.cs-indigo { --cc: #4338ca; --cc-bg: #e0e7ff; }
+.cs-orange { --cc: #c2410c; --cc-bg: #ffedd5; }
+
+/* ---------- 非本周课程：虚化 ----------
+   淡色 + 虚线边 = 「这门课排在这学期，但这一周不上」。
+   不用半透明 opacity 而是显式降饱和，避免暗色主题下糊成一片灰。 */
+.course-card.off-week,
+.ttm-card.off-week {
+  background: transparent;
+  color: color-mix(in srgb, var(--cc) 42%, var(--text-weak));
+  border: 1px dashed color-mix(in srgb, var(--cc) 34%, transparent);
+  box-shadow: none;
+}
+.ttm-card.off-week { background: transparent; }
+
+/* ---------- 没课的格子：极浅底色 ----------
+   以前空格子跟页面背景一样白，「这一格是空的」和「这里根本没有格子」分不出来。
+   有课时课程卡片自己铺满（盖住这层），所以只在无课时才露出来。
+   不用 --card-soft：它只有 3.5% 的浓度（editorial 是 rgba(28,28,28,.035)），
+   铺在整片表格里几乎看不出来，等于没做。这里按 --border 的强度取一档更实的灰，
+   五套主题都能看出「这一格是空的」，又不会抢课程卡片的视觉。 */
+.tt td.tt-empty { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.tt td.tt-empty.today { background: var(--accent-soft); }
+/* 手机网格那层横线是 background-image，这里只能改 background-color，否则会把线擦掉 */
+.ttm-day { background-color: color-mix(in srgb, var(--text) 6%, transparent); }
+.ttm-day.today { background-color: var(--accent-soft); }
+
+/* 课程表选项条（显示/隐藏非本周课程） */
+.tt-opts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+.tt-opt-toggle {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  padding: 6px 13px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--card-soft); color: var(--text-sub);
+  font: inherit; font-size: .84rem; line-height: 1.4;
+  transition: color var(--dur) var(--easing), border-color var(--dur) var(--easing),
+              background var(--dur) var(--easing);
+}
+.tt-opt-toggle:hover { color: var(--text); border-color: var(--accent); }
+.tt-opt-toggle.on {
+  color: var(--accent-strong); border-color: transparent;
+  background: var(--accent-soft, var(--card-soft));
+}
+.tt-opt-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  border: 1px solid currentColor;
+  background: transparent;
+}
+.tt-opt-toggle.on .tt-opt-dot { background: currentColor; }
+
+/* ---------- 课程配色选择器（编辑/新建页） ----------
+   8 个色块单选。用 label + radio 而不是 select：颜色这东西，
+   看见色块比看见「青」「靛蓝」这两个字有用得多。
+   radio 本体用 .visually-hidden 藏起来但保留键盘可及性（Tab + 空格照常能用）。 */
+.cc-swatches { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cc-swatch {
+  position: relative; width: 36px; height: 36px; cursor: pointer; flex: none;
+  border-radius: 50%; border: 2px solid transparent;
+  background: var(--cc-bg); color: var(--cc);
+  display: grid; place-items: center;
+  transition: transform var(--dur) var(--easing), border-color var(--dur) var(--easing),
+              box-shadow var(--dur) var(--easing);
+}
+.cc-swatch:hover { transform: scale(1.08); }
+/* 选中：外圈用该色本身描一圈 + 一圈外侧留白，比通用 accent 描边更「这就是我选的颜色」 */
+.cc-swatch.on {
+  border-color: var(--cc);
+  box-shadow: 0 0 0 3px var(--card), 0 0 0 4px var(--cc);
+  transform: scale(1.04);
+}
+/* 圆点本体是 span，必须显式 display:block —— inline 元素的 width/height 不生效，
+   会算成 0×0，色块就只剩一层浅底、看着像「没上色」。 */
+.cc-swatch .cc-dot { display: block; width: 18px; height: 18px; border-radius: 50%; background: var(--cc); }
+.cc-swatch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+/* 「自动」那颗没有具体颜色：用虚线环 + 斜线表示「按课名算」，
+   不能只画一个空心圈 —— 页面上看不出它是个选项，像个没加载出来的圆。 */
+.cc-swatch[data-key="auto"] {
+  background: var(--card-soft); color: var(--text-weak);
+  border: 1px dashed var(--border-strong);
+}
+.cc-swatch[data-key="auto"].on {
+  border-color: var(--accent); border-style: solid;
+  box-shadow: 0 0 0 3px var(--card), 0 0 0 4px var(--accent);
+}
+.cc-swatch[data-key="auto"] .cc-dot {
+  display: block; width: 18px; height: 18px; border-radius: 0; background: none;
+  border-bottom: 2px dashed currentColor; transform: rotate(-45deg);
+}
+/* 键盘聚焦时补一圈可见轮廓（radio 本体是透明的，不补就看不到焦点在哪） */
+.cc-swatch:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+.cc-hint { margin: 8px 0 0; font-size: .78rem; color: var(--text-weak); line-height: 1.6; }
+/* 预览条：当前这门课在课表里长什么样，选色时不用来回切换页面对照 */
+.cc-preview {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+  padding: 7px 12px; border-radius: var(--radius-in);
+  background: var(--cc-bg); color: var(--cc); font-size: .86rem;
+}
 
 /* ---------- 手机课表网格（课程格子式：左侧节次+时间、卡片跨节、撞课并排） ---------- */
 .ttm { display: none; --ttm-row: 46px; --ttm-gut: 42px; --ttm-col: 1fr; }
@@ -704,7 +851,7 @@ body {
 .ttm-card {
   position: absolute; display: block; overflow: hidden;
   padding: 2px 3px; border-radius: 6px; text-decoration: none;
-  background: var(--cat-bg); color: var(--cat);
+  background: var(--cc-bg); color: var(--cc);
   font-size: .58rem; line-height: 1.25;
 }
 .ttm-card b { display: block; font-size: .62rem; word-break: break-all; }
@@ -922,6 +1069,28 @@ body {
   border-radius: 12px; border: 1px solid var(--border); margin: 2px 0 6px;
 }
 
+/* ---------- 发送等待行（本地回显 + 分段文案） ----------
+   整页 POST 无法中断，但浏览器会一直停在旧页面上直到新页面到达，
+   所以把「我发的那条」和这条状态行先画出来，用户就知道已经发出去了。 */
+.ai-wait { display: flex; flex-direction: column; gap: 7px; }
+.ai-wait-top { display: flex; align-items: center; gap: 9px; }
+.ai-wait-text { font-size: .92rem; color: var(--text-sub); }
+.ai-wait-sec {
+  margin-left: auto; padding-left: 10px; flex: none;
+  font-size: .76rem; color: var(--text-weak); font-variant-numeric: tabular-nums;
+}
+.ai-wait-tip { font-size: .8rem; color: var(--text-weak); line-height: 1.6; }
+.ai-wait-tip[hidden] { display: none; }
+/* 缺口圆环转圈：与全站细线图标一套，不用粗描边转盘 */
+.ai-spin {
+  flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-top-color: var(--accent);
+  animation: btn-spin .9s linear infinite;
+}
+/* 本地回显的那条：右下角带一个「已发出」标记，和服务器渲染的历史区分开 */
+.ai-sent-tag { font-size: .72rem; color: var(--text-weak); margin-top: 6px; }
+
 @media (max-width: 640px) {
   .ai-bubble { max-width: 94%; }
   .ai-input-row { gap: 7px; }
@@ -932,6 +1101,8 @@ body {
   .ai-act-btns { width: 100%; }
   .ai-act-btns form { flex: 1; }
   .ai-act-btns .btn { width: 100%; }
+  .ai-wait-text { font-size: .88rem; }
+  .ai-wait-tip { font-size: .76rem; }
 }
 
 /* =========================================================

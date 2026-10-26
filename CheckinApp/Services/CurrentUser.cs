@@ -22,6 +22,10 @@ public class CurrentUser(IHttpContextAccessor accessor, AppDbContext db)
 
     public bool IsAuthenticated => UserId is not null;
 
+    /// <summary>登录名（Claims 里的 Name）。本机账号簿要用它来认人，不能拿 DisplayName 代替——
+    /// 昵称可改、可重复，登录名才是稳定的那一把钥匙。</summary>
+    public string Username => accessor.HttpContext?.User.FindFirstValue(ClaimTypes.Name) ?? "";
+
     public string DisplayName
     {
         get

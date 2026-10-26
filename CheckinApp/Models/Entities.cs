@@ -188,8 +188,13 @@ public class Course
     public int EndPeriod { get; set; }
     /// <summary>上课周次描述，如 "1-16" / "1-8,10-16" / "单周" / "双周"</summary>
     public string WeeksText { get; set; } = "1-16";
-    /// <summary>课程类别：required=必修 / college=院级选修 / school=校级选修 / other=其它（决定卡片配色）</summary>
+    /// <summary>课程类别：required=必修 / college=院级选修 / school=校级选修 / other=其它（说明性字段，不再决定配色）</summary>
     public string Category { get; set; } = "other";
+    /// <summary>
+    /// 卡片配色色板键（如 "violet" / "blue"）。空 = 还没分配，读的时候按课程名现算默认色。
+    /// 配色从「按类别」改成「按课程」：同一门课（同名）整个学期同一个颜色，一眼能顺着找。
+    /// </summary>
+    public string Color { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

@@ -16,6 +16,14 @@
             <div class="msg error sticky">@Model.Error</div>
         }
 
+        @* 本机账号：浏览器里存过密码的号，点一下就登进去。
+           容器先留空，由脚本按 localStorage 渲染；一个都没有时整块隐藏。 *@
+        <div class="acct-block" id="acctBlock" hidden>
+            <div class="acct-title">本机账号</div>
+            <div class="acct-list" id="acctList"></div>
+            <p class="acct-note">密码只存在这台设备的浏览器里（Base64 混淆，非加密）。</p>
+        </div>
+
         <form method="post" id="loginForm">
             <div class="field">
                 <label asp-for="Username">账号</label>
@@ -42,14 +50,142 @@
 
 <script>
 (function () {
-    // 密码保存方式（登录页三选一）：
-    //   autologin = 填充 + 30 天持久登录（服务端 cookie，跳过登录页）
-    //   prefill  = 仅填充密码（会话级登录，下次仍到登录页）
-    //   none     = 不保存（并清掉旧存档）
-    // 本机预填存 base64 混淆，防肩窥非加密；自用小站可接受。
-    var KEY = 'checkin_remember';          // { u, p(base64) }
+    // ---------- 本机账号簿 ----------
+    // 存密码而不是 cookie/token：cookie 会被改密码、过期、其它设备退出登录吊销，
+    // 存多份 token 等于维护多份失效逻辑；存密码只需要「用这个号再登一次」一条路径。
+    //
+    // 存储结构（向后兼容旧的单对象 {u,p}）：
+    //   checkin_accounts = [{ u, p(base64), n(昵称), r(角色), t(上次用到的毫秒) }]  最新在前
+    //   checkin_remember_mode = 'autologin' | 'prefill' | 'none'
+    var LIST_KEY = 'checkin_accounts';
+    var LEGACY_KEY = 'checkin_remember';
     var MODE_KEY = 'checkin_remember_mode';
+    var MAX = 8;
 
+    function readList() {
+        var arr = null;
+        try { arr = JSON.parse(localStorage.getItem(LIST_KEY) || 'null'); } catch (e) { arr = null; }
+        if (!Array.isArray(arr)) {
+            // 从旧版单对象升级：一条也算，下次登录成功后自然会写进新键
+            arr = [];
+            try {
+                var legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
+                if (legacy && legacy.u) arr = [{ u: legacy.u, p: legacy.p || '', n: '', r: '', t: 0 }];
+            } catch (e2) { }
+        }
+        return arr.filter(function (a) { return a && a.u; });
+    }
+
+    function writeList(arr) {
+        try { localStorage.setItem(LIST_KEY, JSON.stringify(arr.slice(0, MAX))); } catch (e) { }
+    }
+
+    function forget(username) {
+        writeList(readList().filter(function (a) {
+            return a.u.toLowerCase() !== String(username || '').toLowerCase();
+        }));
+        // 旧键里如果是同一个号也一并清掉，否则下次读取又冒出来
+        try {
+            var legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
+            if (legacy && legacy.u && legacy.u.toLowerCase() === String(username || '').toLowerCase()) {
+                localStorage.removeItem(LEGACY_KEY);
+            }
+        } catch (e) { }
+        render();
+    }
+
+    function bump(username) {
+        // 登录成功那一刻把这个号提到最前（常用号排第一，切换才快）
+        var arr = readList();
+        var hit = null;
+        for (var i = 0; i < arr.length; i++) {
+            if (arr[i].u.toLowerCase() === username.toLowerCase()) { hit = arr[i]; arr.splice(i, 1); break; }
+        }
+        var el = hit || { u: username, p: '', n: '', r: '' };
+        el.t = Date.now();
+        arr.unshift(el);
+        writeList(arr);
+    }
+
+    var block = document.getElementById('acctBlock');
+    var listEl = document.getElementById('acctList');
+    var userInput = document.getElementById('Username');
+    var passInput = document.getElementById('Password');
+    var currentUser = '@Model.Username';
+
+    function initial(name) {
+        // 昵称首字（中文取第一个字，英文取首字母大写）
+        var s = String(name || '').trim();
+        return s ? s.charAt(0).toUpperCase() : '?';
+    }
+
+    function render() {
+        if (!block || !listEl) return;
+        var arr = readList().filter(function (a) { return a.p; });   // 没存密码的点了也没用
+        // 当前用户名对应的那条标成「当前」，其余排后面
+        arr.sort(function (a, b) {
+            var ca = a.u.toLowerCase() === String(currentUser).toLowerCase() ? 1 : 0;
+            var cb = b.u.toLowerCase() === String(currentUser).toLowerCase() ? 1 : 0;
+            return cb - ca;
+        });
+        if (arr.length === 0) { block.hidden = true; listEl.innerHTML = ''; return; }
+        block.hidden = false;
+        listEl.innerHTML = '';
+
+        arr.forEach(function (a) {
+            var row = document.createElement('div');
+            row.className = 'acct-row';
+            row.setAttribute('role', 'button');
+            row.setAttribute('tabindex', '0');
+
+            var av = document.createElement('span');
+            av.className = 'acct-av';
+            av.textContent = initial(a.n || a.u);
+
+            var body = document.createElement('span');
+            body.className = 'acct-body';
+            var nm = document.createElement('span');
+            nm.className = 'acct-name';
+            nm.textContent = a.n || a.u;
+            var sub = document.createElement('span');
+            sub.className = 'acct-sub';
+            sub.textContent = '\u0040' + a.u;      // 转义写 at，否则 Razor 会把符号当成代码块起点
+            body.appendChild(nm);
+            body.appendChild(sub);
+
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'acct-del';
+            del.setAttribute('aria-label', '从本机移除这个账号');
+            del.innerHTML = '&times;';
+            del.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                forget(a.u);
+            });
+
+            row.appendChild(av);
+            row.appendChild(body);
+            row.appendChild(del);
+
+            function pick() {
+                if (!userInput || !passInput) return;
+                userInput.value = a.u;
+                try { passInput.value = atob(a.p); } catch (e) { passInput.value = ''; }
+                if (!passInput.value) { passInput.focus(); return; }   // 解不出来就让用户自己补
+                // 直接提交：点这个号的意图就是「用它进去」，不该再让点一次登录
+                var form = document.getElementById('loginForm');
+                if (form) form.requestSubmit ? form.requestSubmit() : form.submit();
+            }
+            row.addEventListener('click', pick);
+            row.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); }
+            });
+
+            listEl.appendChild(row);
+        });
+    }
+
+    // ---------- 记住密码三选一 ----------
     function currentMode() {
         var checked = document.querySelector('input[name="RememberMode"]:checked');
         return checked ? checked.value : 'none';
@@ -59,37 +195,57 @@
         var mode = localStorage.getItem(MODE_KEY);
         if (mode !== 'autologin' && mode !== 'prefill' && mode !== 'none') {
             // 没记过偏好：有旧存档（旧版勾选=自动进入）就延续自动进入，否则不保存
-            var legacy = JSON.parse(localStorage.getItem(KEY) || 'null');
+            var legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
             mode = (legacy && legacy.u) ? 'autologin' : 'none';
         }
         var radios = document.querySelectorAll('input[name="RememberMode"]');
         for (var i = 0; i < radios.length; i++) radios[i].checked = (radios[i].value === mode);
     } catch (e) { }
 
+    // 预填：优先服务端回显的账号（刚从这个号退出来/切号过来），否则用账号簿里最近用过的
     try {
-        var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-        if (saved && saved.u) {
-            var u = document.getElementById('Username');
-            var p = document.getElementById('Password');
-            if (u) u.value = saved.u;
-            if (p && saved.p) p.value = atob(saved.p);
-            if (u && !u.value && p) p.value = '';
-        }
-    } catch (e) { /* 忽略损坏的本地数据 */ }
-
-    document.getElementById('loginForm').addEventListener('submit', function () {
-        var m = currentMode();
-        try {
-            localStorage.setItem(MODE_KEY, m);
-            if (m === 'autologin' || m === 'prefill') {
-                localStorage.setItem(KEY, JSON.stringify({
-                    u: document.getElementById('Username').value,
-                    p: btoa(document.getElementById('Password').value)
-                }));
-            } else {
-                localStorage.removeItem(KEY);
+        if (userInput && !userInput.value) {
+            var arr0 = readList();
+            if (arr0.length && arr0[0].u) {
+                userInput.value = arr0[0].u;
+                if (passInput && arr0[0].p) {
+                    try { passInput.value = atob(arr0[0].p); } catch (e1) { }
+                }
             }
-        } catch (e) { /* 隐私模式下 localStorage 可能不可写 */ }
-    });
+        } else if (userInput && passInput && !passInput.value) {
+            var mine = readList().filter(function (a) { return a.u === userInput.value; })[0];
+            if (mine && mine.p) { try { passInput.value = atob(mine.p); } catch (e2) { } }
+        }
+    } catch (e) { }
+    render();
+
+    // 提交时按当前选择维护账号簿
+    var loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function () {
+            var m = currentMode();
+            var u = userInput ? userInput.value.trim() : '';
+            var p = passInput ? passInput.value : '';
+            try {
+                localStorage.setItem(MODE_KEY, m);
+                if ((m === 'autologin' || m === 'prefill') && u && p) {
+                    var arr = readList();
+                    arr.forEach(function (a) {
+                        if (a.u.toLowerCase() === u.toLowerCase()) { a.p = btoa(p); }
+                    });
+                    var found = arr.filter(function (a) { return a.u.toLowerCase() === u.toLowerCase(); })[0];
+                    if (!found) arr.unshift({ u: u, p: btoa(p), n: '', r: '', t: Date.now() });
+                    writeList(arr);
+                    // 旧键同步一份，兼容还在读旧键的页面/版本
+                    localStorage.setItem(LEGACY_KEY, JSON.stringify({ u: u, p: btoa(p) }));
+                }
+            } catch (e) { /* 隐私模式下 localStorage 可能不可写 */ }
+        });
+    }
+
+    // 从「切换账号」过来的（?pick=1）：把本机账号区块滚到视野里，账号框也拿到焦点
+    if (new URLSearchParams(location.search).get('pick') === '1' && block && !block.hidden) {
+        block.scrollIntoView({ block: 'center' });
+    }
 })();
 </script>

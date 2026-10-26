@@ -166,6 +166,10 @@ public static class AuthApi
                 versionCode = int.TryParse(v["ClientVersionCode"], out var c) ? c : 2,
                 url = v["ClientApk"] ?? "/download/app-release.apk",
                 notes = v["ClientNotes"] ?? "",
+                // App 备案号随接口下发：法规要求「关于/设置」页显著位置标注，
+                // 但号一旦要更正（补正、换号）就得重新发版，所以不写死在 APK 里。
+                // 空串 = 服务端没配，App 端回落到内置的兜底常量。
+                beiAn = v["AppBeiAn"] ?? "",
             });
         }).AllowAnonymous();
     }

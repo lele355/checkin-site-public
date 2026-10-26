@@ -42,16 +42,52 @@
             <span class="hint">未设置，默认按本周算第 1 周</span>
         }
     </form>
+
+    @* ---- 显示非本周课程：本周要上的课和「只是排在这学期」的课分开看 ---- *@
+    <div class="tt-opts">
+        <form method="post" asp-page-handler="ToggleOffWeek">
+            <input type="hidden" name="week" value="@Model.Week" />
+            <input type="hidden" name="show" value="@(Model.ShowOffWeek ? "0" : "1")" />
+            <button class="tt-opt-toggle @(Model.ShowOffWeek ? "on" : "")" type="submit"
+                    aria-pressed="@(Model.ShowOffWeek ? "true" : "false")">
+                <span class="tt-opt-dot" aria-hidden="true"></span>
+                @(Model.ShowOffWeek ? "显示非本周课程" : "只看本周课程")
+            </button>
+        </form>
+        <span class="hint">
+            @if (Model.ShowOffWeek)
+            {
+                <text>淡色虚线的课本周不上。点左侧按钮只看本周。</text>
+            }
+            else
+            {
+                <text>已收起非本周的课。点左侧按钮把它们淡画出来。</text>
+            }
+        </span>
+    </div>
 </div>
 
 <div class="card">
-    @* ---- 图例：颜色 = 课程类别 ---- *@
-    <div class="tt-legend">
-        @foreach (var (slug, label) in IndexModel.Categories)
+    @* ---- 图例：颜色 = 课程（同名同色），不再按类别 ---- *@
+    @if (Model.DayGrid.SelectMany(x => x).Any())
+    {
+        var seen = new List<(string Color, string Name)>();
+        foreach (var g in Model.DayGrid.SelectMany(x => x).Where(x => !x.OffWeek))
         {
-            <span class="tt-legend-item cat-@slug"><i></i>@label</span>
+            var key = g.Color;
+            if (seen.Any(s => s.Color == key)) continue;
+            seen.Add((key, g.Name));
         }
-    </div>
+        if (seen.Count > 0)
+        {
+            <div class="tt-legend">
+                @foreach (var (color, name) in seen.Take(12))
+                {
+                    <span class="tt-legend-item cs-@color"><i></i>@name</span>
+                }
+            </div>
+        }
+    }
 
     @* ---- 桌面：教务式大节×星期 表格 ---- *@
     <div class="tt-wrap scroll-x">
@@ -83,10 +119,10 @@
                         {
                             var date = Model.WeekStart.AddDays(d);
                             var isToday = date == Model.Today;
-                            <td class="@(isToday ? "today" : "")">
+                            <td class="@(isToday ? "today" : "") @(Model.Cells[b][d].Count == 0 ? "tt-empty" : "")">
                                 @foreach (var c in Model.Cells[b][d])
                                 {
-                                    <a class="course-card cat-@c.Category" href="/Courses/Edit/@c.Id">
+                                    <a class="course-card cs-@c.Color @(c.OffWeek ? "off-week" : "")" href="/Courses/Edit/@c.Id">
                                         <div class="cc-name">@c.Name</div>
                                         <div class="cc-meta">周次:@Weeks.Display(c.WeeksText)</div>
                                         @if (!string.IsNullOrWhiteSpace(c.Location))
@@ -140,9 +176,9 @@
                 <div class="ttm-day @(isToday ? "today" : "")">
                     @foreach (var g in Model.DayGrid[d])
                     {
-                        <a class="ttm-card cat-@g.Category"
+                        <a class="ttm-card cs-@g.Color @(g.OffWeek ? "off-week" : "")"
                            style="top:calc(var(--ttm-row) * @g.Row + 2px);height:calc(var(--ttm-row) * @g.Span - 4px);left:@(g.Lane * 100.0 / g.Lanes)%;width:@(100.0 / g.Lanes)%"
-                           href="/Courses/Edit/@g.Id" title="@g.Name">
+                           href="/Courses/Edit/@g.Id" title="@g.Name@(g.OffWeek ? "（本周不上）" : "")">
                             <b>@g.Name</b>
                             @if (!string.IsNullOrWhiteSpace(g.Location))
                             {
@@ -157,7 +193,7 @@
       <div class="ttm-swipe-hint">← 左右滑动看完整一周 →</div>
     </div>
 
-    @if (Model.Cells.SelectMany(r => r).All(cell => cell.Count == 0))
+    @if (Model.ThisWeekCount == 0)
     {
         <div class="hint" style="margin-top:10px;">
             @if (Model.Week == Model.CurrentWeek)

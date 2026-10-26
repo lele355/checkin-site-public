@@ -21,6 +21,8 @@ public class NewModel(AppDbContext db, CurrentUser me) : PageModel
     [BindProperty] public int EndPeriod { get; set; } = 2;
     [BindProperty] public string WeeksText { get; set; } = "1-16";
     [BindProperty] public string Category { get; set; } = "other";
+    /// <summary>色板键；空串 = 保存时按课程名自动分配（同名课自动同色）</summary>
+    [BindProperty] public string Color { get; set; } = "";
     public string? Error { get; private set; }
 
     /// <summary>节次数（可自定义，下拉范围跟着配置走）</summary>
@@ -44,10 +46,24 @@ public class NewModel(AppDbContext db, CurrentUser me) : PageModel
         if (StartPeriod < 1 || EndPeriod < StartPeriod || EndPeriod > PeriodCount)
         { Error = $"节次范围不合法（1-{PeriodCount}，且结束 ≥ 开始）。"; return Page(); }
 
+        var name = Name.Trim();
+        // 没选色：若这个课名本学期已经有色（用户改过的或默认的），沿用它 ——
+        // 一门课加第二节（周三实验）不该跟周一那次颜色不一样。
+        var color = CoursePalette.Normalize(Color);
+        if (color.Length == 0)
+        {
+            var key = CoursePalette.NameKey(name);
+            color = _db.Courses.Where(x => x.UserId == uid).Select(x => new { x.Name, x.Color }).ToList()
+                .Where(x => CoursePalette.NameKey(x.Name) == key)
+                .Select(x => CoursePalette.Normalize(x.Color) is { Length: > 0 } k ? k : CoursePalette.DefaultFor(x.Name))
+                .FirstOrDefault() ?? "";
+            // 仍为空 = 这门课是全新的，交给读的时候按名字现算默认色（不落库）
+        }
+
         _db.Courses.Add(new Course
         {
             UserId = uid,
-            Name = Name.Trim(),
+            Name = name,
             Teacher = Teacher?.Trim() ?? "",
             Location = Location?.Trim() ?? "",
             Weekday = Weekday,
@@ -55,6 +71,7 @@ public class NewModel(AppDbContext db, CurrentUser me) : PageModel
             EndPeriod = EndPeriod,
             WeeksText = string.IsNullOrWhiteSpace(WeeksText) ? "1-16" : WeeksText.Trim(),
             Category = AllowedCategories.Contains(Category) ? Category : "other",
+            Color = color,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });

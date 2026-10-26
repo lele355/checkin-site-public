@@ -123,6 +123,10 @@
         @* 单机模式没有「退出」的意义：退了会被自动登录立刻拉回来，反而让人以为坏了 *@
         @if (!CheckinApp.Services.LocalMode.Enabled)
         {
+            <form asp-page="/Logout" method="post" class="switch-form">
+                <input type="hidden" name="switchTo" value="1" />
+                <button class="btn-ghost" type="submit" title="换个账号登录">@Html.Raw(Icons.Svg("arrow-left-right", 16)) 切换</button>
+            </form>
             <form asp-page="/Logout" method="post">
                 <button class="btn-ghost" type="submit">@Html.Raw(Icons.Svg("log-out", 16)) 退出</button>
             </form>
@@ -254,6 +258,36 @@
     <div class="modal-body"></div>
 </dialog>
 
+@* 本机账号簿同步：已登录的每一页都会经过这里，顺手把「当前是谁」写进账号簿，
+   这样昵称/角色不用登录接口另外回传——登录页那几行直接就有名字可显示。
+   只补昵称和角色，不碰密码（密码由登录页在提交时写，别的页面读不到明文）。 *@
+@if (Me.IsAuthenticated)
+{
+    <script>
+        (function () {
+            try {
+                var u = '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(Me.Username ?? ""))';
+                if (!u) return;
+                var key = 'checkin_accounts';
+                var arr = JSON.parse(localStorage.getItem(key) || '[]');
+                if (!Array.isArray(arr)) arr = [];
+                var hit = null;
+                for (var i = 0; i < arr.length; i++) {
+                    if (arr[i] && String(arr[i].u).toLowerCase() === u.toLowerCase()) { hit = arr[i]; break; }
+                }
+                if (!hit) {
+                    // 账号簿里没有这个号：说明是别人在别的设备上存的、或用户选了「不保存」。
+                    // 不主动建条目（没密码的条目点了也登不进去），等用户在登录页提交时再写。
+                    return;
+                }
+                hit.n = '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(Me.DisplayName ?? ""))';
+                hit.r = '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(Me.RoleName ?? ""))';
+                hit.t = Date.now();
+                localStorage.setItem(key, JSON.stringify(arr));
+            } catch (e) { }
+        })();
+    </script>
+}
 @* 轻提示容器（lucianlabs 070 堆叠 Toast 动效） *@
 <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
 

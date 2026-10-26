@@ -12,7 +12,8 @@ public static class LifeApi
     public record HabitReq(string? Name, string? Icon);
     public record ExpenseReq(decimal Amount, string? Type, string? Category, string? OccurDate, string? Note);
     public record CourseReq(string? Name, string? Teacher, string? Location, int Weekday,
-                            int StartPeriod, int EndPeriod, string? WeeksText, string? Category);
+                            int StartPeriod, int EndPeriod, string? WeeksText, string? Category,
+                            string? Color);
     public record PeriodsReq(List<string>? Start, List<string>? End);
     public record CourseSettingsReq(string? SemesterStart, List<PeriodPair>? Periods);
     public record PeriodPair(string? S, string? E);
@@ -243,6 +244,9 @@ public static class LifeApi
                     id = c.Id, name = c.Name, teacher = c.Teacher, location = c.Location,
                     weekday = c.Weekday, startPeriod = c.StartPeriod, endPeriod = c.EndPeriod,
                     weeksText = c.WeeksText, weeksLabel = Weeks.Display(c.WeeksText), category = c.Category,
+                    // 已算好的颜色（用户设过的优先，否则按课名默认）—— App 直接拿去上色，
+                    // 不用在客户端再实现一遍 NameKey 归一化与哈希，两端才不会各算各的
+                    color = CoursePalette.Of(c),
                 }).ToList();
 
             return ApiKit.Ok(new
@@ -270,6 +274,7 @@ public static class LifeApi
                 StartPeriod = s, EndPeriod = e,
                 WeeksText = string.IsNullOrWhiteSpace(req.WeeksText) ? "1-16" : ApiKit.Cut(req.WeeksText, 40),
                 Category = req.Category is "required" or "college" or "school" or "other" ? req.Category : "other",
+                Color = CoursePalette.Normalize(req.Color),
                 CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
             };
             db.Courses.Add(c);
@@ -290,6 +295,8 @@ public static class LifeApi
             c.StartPeriod = s; c.EndPeriod = e;
             c.WeeksText = string.IsNullOrWhiteSpace(req.WeeksText) ? "1-16" : ApiKit.Cut(req.WeeksText, 40);
             c.Category = req.Category is "required" or "college" or "school" or "other" ? req.Category : "other";
+            // App 传空串 = 改回「自动」（跟着课名算），空串是合法意图，不能当没传
+            c.Color = CoursePalette.Normalize(req.Color);
             c.UpdatedAt = DateTime.UtcNow;
             db.SaveChanges();
             return ApiKit.Ok(new { id });

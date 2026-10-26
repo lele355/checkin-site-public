@@ -20,6 +20,8 @@ public static class Icons
         ["users"] = """<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>""",
         ["role"] = """<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>""",
         ["check"] = """<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>""",
+        // 纯对勾（无外圈）：小尺寸下 check 那个「圆圈里打勾」会糊成一个圈
+        ["check-plain"] = """<path d="M20 6 9 17l-5-5"/>""",
         ["grid"] = """<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>""",
         ["list"] = """<path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/>""",
         ["heart"] = """<path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>""",
@@ -63,6 +65,12 @@ public static class Icons
         ["settings-2"] = """<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>""",
         ["chevron-up"] = """<path d="m18 15-6-6-6 6"/>""",
         ["chevron-down"] = """<path d="m6 9 6 6 6-6"/>""",
+        // 切换账号：左右箭头（Lucide arrow-left-right）
+        ["arrow-left-right"] = """<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>""",
+        // 发送中 / 等待中：缺口圆环（Lucide loader-circle），配合 rotate 动画
+        ["loader"] = """<path d="M21 12a9 9 0 1 1-6.219-8.56"/>""",
+        // 等待计时（Lucide clock）
+        ["clock"] = """<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>""",
     };
 
     /// <summary>输出内联 SVG；未知名称返回空串（页面不炸，只是没图标）。返回 HtmlString 防 Razor 转义。</summary>
