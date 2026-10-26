@@ -1,10 +1,10 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
+// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
+const ADMIN = process.env.QA_USER || 'admin';
 // qa_email.js — M7 邮件模块专项测试（绑定/加密/收件箱/阅读/同步容错/越权/级联删除）
 // 用法: NODE_PATH=... node qa_email.js   → 输出 report-email.json + console 明细
 // 基建约定同 qa_full.js：playwright 用系统 Edge；toast 断言用 hasText 防竞态；
 // .msg 横幅被 modal.js 转 Toast；直接 goto URL 不走弹窗（modal.js 只拦链接点击）。
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -58,7 +58,7 @@ async function toastText(page, timeout = 8000) {
     try {
         // ================= S1 绑定账号：平台预设 + 授权码加密 =================
         sec('S1 绑定账号（预设自动填充 + 授权码加密）');
-        await login(page, ADMIN, PW);
+        await login(page, QA.USER, QA.PASS);
         T('admin 登录成功', !page.url().includes('Login'), page.url());
 
         await page.goto(BASE + '/Email/New');
@@ -255,7 +255,7 @@ async function toastText(page, timeout = 8000) {
         const ctxM = await browser.newContext({ viewport: { width: 390, height: 844 } });
         const pM = await ctxM.newPage();
         pM.on('dialog', d => d.accept().catch(() => {}));
-        await login(pM, ADMIN, PW);
+        await login(pM, QA.USER, QA.PASS);
         await pM.goto(BASE + '/Email');
         await pM.waitForLoadState('networkidle');
         await pM.waitForTimeout(300);

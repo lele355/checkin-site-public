@@ -29,7 +29,7 @@ public static class LocalMode
     public static bool Enabled { get; private set; }
 
     /// <summary>自动登录用哪个账号（默认播种出来的管理员）。</summary>
-    public static string AdminUsername { get; private set; } = ADMIN;
+    public static string AdminUsername { get; private set; } = "admin";
 
     public static void Init(IConfiguration cfg)
     {

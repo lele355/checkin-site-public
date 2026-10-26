@@ -1,12 +1,10 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 密码保存方式三选一语义测试（登录页单选组）
 // autologin = 下次直接进入跳过登录页（30 天持久 cookie）
 // prefill  = 仅填充密码（会话 cookie，下次仍到登录页但已填好）
 // none     = 不保存（并清旧档）
 // 「模拟浏览器重启」= storageState 里剔除会话 cookie（expires=-1），持久 cookie 与 localStorage 保留
 // 用法: NODE_PATH=... node qa_login_options.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 
 const BASE = 'http://localhost:5188';
@@ -17,8 +15,8 @@ async function loginWithMode(browser, mode) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
   await page.goto(BASE + '/Login');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.check(`input[name="RememberMode"][value="${mode}"]`);
   await page.click('#loginForm button[type="submit"]');
   await page.waitForTimeout(900);
@@ -70,7 +68,7 @@ function simulateRestart(state) {
     check('[prefill] 重启后仍到登录页(不跳过)', atLogin, `url=${page.url().replace(BASE, '')}`);
     const u = await page.inputValue('#Username').catch(() => '');
     const p = await page.inputValue('#Password').catch(() => '');
-    check('[prefill] 登录页账号密码已自动填充', u === ADMIN && p.length > 0, `u=${u} p.len=${p.length}`);
+    check('[prefill] 登录页账号密码已自动填充', u === QA.USER && p.length > 0, `u=${u} p.len=${p.length}`);
     const modeChecked = await page.isChecked('input[name="RememberMode"][value="prefill"]').catch(() => false);
     check('[prefill] 单选保持为仅填充', modeChecked);
     await ctx.close();
@@ -103,8 +101,8 @@ function simulateRestart(state) {
     const page = await ctx.newPage();
     await page.goto(BASE + '/Login');
     await page.check('input[name="RememberMode"][value="prefill"]');
-    await page.fill('#Username', ADMIN);
-    await page.fill('#Password', PW);
+    await page.fill('#Username', QA.USER);
+    await page.fill('#Password', QA.PASS);
     await page.click('#loginForm button[type="submit"]');
     await page.waitForTimeout(900);
     await ctx.clearCookies();          // 清登录态逼出登录页

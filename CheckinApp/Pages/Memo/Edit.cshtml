@@ -34,8 +34,8 @@
     </form>
 
     <hr class="rule" />
-    <form method="post" asp-page-handler="Delete" onsubmit="return confirm('确认删除这张便签？此操作不可撤销。');" style="text-align:right;">
+    <form method="post" asp-page-handler="Delete" data-confirm="确认删除" class="danger-row">
         <input type="hidden" name="id" value="@Model.Id" />
-        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除此便签</button>
+        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除便签</button>
     </form>
 </div>

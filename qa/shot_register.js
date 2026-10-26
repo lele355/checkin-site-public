@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // shot_register.js — 目检用截图（注册页 PC/手机、邀请码页、用户管理待审核态）
 // 用法：NODE_PATH=... node shot_register.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const path = require('path');
 
@@ -33,8 +31,8 @@ const OUT = 'D:/projects/checkin/docs';
     const ac = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     const a = await ac.newPage();
     await a.goto(BASE + '/Login');
-    await a.fill('#Username', ADMIN);
-    await a.fill('#Password', PW);
+    await a.fill('#Username', QA.USER);
+    await a.fill('#Password', QA.PASS);
     await a.click('form button[type=submit]');
     await a.waitForLoadState('networkidle').catch(() => { });
 

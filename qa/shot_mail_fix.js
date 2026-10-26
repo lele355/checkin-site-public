@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // shot_mail_fix.js — 手机端阅读页标题竖排修复的截图复验（一次性）
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 
@@ -26,8 +24,8 @@ function dbq(sql) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await ctx.newPage();
     await page.goto(BASE + '/Login');
-    await page.fill('#Username', ADMIN);
-    await page.fill('#Password', PW);
+    await page.fill('#Username', QA.USER);
+    await page.fill('#Password', QA.PASS);
     await page.click('#loginForm button[type=submit]');
     await page.waitForLoadState('networkidle').catch(() => {});
     await page.goto(BASE + '/Email/Read/' + msg);

@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // PC 端布局目检截图：不同视口宽度 × 侧栏展开/收起，覆盖工作台 / PyLab / 备忘
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 
@@ -25,8 +23,8 @@ async function shot(p, name) {
     p.on('pageerror', e => errs.push(e.message));
 
     await p.goto(BASE + '/Login', { waitUntil: 'domcontentloaded' });
-    await p.fill('#Username', ADMIN);
-    await p.fill('#Password', PW);
+    await p.fill('#Username', QA.USER);
+    await p.fill('#Password', QA.PASS);
     await p.locator('form:has(#Username) button[type=submit]').click();
     await p.waitForLoadState('domcontentloaded');
 

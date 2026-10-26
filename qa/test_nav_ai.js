@@ -1,18 +1,16 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // test_nav_ai.js — 本轮两件事的专项测试
 //   ① 侧栏：分组折叠（记忆）+ 自定义隐藏/恢复（跟账号走）+ 隐藏不影响权限
 //   ② AI：每日 token 用量显示 + 超额拦截（默认 1 亿）
 // 用法：NODE_PATH=... node test_nav_ai.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 
 const BASE = 'http://localhost:5188';
 const PY = 'C:/Users/An/AppData/Local/Programs/Python/Python314/python.exe';
 const QA_DIR = 'D:/projects/checkin/qa';
-const ADMIN_USER = ADMIN;
-const ADMIN_PASS = PW;
+const ADMIN_USER = QA.USER;
+const ADMIN_PASS = QA.PASS;
 
 const results = [];
 let curSec = '';

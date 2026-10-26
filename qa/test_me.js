@@ -1,10 +1,8 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // test_me.js — 个人主页 + 测试数据 专项验收
 // 覆盖：顶栏/底栏入口 → 名片与数据概览 → 资料编辑（含邮箱校验）→ 建号自动播种测试数据
 //       → 一键清除 / 再生成（幂等）→ 在个人主页改密码后用新密码登录
 // 用法：node test_me.js   （前置：站点跑在 5188，已执行 wipe_qa.py）
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -67,7 +65,7 @@ async function sampleCount(page) {
     try {
         // ---------- 1. 管理员视角：入口与名片 ----------
         sec('M1 入口与名片');
-        await login(pL, ADMIN, PW);
+        await login(pL, QA.USER, QA.PASS);
         T('admin 登录成功', !pL.url().toLowerCase().includes('login'), pL.url());
 
         const chipHref = await pL.locator('.user-chip').first().getAttribute('href');

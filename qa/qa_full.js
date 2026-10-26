@@ -1,10 +1,8 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // qa_full.js — 生活管家全流程全功能测试套件（含数据落库验证 + 越权隔离）
 // 用法: node qa_full.js <轮次号>   → 输出 report-r<轮次>.json + console 明细
 // 基建约定: playwright 用系统 Edge（channel:'msedge'）；弹窗=#appModal .modal-body；
 // toast 断言用 .toast-ok/.toast-err；测试账号 QA_A/QA_B 每轮重建；演示数据 admin 不动。
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -99,14 +97,14 @@ async function openEdit(page, listPath, id) {
             const r = await pL.request.get(BASE + path, { maxRedirects: 0 }).catch(() => null);
             T(`未登录访问 ${path} 302`, r && r.status() === 302, r && r.status());
         }
-        await login(pL, ADMIN, 'wrongpass');
+        await login(pL, QA.USER, 'wrongpass');
         T('错误密码提示', await pL.locator('.msg.error, .toast-err').count() > 0);
-        await loginOK(pL, ADMIN, PW, ADMIN);
+        await loginOK(pL, QA.USER, QA.PASS);
         // 登出是 POST 表单（GET /Logout 有意不登出防 CSRF），点「退出」按钮
         await pL.locator('button:has-text("退出"), a:has-text("退出")').first().click();
         await pL.waitForTimeout(700);
         T('登出后回到登录页', pL.url().toLowerCase().includes('login'), pL.url());
-        await loginOK(pL, ADMIN, PW, 'admin 再登录');
+        await loginOK(pL, QA.USER, QA.PASS, 'admin 再登录');
 
         // ================= S2 管理后台建号 =================
         sec('S2 管理后台建号（弹窗流程）');

@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // test_user_delete_cascade.js — 验证「删用户 = 连他所有数据一起删」
 // 做法：建号时勾上「生成测试数据」（每模块都有数据）→ 逐表数一遍 → 删号 → 再逐表数一遍，必须全 0。
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const BASE = 'http://localhost:5188';
@@ -32,8 +30,8 @@ const NAME = 'qa_cas_' + TS;
     const b = await chromium.launch({ channel: 'msedge' });
     const p = await (await b.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' })).newPage();
     await p.goto(BASE + '/Login', { waitUntil: 'domcontentloaded' });
-    await p.fill('#Username', ADMIN);
-    await p.fill('#Password', PW);
+    await p.fill('#Username', QA.USER);
+    await p.fill('#Password', QA.PASS);
     await p.click('form button[type=submit]');
     await p.waitForURL(u => !u.pathname.toLowerCase().includes('login'), { timeout: 20000 });
 

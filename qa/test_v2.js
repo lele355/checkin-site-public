@@ -1,10 +1,10 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
+// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
+const ADMIN = process.env.QA_USER || 'admin';
 // test_v2.js — 本批次新增功能专项（不跑全量，只测这次改的东西）
 // 覆盖：站点改名/新图标 → 底色系扩容（每套 6 档且色差明显、可持久化）
 //       → 首页「一键删除测试数据」（删完永久消失）→ 提醒中心「每日邮件提醒」（保存/预览/发送失败兜底/后台到点）
 // 用法：node test_v2.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -67,7 +67,7 @@ async function login(page, user, pass) {
         T('512 图标体积像张真图（>20KB）', Number(i512.headers()['content-length'] || 0) > 20000,
             i512.headers()['content-length']);
 
-        await login(p, ADMIN, PW);
+        await login(p, QA.USER, QA.PASS);
         T('登录成功', !p.url().toLowerCase().includes('login'), p.url());
         const brand = (await p.locator('.topbar .brand').innerText()).trim();
         T('顶栏品牌名为「日常管理」', brand === '日常管理', brand);

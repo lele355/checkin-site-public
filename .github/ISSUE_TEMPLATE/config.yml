@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞
+    url: https://github.com/Lele355/checkin-site-public/security/advisories/new
+    about: 发现越权、注入、令牌泄漏这类问题，请走私密通道，不要开公开 Issue。
+  - name: 先看看文档
+    url: https://github.com/Lele355/checkin-site-public#readme
+    about: README 里有本地运行方式和六条硬规矩，多数"跑不起来"的问题都写在 FAQ 小节。

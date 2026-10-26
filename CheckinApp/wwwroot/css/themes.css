@@ -40,14 +40,17 @@
 /* 底线式输入框：去掉边框，只留底线 */
 [data-theme="editorial"] .field input,
 [data-theme="editorial"] .field select,
-[data-theme="editorial"] .field textarea {
+[data-theme="editorial"] .field textarea,
+[data-theme="editorial"] .dp-trigger {
   border: none; border-bottom: 1px solid rgba(28, 28, 28, .20);
   border-radius: 0; background: transparent;
   padding-left: 0; padding-right: 0;
 }
 [data-theme="editorial"] .field input:focus,
 [data-theme="editorial"] .field select:focus,
-[data-theme="editorial"] .field textarea:focus {
+[data-theme="editorial"] .field textarea:focus,
+[data-theme="editorial"] .dp-trigger:hover,
+[data-theme="editorial"] .dp-trigger:focus-visible {
   border-bottom: 1px solid #1C1C1C;
 }
 [data-theme="editorial"] .field:focus-within label { color: #1C1C1C; font-style: italic; }
@@ -103,14 +106,17 @@
 
 [data-theme="neumorphism"] .field input,
 [data-theme="neumorphism"] .field select,
-[data-theme="neumorphism"] .field textarea {
+[data-theme="neumorphism"] .field textarea,
+[data-theme="neumorphism"] .dp-trigger {
   border: none;
   box-shadow: var(--shadow-inset);
 }
 /* focus 时内阴影变浅 = 输入通道打开（惰性收缩，非加压） */
 [data-theme="neumorphism"] .field input:focus,
 [data-theme="neumorphism"] .field select:focus,
-[data-theme="neumorphism"] .field textarea:focus {
+[data-theme="neumorphism"] .field textarea:focus,
+[data-theme="neumorphism"] .dp-trigger:hover,
+[data-theme="neumorphism"] .dp-trigger:focus-visible {
   box-shadow: var(--shadow-inset-sm);
 }
 
@@ -154,7 +160,8 @@
 
 [data-theme="natural"] .field input,
 [data-theme="natural"] .field select,
-[data-theme="natural"] .field textarea {
+[data-theme="natural"] .field textarea,
+[data-theme="natural"] .dp-trigger {
   border-radius: 999px;
   background: #ffffff;
   padding-left: 18px; padding-right: 18px;
@@ -204,13 +211,16 @@
 
 [data-theme="macos"] .field input,
 [data-theme="macos"] .field select,
-[data-theme="macos"] .field textarea {
+[data-theme="macos"] .field textarea,
+[data-theme="macos"] .dp-trigger {
   background: var(--bg);
   border-color: rgba(255, 255, 255, .10);
 }
 [data-theme="macos"] .field input:focus,
 [data-theme="macos"] .field select:focus,
-[data-theme="macos"] .field textarea:focus {
+[data-theme="macos"] .field textarea:focus,
+[data-theme="macos"] .dp-trigger:hover,
+[data-theme="macos"] .dp-trigger:focus-visible {
   border-color: rgba(255, 255, 255, .25);
 }
 
@@ -269,14 +279,17 @@
 
 [data-theme="clay"] .field input,
 [data-theme="clay"] .field select,
-[data-theme="clay"] .field textarea {
+[data-theme="clay"] .field textarea,
+[data-theme="clay"] .dp-trigger {
   border: none; border-radius: 20px;
   background: var(--clay-in);
   box-shadow: var(--shadow-inset);
 }
 [data-theme="clay"] .field input:focus,
 [data-theme="clay"] .field select:focus,
-[data-theme="clay"] .field textarea:focus {
+[data-theme="clay"] .field textarea:focus,
+[data-theme="clay"] .dp-trigger:hover,
+[data-theme="clay"] .dp-trigger:focus-visible {
   box-shadow: var(--shadow-inset-sm);
 }
 
@@ -391,3 +404,47 @@
   background: var(--clay-in);
   box-shadow: var(--shadow-inset-sm);
 }
+
+/* =========================================================
+   日期 / 时间选择弹层：与所在主题的卡片同材质
+   ---------------------------------------------------------
+   弹层浮在卡片之上，必须比卡片「更高一层」才看得清边界。
+   浅色主题靠阴影，暗色主题靠提亮 —— 同色 + 阴影在深色里会糊成一片。
+   ========================================================= */
+
+/* 新拟物：用同一套双光源阴影，弹层凸起、背景凹下 */
+[data-theme="neumorphism"] .dp-pop {
+  border: none;
+  box-shadow: var(--shadow);
+}
+[data-theme="neumorphism"] .dp-day:hover,
+[data-theme="neumorphism"] .dp-nav:hover,
+[data-theme="neumorphism"] .dp-chip:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+/* macos：提亮一级（card-soft），配半透边框，明显浮在卡片上 */
+[data-theme="macos"] .dp-pop {
+  background: var(--card-soft);
+  border-color: rgba(255, 255, 255, .14);
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .04);
+}
+
+/* 粘土：延续糖果渐变卡面 + 内外阴影 */
+[data-theme="clay"] .dp-pop {
+  background: var(--card);
+  box-shadow: var(--shadow), 0 24px 48px -22px rgba(0, 0, 0, .28);
+}
+
+/* 自然有机：卡片比底色亮，弹层用同一张纸即可，阴影略收 */
+[data-theme="natural"] .dp-pop {
+  box-shadow: 0 18px 36px -18px rgba(92, 64, 51, .28);
+}
+
+/* 编辑杂志风：纸面提亮成纯白，模拟「摊在桌上的另一张纸」 */
+[data-theme="editorial"] .dp-pop {
+  background: #FFFFFF;
+  border-color: #1C1C1C;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .28);
+}
+

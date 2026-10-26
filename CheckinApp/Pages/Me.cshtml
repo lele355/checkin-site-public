@@ -24,7 +24,7 @@
         </div>
         @if (string.IsNullOrWhiteSpace(Model.Signature))
         {
-            <p class="me-sign me-sign-empty">还没有个性签名，在下面「基本资料」里写一句吧。</p>
+            <p class="me-sign me-sign-empty">还没有个性签名</p>
         }
         else
         {
@@ -50,7 +50,7 @@
     {
         <div class="empty">
             <span class="big">◎</span>
-            当前角色还没有任何模块权限，找管理员开一个吧。
+            当前角色还没有任何模块权限，请联系管理员开通。
         </div>
     }
     else
@@ -66,6 +66,15 @@
             }
         </div>
     }
+</section>
+
+@* ---------- 安卓客户端下载：侧栏底部和页脚也有入口，这里再放一个，从「我的」找设置的人能撞见 ---------- *@
+<section class="card">
+    <div class="page-head">
+        <h2>安卓客户端</h2>
+        <a class="btn secondary" href="/Download">@Html.Raw(Icons.Svg("download", 16)) 去下载</a>
+    </div>
+    <p class="hint" style="margin-top:6px;">装到手机上更好用：全屏无地址栏，日程到点能弹通知。客户端只是个壳，服务端更新后不用重装。</p>
 </section>
 
 <div class="me-grid">

@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 功能测试：节次时间自定义（改时间→课表网格跟着变→加/删节→恢复默认）
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const BASE = 'http://localhost:5188';
 let pass = 0, fail = 0;
@@ -17,10 +15,25 @@ function T(name, ok, extra) {
   page.on('dialog', d => d.accept());   // confirm() 自动确认
 
   await page.goto(BASE + '/Login');
-  await page.fill('input[name="Username"]', ADMIN);
-  await page.fill('input[name="Password"]', PW);
+  await page.fill('input[name="Username"]', QA.USER);
+  await page.fill('input[name="Password"]', QA.PASS);
   await page.click('button[type="submit"]');
   await page.waitForURL(u => !u.pathname.includes('Login'), { timeout: 10000 });
+
+  // 前置：把节次配置复位成默认 12 节。
+  // 这个脚本会改库里的全局配置，中途崩了下次跑就会撞上"13 行"的假失败；
+  // 所以开头先自己收拾干净——恢复默认是幂等的，跑几次结果都一样。
+  await page.goto(BASE + '/Courses/Periods');
+  await page.waitForSelector('.pp-row');
+  if (await page.locator('.pp-row').count() !== 12) {
+    const r = page.locator('button:has-text("恢复默认")');
+    await r.click();
+    await page.waitForTimeout(200);
+    await r.click();
+    await page.waitForURL(/saved=True/i, { timeout: 8000 });
+    await page.goto(BASE + '/Courses/Periods');
+    await page.waitForSelector('.pp-row');
+  }
 
   // ① 改第 1 节开始时间 08:00 → 07:30，保存
   await page.goto(BASE + '/Courses/Periods');
@@ -29,7 +42,7 @@ function T(name, ok, extra) {
   const firstStart = page.locator('.pp-row input').first();
   await firstStart.fill('07:30');
   // 注意：顶栏「退出」表单也有 button[type=submit]，DOM 在前——必须按文案定位「保存」
-  await page.locator('button:has-text("保存")').click();
+  await page.locator('form').filter({ has: page.locator('.pp-row') }).locator('button[type=submit]').first().click();
   await page.waitForURL(/saved=True/i, { timeout: 8000 });
   // .msg 横幅会被 modal.js 自动转 Toast，两者任一出现就算提示成功
   await page.waitForTimeout(300);
@@ -51,7 +64,7 @@ function T(name, ok, extra) {
   await lastStart.fill('21:00');
   const lastEnd = page.locator('.pp-row input').nth(25);
   await lastEnd.fill('21:50');
-  await page.locator('button:has-text("保存")').click();
+  await page.locator('form').filter({ has: page.locator('.pp-row') }).locator('button[type=submit]').first().click();
   await page.waitForURL(/saved=True/i, { timeout: 8000 });
   await page.goto(BASE + '/Courses');
   await page.waitForSelector('.ttm-gcell');
@@ -64,7 +77,12 @@ function T(name, ok, extra) {
   T('删除一行后 12 行', await page.locator('.pp-row').count() === 12);
 
   // ⑤ 恢复默认 → 12 节、08:00 开头
-  await page.locator('button:has-text("恢复默认")').click();
+  // 2.3.0 起危险操作改成就地二次确认：第一下只进入待确认态，第二下才真正提交
+  const btnReset = page.locator('button:has-text("恢复默认")');
+  await btnReset.click();
+  await page.waitForTimeout(200);
+  T('恢复默认需二次确认', await btnReset.evaluate(el => el.classList.contains('is-armed')));
+  await btnReset.click();
   await page.waitForURL(/saved=True/i, { timeout: 8000 });
   await page.goto(BASE + '/Courses');
   await page.waitForSelector('.ttm-gcell');

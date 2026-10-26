@@ -125,6 +125,45 @@ public static class AiTools
                 },
             },
         },
+        new
+        {
+            type = "function",
+            function = new
+            {
+                name = "create_courses",
+                description = "把课程批量写进课程表。用户发来课表截图、贴课程清单、说「导入课程表」时用它，一门课一条放进 courses 数组。",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        semester_start = new { type = "string", description = "学期第 1 周的周一，yyyy-MM-dd，可选；给了就同时更新课程表的学期开始日" },
+                        courses = new
+                        {
+                            type = "array",
+                            description = "课程数组，一门课一条；同一门课在不同星期/不同节次要拆成多条",
+                            items = new
+                            {
+                                type = "object",
+                                properties = new
+                                {
+                                    name = new { type = "string", description = "课程名称，必填" },
+                                    teacher = new { type = "string", description = "任课教师，可选" },
+                                    location = new { type = "string", description = "上课地点，可选" },
+                                    weekday = new { type = "integer", description = "星期几：1=周一 … 7=周日，必填" },
+                                    start_period = new { type = "integer", description = "起始小节号，必填。课表上「第N大节」按 start=N×2-1 换算（第一大节→1，第二大节→3，第三大节→5，第四大节→7，第五大节→9，第六大节→11）" },
+                                    end_period = new { type = "integer", description = "结束小节号（含），必填。常规大节是 start+1；第六大节 11,12,13 三小节则 end=13" },
+                                    weeks = new { type = "string", description = "上课周次，原样保留课表写法：1-16 / 1-8,10-16 / 单周 / 双周 / 8，可选，默认 1-16" },
+                                    category = new { type = "string", description = "课程类别：required=必修 / college=院级选修 / school=校级选修 / other=其它，看不出来就填 other", @enum = new[] { "required", "college", "school", "other" } },
+                                },
+                                required = new[] { "name", "weekday", "start_period", "end_period" },
+                            },
+                        },
+                    },
+                    required = new[] { "courses" },
+                },
+            },
+        },
     ];
 
     /// <summary>
@@ -238,6 +277,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         ["create_expense"]    = "expense.use",
         ["checkin_habit"]     = "habits.use",
         ["create_anniversary"] = "anniversary.use",
+        ["create_courses"]    = "courses.use",
     };
 
     /// <summary>动作 → 中文名（确认卡展示用）</summary>
@@ -248,6 +288,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         ["create_expense"]     = "记一笔账",
         ["checkin_habit"]      = "习惯打卡",
         ["create_anniversary"] = "新增纪念日",
+        ["create_courses"]     = "导入课程表",
     };
 
     public AiActionResult Execute(string actionsJson, int index)
@@ -275,6 +316,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
             "create_expense"     => CreateExpense(uid, act),
             "checkin_habit"      => CheckinHabit(uid, act),
             "create_anniversary" => CreateAnniversary(uid, act),
+            "create_courses"     => CreateCourses(uid, act),
             _ => new(false, "不支持的操作类型（不在 AI 菜单内）")
         };
     }
@@ -383,6 +425,100 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         });
         db.SaveChanges();
         return new(true, $"已创建纪念日「{title}」（{date:yyyy-MM-dd}）");
+    }
+
+    /// <summary>
+    /// 批量导入课程：一张课表截图 → 一个动作写多行，用户点一次确认就全部落库。
+    /// 一门课在课表上占几个格子就拆几条；同格子里「1-16周 / 2-12周」这种重复段合并周次。
+    /// 库里已有的（同课名 + 同星期 + 同节次）直接跳过，重复导入不会翻倍。
+    /// </summary>
+    private AiActionResult CreateCourses(int uid, JsonElement a)
+    {
+        if (a.ValueKind != JsonValueKind.Object
+            || !a.TryGetProperty("courses", out var arr)
+            || arr.ValueKind != JsonValueKind.Array)
+            return new(false, "课程清单格式不对（缺少 courses 数组）");
+
+        const int MaxCourses = 60;   // 一学期撑死几十条，超了基本是模型幻觉
+
+        var existing = db.Courses
+            .Where(c => c.UserId == uid)
+            .Select(c => new { c.Name, c.Weekday, c.StartPeriod, c.EndPeriod })
+            .ToList();
+
+        var add = new List<Course>();
+        int skipped = 0, duplicate = 0;
+
+        foreach (var el in arr.EnumerateArray())
+        {
+            if (add.Count >= MaxCourses) break;
+
+            var name = Str(el, "name", 60);
+            if (name == "") { skipped++; continue; }
+
+            // 节次一律按「小节」存（1 起），星期 1~7；越界的一律当解析失败，不猜
+            if (!int.TryParse(Str(el, "weekday", 4), out var weekday) || weekday < 1 || weekday > 7) { skipped++; continue; }
+            if (!int.TryParse(Str(el, "start_period", 4), out var sp) || sp < 1 || sp > 16) { skipped++; continue; }
+            if (!int.TryParse(Str(el, "end_period", 4), out var ep) || ep < sp || ep > 16) { skipped++; continue; }
+
+            var weeks = Str(el, "weeks", 40);
+            if (weeks == "") weeks = "1-16";
+
+            var catRaw = Str(el, "category", 12);
+            var category = catRaw is "required" or "college" or "school" ? catRaw : "other";
+
+            // 截图上同一格常写成两条（如体育 1-16周 与 2-12周）—— 合并成一条更贴近真实
+            var sameSlot = add.FirstOrDefault(c => c.Name == name && c.Weekday == weekday
+                                                   && c.StartPeriod == sp && c.EndPeriod == ep);
+            if (sameSlot is not null)
+            {
+                if (!sameSlot.WeeksText.Contains(weeks)) sameSlot.WeeksText += "," + weeks;
+                continue;
+            }
+
+            if (existing.Any(c => c.Name == name && c.Weekday == weekday
+                                  && c.StartPeriod == sp && c.EndPeriod == ep))
+            { duplicate++; continue; }
+
+            add.Add(new Course
+            {
+                UserId = uid,
+                Name = name,
+                Teacher = Str(el, "teacher", 40),
+                Location = Str(el, "location", 60),
+                Weekday = weekday,
+                StartPeriod = sp,
+                EndPeriod = ep,
+                WeeksText = weeks,
+                Category = category,
+            });
+        }
+
+        if (add.Count == 0)
+        {
+            if (duplicate > 0) return new(false, $"这 {duplicate} 条课表里都已经有了，没导入新的");
+            return new(false, "没解析出可用课程（课程名 / 星期 / 节次得齐全）");
+        }
+
+        db.Courses.AddRange(add);
+
+        // 学期开始日顺手一起写：「本周是第几周」全靠它，不设的话课程表永远停在第 1 周
+        var semNote = "";
+        if (Date(a, "semester_start", out var ss))
+        {
+            var monday = ss.Date.AddDays(-(((int)ss.DayOfWeek + 6) % 7));   // 归一到周一
+            var iso = monday.ToString("yyyy-MM-dd");
+            var setting = db.AppSettings.FirstOrDefault(s => s.Key == "courses.semester-start");
+            if (setting is null) db.AppSettings.Add(new AppSetting { Key = "courses.semester-start", Value = iso });
+            else setting.Value = iso;
+            semNote = $"，学期开始日设为 {iso}";
+        }
+
+        db.SaveChanges();
+
+        var tail = (skipped > 0 ? $"，{skipped} 条字段不全跳过" : "")
+                 + (duplicate > 0 ? $"，{duplicate} 条已存在跳过" : "");
+        return new(true, $"已导入 {add.Count} 条课程{semNote}{tail}");
     }
 
     // ---------- 字段校验小工具：长度封顶 + 日期白名单，坏值直接拒 ----------

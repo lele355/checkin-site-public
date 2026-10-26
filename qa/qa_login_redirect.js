@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 登录落地页验证：登录成功后固定进工作台（/），不跟随深链接 ReturnUrl
 // 用法: NODE_PATH=... node qa_login_redirect.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 
 const BASE = 'http://localhost:5188';
@@ -11,8 +9,8 @@ function check(name, ok, extra = '') { results.push({ name, ok, extra }); consol
 
 async function login(page) {
   await page.goto(BASE + '/Login');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.click('#loginForm button[type="submit"]');
   await page.waitForTimeout(800);
 }
@@ -33,8 +31,8 @@ async function login(page) {
   // 退出是 POST 表单：清 cookie 直接重建上下文更干净
   await ctx.clearCookies();
   await page.goto(BASE + '/Login?ReturnUrl=%2FSchedule');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.click('#loginForm button[type="submit"]');
   await page.waitForTimeout(800);
   const u2 = page.url();

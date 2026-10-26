@@ -84,7 +84,7 @@
         <tbody>
         @if (Model.Rows.Count == 0)
         {
-            <tr><td colspan="7" class="meta">还没有邀请码，上面生成一个吧。</td></tr>
+            <tr><td colspan="7" class="meta">还没有邀请码</td></tr>
         }
         @foreach (var r in Model.Rows)
         {
@@ -99,8 +99,7 @@
                     @if (r.Status == "可用")
                     {
                         <button class="btn secondary" type="button" data-copy="@r.Code" style="padding:4px 10px;font-size:12px;">复制邀请码</button>
-                        <form method="post" asp-page-handler="Revoke" asp-route-id="@r.Id" style="display:inline;"
-                              onsubmit="return confirm('撤销后这个码就不能用了，确定吗？');">
+                        <form method="post" asp-page-handler="Revoke" asp-route-id="@r.Id" class="inline-act" data-confirm="确认撤销">
                             <button class="btn secondary" type="submit" style="padding:4px 10px;font-size:12px;">撤销</button>
                         </form>
                     }

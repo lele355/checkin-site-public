@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // UI 打磨验证：行内按钮尺寸 / 卡片底边对齐 / 手机权限单行 / 动效生效 + 尊重 reduced-motion
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const BASE = 'http://localhost:5188';
 const OUT = 'D:/projects/checkin/_shots';
@@ -13,8 +11,8 @@ function T(name, ok, extra) {
 
 async function login(page) {
   await page.goto(BASE + '/Login');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.click('button[type=submit]');
   await page.waitForURL(u => !u.pathname.toLowerCase().includes('login'), { timeout: 10000 });
 }

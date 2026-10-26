@@ -324,9 +324,12 @@ button { font: inherit; color: inherit; }
   transition: color var(--dur) var(--easing);
 }
 .field input, .field select, .field textarea {
-  width: 100%; min-height: 44px; padding: 10px 14px;
+  width: 100%; min-height: 44px; padding: 8px 14px;
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   background: var(--card-soft); color: var(--text); font: inherit;
+  /* 行高固定 1.5：不写的话 input 按 1.75 撑到 49px，而 select 的内容盒
+     算法不同只有 44px，两者并排时下边缘差 5px（并排字段里很显眼）。 */
+  line-height: 1.5;
   transition: border-color var(--dur) var(--easing), background var(--dur) var(--easing), box-shadow var(--dur) var(--easing);
 }
 .field input::placeholder, .field textarea::placeholder { color: var(--text-weak); }
@@ -335,9 +338,10 @@ button { font: inherit; color: inherit; }
 /* 单行输入条（留言/小纸条）：输入框套同一套皮肤，跟按钮同高，不再用浏览器原生样式 */
 .inline-form { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
 .inline-form > input:not([type=hidden]) {
-  flex: 1; min-width: 0; min-height: 44px; padding: 10px 14px;
+  flex: 1; min-width: 0; min-height: 44px; padding: 8px 14px;
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   background: var(--card-soft); color: var(--text); font: inherit;
+  line-height: 1.5;
   transition: border-color var(--dur) var(--easing), background var(--dur) var(--easing);
 }
 .inline-form > input::placeholder { color: var(--text-weak); }
@@ -427,6 +431,8 @@ button { font: inherit; color: inherit; }
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 10px;
 }
+/* 页头右侧放多个按钮时用（课程表的「从截图导入」+「添加课程」） */
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 /* 空状态 */
 .empty {
@@ -654,7 +660,7 @@ body {
 .tt .today { background: var(--accent-soft); }   /* 今天所在列 */
 
 .course-card {
-  display: block; padding: 8px; margin-bottom: 6px; border-radius: 8px;
+  display: block; padding: 8px; margin-bottom: 6px; border-radius: var(--radius-in);
   text-decoration: none;
   background: var(--cat-bg); color: var(--cat);
 }
@@ -778,7 +784,7 @@ body {
 .stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .stat-box {
   flex: 1; min-width: 100px; padding: 12px;
-  background: var(--bg-soft, rgba(0,0,0,.04)); border-radius: 10px;
+  background: var(--bg-soft, rgba(0,0,0,.04)); border-radius: var(--radius-in);
 }
 .stat-num { font-size: 22px; font-weight: 700; margin-top: 2px; }
 
@@ -893,6 +899,13 @@ body {
   transition: color var(--dur) var(--easing), border-color var(--dur) var(--easing);
 }
 .ai-attach:hover { color: var(--accent-strong); border-color: var(--accent); }
+/* 从课程表页跳过来时给附件按钮打个呼吸灯：浏览器不允许无手势直接弹文件框，
+   只能把「点这里」的视觉焦点做实 */
+.ai-attach.pulse { color: var(--accent-strong); border-color: var(--accent); animation: ai-pulse 1.4s ease-in-out infinite; }
+@keyframes ai-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
 .ai-preview { position: relative; display: inline-block; margin-bottom: 8px; }
 .ai-preview[hidden] { display: none; }
 .ai-preview img { display: block; max-width: 132px; max-height: 132px; border-radius: 10px; border: 1px solid var(--border); }
@@ -938,7 +951,7 @@ dialog.app-modal {
   margin: auto;                 /* 全局 margin reset 会清掉 UA 的自动居中，必须显式补 */
   position: fixed; inset: 0;
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: var(--radius-pop);
   background: var(--card);
   color: var(--text);
   width: min(560px, calc(100vw - 32px));
@@ -1246,14 +1259,15 @@ input[type="month"]::-webkit-calendar-picker-indicator:hover { opacity:1; }
 .tt-semester input[type="date"]:focus { outline:none; border-color:var(--accent); }
 .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
 .cal-dow { text-align:center; font-size:.75rem; color:var(--text-sub); padding:4px 0; }
-.cal-cell { min-height:88px; border:1px solid var(--border); border-radius:8px; padding:4px 5px; display:flex; flex-direction:column; gap:3px; cursor:pointer; transition:border-color .15s, background .15s; position:relative; }
+/* 格子圆角跟随主题的内层圆角（--radius-in）：嵌套在卡片里，比卡片小一档才同心 */
+.cal-cell { min-height:88px; border:1px solid var(--border); border-radius:var(--radius-in); padding:4px 5px; display:flex; flex-direction:column; gap:3px; cursor:pointer; transition:border-color .15s, background .15s; position:relative; }
 .cal-cell:hover { border-color:var(--accent); background:var(--accent-soft); }
 .cal-cell.other { opacity:.42; }
 .cal-cell.today { border-color:var(--accent); background:var(--accent-soft); }
 .cal-day {
   display:inline-flex; align-items:center; justify-content:center;
   min-width:22px; height:22px; padding:0 4px;
-  font-size:.78rem; font-weight:600; line-height:1; border-radius:7px;
+  font-size:.78rem; font-weight:600; line-height:1; border-radius:min(var(--radius-in), 11px);
 }
 /* 今天：描边高亮；选中：实心强调小方块（仿万年历照片） */
 .cal-cell.today .cal-day { color:var(--accent-strong); box-shadow:inset 0 0 0 1.5px var(--accent); }
@@ -1275,7 +1289,7 @@ input[type="month"]::-webkit-calendar-picker-indicator:hover { opacity:1; }
 .agenda-list { display:flex; flex-direction:column; gap:6px; }
 .agenda-item {
   display:flex; gap:10px; align-items:baseline;
-  padding:9px 11px; border-radius:10px;
+  padding:9px 11px; border-radius:var(--radius-in);
   background:var(--card-soft); border:1px solid var(--border);
   color:var(--text); font-size:.88rem; cursor:pointer;
   transition:border-color .15s, background .15s, transform .15s;
@@ -1377,7 +1391,20 @@ input[type="month"]::-webkit-calendar-picker-indicator:hover { opacity:1; }
 .pin-btn svg, .card-pin svg { display:block; }
 
 /* ---------- 工作台自定义（dashboard.js：排序/显隐/快捷置顶） ---------- */
-.dash-bar { display:flex; justify-content:flex-end; margin:0 0 12px; }
+/* 自定义入口放在问候卡右上角，挨着图钉：两个都是「这张卡自己的操作」。
+   原先它是首屏独立一行的按钮，比当天的日程还显眼，属于次序错位。 */
+.card-gear {
+  position: absolute; top: 10px; right: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-weak); cursor: pointer;
+  transition: background var(--dur) var(--easing), color var(--dur) var(--easing);
+}
+.card-gear:hover, .card-gear[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent-strong); }
+.card-gear svg { display: block; }
+/* 标题给两个按钮让位（30 + 4 + 30 + 左右留白） */
+[data-card="hello"] > h2 { padding-right: 82px; }
 .dash-grid > .card { position:relative; min-width:0; }   /* min-width:0：否则卡片里的 nowrap 内容会把 grid 项撑破 */
 .dash-grid > .card > h2 { padding-right:36px; }   /* 给右上角图钉让位 */
 
@@ -1400,8 +1427,8 @@ input[type="month"]::-webkit-calendar-picker-indicator:hover { opacity:1; }
   }
   .perm-wrap::-webkit-scrollbar { display:none; }
   .perm-wrap .chip { margin:0 1px; }
-  .dash-bar { margin-bottom:8px; }
-  .dash-bar .btn-ghost { min-height:32px; padding:0 10px; font-size:.8rem; }
+  .card-gear { top: 6px; right: 38px; }
+  [data-card="hello"] > h2 { padding-right: 74px; }
   /* 行内表单（若干字段 + 保存）：手机上保存键独占一行，别挤在最后一个输入框右边
      注意用 :last-of-type —— 表单末尾有防伪 token 隐藏域，:last-child 永远不成立 */
   form:has(.field) > .btn:last-of-type { width:100%; margin-top:12px; }
@@ -1778,8 +1805,8 @@ main.content { scroll-timeline: --main-scroll block; }
   .btn { min-height: 34px; padding: 0 13px; font-size: .84rem; }
   .btn-ghost { min-height: 34px; padding: 0 11px; }
   .field { margin-bottom: 10px; }
-  .field input, .field select, .field textarea { min-height: 34px; padding: 5px 10px; font-size: .92rem; }
-  .inline-form > input:not([type=hidden]) { min-height: 34px; padding: 5px 10px; font-size: .92rem; }
+  .field input, .field select, .field textarea { min-height: 34px; padding: 4px 10px; font-size: .92rem; line-height: 1.5; }
+  .inline-form > input:not([type=hidden]) { min-height: 34px; padding: 4px 10px; font-size: .92rem; }
   .filter-input { height: 34px; padding: 0 11px; min-width: 150px; }
   .form-actions { margin-top: 14px; padding-top: 10px; gap: 8px; }
 
@@ -1994,3 +2021,266 @@ html.is-native .btn.mag-live {
 /* 触屏惯性滚动：WebView 里要显式声明，否则内部滚动容器的惯性是断的 */
 html.is-native .sidebar,
 html.is-native main.content { -webkit-overflow-scrolling: touch; }
+
+/* =========================================================
+   统一日期 / 时间选择组件（js/datepicker.js 驱动）
+   ---------------------------------------------------------
+   形态与 .field input 同源：同高、同皮肤、同圆角；
+   浮层用 --radius-pop，内部元素用 --radius-in —— 两层同心，
+   嵌进去的小方块弧度比外框小一档，嵌套处不会「圆里套方」。
+   全部引用令牌，五套主题自动跟随，不写主题分支。
+   ========================================================= */
+
+/* 原生控件：视觉消失但留在文档流位置（表单提交、必填校验、
+   校验气泡的锚点全都靠它，不能 display:none） */
+.dp-wrap { position: relative; display: block; width: 100%; min-width: 0; }
+.dp-native {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  min-height: 0 !important;
+  padding: 0 !important; margin: 0 !important;
+  border: 0 !important; background: none !important;
+  opacity: 0; pointer-events: none; z-index: 1;
+}
+
+/* 可见触发器：高度与 .field input 完全一致，替换后布局零位移 */
+.dp-trigger {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; min-height: 44px;
+  padding: 8px 14px;
+  line-height: 1.5;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card-soft);
+  color: var(--text);
+  font: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--dur) var(--easing), background var(--dur) var(--easing);
+}
+.dp-trigger:hover { border-color: var(--accent); }
+.dp-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dp-trigger .dp-value {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-variant-numeric: tabular-nums;   /* 数字等宽：翻日时按钮宽度不跳 */
+}
+.dp-trigger.is-empty .dp-value { color: var(--text-weak); }
+.dp-trigger .dp-ico { flex: none; color: var(--text-sub); }
+.dp-trigger:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------- 浮层 ---------- */
+.dp-pop {
+  position: fixed; z-index: 340;
+  width: 292px;
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pop);
+  background: var(--card);
+  box-shadow: 0 24px 48px -20px rgba(0, 0, 0, .38), 0 2px 6px rgba(0, 0, 0, .06);
+  color: var(--text);
+  opacity: 0; transform: translateY(-6px) scale(.985);
+  transition: opacity .18s var(--easing), transform .24s var(--spring, cubic-bezier(.3,1.4,.5,1));
+}
+.dp-pop.is-open { opacity: 1; transform: none; }
+.dp-pop[hidden] { display: none; }
+
+.dp-head {
+  display: flex; align-items: center; gap: 2px;
+  padding: 2px 2px 6px;
+}
+.dp-title {
+  flex: 1; text-align: center;
+  font-size: .95rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;   /* 「10 月」→「11 月」宽度不变，标题不抖 */
+  letter-spacing: .01em;
+}
+.dp-nav {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: var(--radius-in);
+  background: transparent; color: var(--text-sub); cursor: pointer;
+  transition: background var(--dur) var(--easing), color var(--dur) var(--easing);
+}
+.dp-nav:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.dp-nav:active { transform: scale(.92); }
+
+/* 月历网格：7 列等宽，周一开头（与站内日历视图一致） */
+.dp-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.dp-dow {
+  display: flex; align-items: center; justify-content: center;
+  height: 24px;
+  font-size: .7rem; color: var(--text-weak); font-weight: 500;
+}
+.dp-day {
+  display: flex; align-items: center; justify-content: center;
+  height: 34px; padding: 0;
+  border: 0; border-radius: var(--radius-in);
+  background: transparent; color: var(--text);
+  font: inherit; font-size: .84rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--dur) var(--easing), color var(--dur) var(--easing);
+}
+.dp-day:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.dp-day.other { color: var(--text-weak); opacity: .4; cursor: default; }
+.dp-day.other:hover { background: transparent; color: var(--text-weak); }
+/* 今天：细描边（不抢选中的实心），选中：实心强调色 */
+.dp-day.now { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent-strong); font-weight: 600; }
+.dp-day.on {
+  background: var(--accent); color: var(--on-accent);
+  font-weight: 600; box-shadow: none;
+}
+
+/* 月份网格（input[type=month]） */
+.dp-months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 2px; }
+.dp-month {
+  height: 40px; padding: 0;
+  border: 0; border-radius: var(--radius-in);
+  background: var(--card-soft); color: var(--text);
+  font: inherit; font-size: .84rem; cursor: pointer;
+  transition: background var(--dur) var(--easing), color var(--dur) var(--easing);
+}
+.dp-month:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.dp-month.now { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent-strong); }
+.dp-month.on { background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: none; }
+
+/* 快捷选择（今天 / 明天 / 下周同一天）：一步到位的常用项，省掉翻月份 */
+.dp-quick { display: flex; gap: 6px; padding: 8px 2px 2px; }
+.dp-quick[hidden] { display: none; }
+.dp-chip {
+  flex: 1; height: 30px; padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-in);
+  background: transparent; color: var(--text-sub);
+  font: inherit; font-size: .78rem; cursor: pointer; white-space: nowrap;
+  transition: background var(--dur) var(--easing), color var(--dur) var(--easing), border-color var(--dur) var(--easing);
+}
+.dp-chip:hover { background: var(--accent-soft); color: var(--accent-strong); border-color: transparent; }
+
+/* 时间行（日期时间 / 纯时间） */
+.dp-time {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px; padding: 8px 2px 2px;
+  border-top: 1px solid var(--border);
+}
+.dp-time[hidden] { display: none; }
+.dp-time-label { font-size: .78rem; color: var(--text-sub); margin-right: auto; }
+.dp-colon { color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.dp-sel {
+  appearance: none; -webkit-appearance: none;
+  height: 32px; min-height: 0; padding: 0 24px 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-in);
+  background-color: var(--card-soft);
+  /* 自绘下箭头（原生箭头在各主题下都不协调） */
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 13px) 14px, calc(100% - 9px) 14px;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  color: var(--text); font: inherit; font-size: .84rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.dp-sel:focus { outline: none; border-color: var(--accent); }
+
+/* 底部动作：清除 / 确定。日期类点一下就完成，这一行自动收起 */
+.dp-foot {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 2px 2px;
+}
+.dp-foot[hidden] { display: none; }
+.dp-foot:has(> .dp-ok[hidden]) { padding-top: 6px; }
+.dp-clear {
+  height: 32px; padding: 0 10px;
+  border: 0; border-radius: var(--radius-in);
+  background: transparent; color: var(--text-sub);
+  font: inherit; font-size: .8rem; cursor: pointer;
+}
+.dp-clear:hover { background: var(--card-soft); color: var(--danger); }
+.dp-ok { margin-left: auto; min-height: 32px; padding: 0 18px; font-size: .84rem; }
+.dp-ok[hidden] { display: none; }
+
+/* 手机：贴底弹层（与弹出卡片同一形态语言），拇指区好够到 */
+@media (max-width: 640px) {
+  body.dp-lock { overflow: hidden; }
+  /* 弹层背后的遮罩：手机端弹层是一整块面板贴在底部，没有遮罩会和页面内容
+     糊在一起，看不出「现在只有这一层可点」。桌面端是锚定的小浮层，不需要遮罩。 */
+  body.dp-lock::before {
+    content: ""; position: fixed; inset: 0;
+    background: rgba(0, 0, 0, .30);
+    z-index: 339;              /* 弹层是 340，遮罩要低一层 */
+    animation: dp-veil .2s ease-out both;
+  }
+  @keyframes dp-veil { from { opacity: 0; } to { opacity: 1; } }
+  .dp-pop {
+    left: 0 !important; right: 0; top: auto !important; bottom: 0;
+    width: auto;
+    margin: 0 8px calc(8px + env(safe-area-inset-bottom));
+    padding: 10px;
+    transform: translateY(14px);
+  }
+  .dp-pop.is-open { transform: none; }
+  .dp-day { height: 38px; font-size: .88rem; }
+  .dp-month { height: 44px; }
+  .dp-trigger { min-height: 34px; padding: 4px 10px; font-size: .92rem; line-height: 1.5; }
+  /* 快捷项做成够得着的高度：手机上 32px 的条子经常点不中 */
+  .dp-chip { height: 40px; font-size: .82rem; }
+  .dp-clear, .dp-ok { height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dp-pop, .dp-day, .dp-month, .dp-chip, .dp-nav, .dp-trigger { transition: none !important; }
+}
+
+/* =========================================================
+   危险操作就地确认态（js/site.js 驱动，替代原生 confirm）
+   ---------------------------------------------------------
+   第一次点「删除」→ 按钮原地变成红色确认态，3.5 秒没再点就自动退回。
+   只改颜色和轻微呼吸，不移动位置、不弹层、不加说明文字。
+   ========================================================= */
+.btn.is-armed,
+.btn.secondary.is-armed,
+.btn.danger.is-armed {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent);
+  animation: armed-breathe 1.4s ease-in-out infinite;
+}
+/* 无 color-mix 的旧内核：退化成实心红，不加光圈 */
+@supports not (background: color-mix(in srgb, red 20%, transparent)) {
+  .btn.is-armed, .btn.secondary.is-armed { box-shadow: none; }
+}
+.link-danger.is-armed {
+  color: var(--danger);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@keyframes armed-breathe {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 8%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-armed { animation: none !important; }
+}
+
+/* 删除动作条：靠右一行（原先是内联 style="text-align:right"，
+   行内样式在弹窗里会被 modal 的 padding 规则带偏，统一成 class） */
+.danger-row { display: flex; justify-content: flex-end; gap: 8px; }
+.danger-row .btn { min-height: 36px; }
+
+/* 行内的次要动作（列表行里的「删除」「撤销」）：不占整行、不换行 */
+.inline-act { display: inline-flex; margin: 0; gap: 6px; }
+
+/* 日期组件放进 flex 行时不要被压扁：
+   .dp-wrap 是 block + width:100%，直接进 flex 会被 flex-basis 算法压成很窄一条 */
+.pp-row .dp-wrap { flex: 1; min-width: 0; }
+.tt-semester .dp-wrap { flex: 0 0 auto; width: 176px; }
+.tt-semester .dp-trigger { min-height: 36px; padding: 4px 10px; font-size: .88rem; }
+
+
+
+

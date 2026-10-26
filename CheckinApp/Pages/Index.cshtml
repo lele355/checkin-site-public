@@ -5,8 +5,7 @@
 @using CheckinApp.Services
 @{
     ViewData["Title"] = "工作台";
-    var perms = Me.PermissionCodes();
-    var now = DateTime.Now;
+    var now = SiteClock.Now;
 }
 @* 卡片布局配置（dashboard.js 消费：pinned/order/hidden 三组卡片 id） *@
 <script type="application/json" id="dashData">@Html.Raw(string.IsNullOrWhiteSpace(Model.DashboardJson) ? "{}" : Model.DashboardJson)</script>
@@ -21,24 +20,19 @@
     <div class="msg error">@errMsg</div>
 }
 
-<div class="dash-bar">
-    <button type="button" class="btn-ghost" id="dashCustomBtn" aria-expanded="false">@Html.Raw(Icons.Svg("settings-2", 15)) 自定义</button>
-</div>
+@* 自定义入口放进问候卡右上角（原来它单独占首屏一整行，
+   一个「设置」按钮不该比当天的日程更显眼） *@
 
 @* 测试数据提示：只在「有【测试】记录 且 从没点过删除」时出现；点一次删除后永久消失 *@
 @if (Model.ShowSampleBanner)
 {
     <section class="card sample-banner">
         <div class="sample-banner-text">
-            <h2>这个账号有 @Model.SampleRows 条测试数据</h2>
-            <p class="hint">
-                它们都以「@SampleData.Mark」开头，是建号时自动生成的样例，用来让你先看清每个模块长什么样。
-                看腻了点右边一键清掉 —— 只删这些带标记的记录，你自己的真实数据一条不动。
-            </p>
+            <h2>这个账号有 @Model.SampleRows 条样例数据</h2>
+            <p class="hint">建号时自动生成的，都以「@SampleData.Mark」开头。清掉只删这些，你自己的数据不动。</p>
         </div>
-        <form method="post" asp-page-handler="ClearSample"
-              onsubmit="return confirm('确认删除全部测试数据？只会删掉带「【测试】」标记的记录，真实数据不受影响。删除后这张提示卡不会再出现。');">
-            <button class="btn" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 一键删除测试数据</button>
+        <form method="post" asp-page-handler="ClearSample" data-confirm="确认清掉">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 清掉样例</button>
         </form>
     </section>
 }
@@ -58,20 +52,10 @@
     @* ---------- 问候 ---------- *@
     <div class="card dash-span" data-card="hello">
         <button type="button" class="card-pin" data-pin="hello" title="置顶到最上面">@Html.Raw(Icons.Svg("pin", 14))</button>
-        <h2>你好，@Me.DisplayName 👋</h2>
-        <p class="hint">
-            现在是 @now.ToString("yyyy年M月d日 dddd HH:mm") ｜ 你的角色：@Me.RoleName
-            @if (perms.Any())
-            {
-                <span class="perm-wrap">
-                    <span style="margin-left:6px;">｜ 权限：</span>
-                    @foreach (var p in perms)
-                    {
-                        <span class="chip">@(PermissionCatalog.PermLabels.GetValueOrDefault(p, p))</span>
-                    }
-                </span>
-            }
-        </p>
+        <button type="button" class="card-gear" id="dashCustomBtn" aria-expanded="false"
+                title="自定义工作台" aria-label="自定义工作台">@Html.Raw(Icons.Svg("settings-2", 15))</button>
+        <h2>你好，@Me.DisplayName</h2>
+        <p class="hint">@now.ToString("M月d日") @SiteClock.WeekdayCn(now) · @now.ToString("HH:mm") ｜ @Me.RoleName</p>
     </div>
 
     @* ---------- 提醒横幅（有要事才出现） ---------- *@
@@ -81,7 +65,7 @@
             <button type="button" class="card-pin" data-pin="reminders" title="置顶到最上面">@Html.Raw(Icons.Svg("pin", 14))</button>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <span style="font-weight:600;">🔔 近期有 @Model.ReminderCount 件事需要留意</span>
-                <a class="mini" href="/Reminders">去提醒中心看看 →</a>
+                <a class="mini" href="/Reminders">查看 →</a>
             </div>
         </div>
     }
@@ -94,7 +78,7 @@
             <h2>✅ 今日打卡</h2>
             @if (Model.TodayHabits.Count == 0)
             {
-                <p class="hint">还没有习惯。去 <a href="/Habits">打卡</a> 新建一个吧。</p>
+                <p class="hint">还没有习惯 · <a href="/Habits">去新建</a></p>
             }
             else
             {
@@ -131,11 +115,11 @@
             <h2>📚 今日课程</h2>
             @if (!Model.SemesterConfigured)
             {
-                <p class="hint">还没设置学期起始，周次算不准。去 <a href="/Courses">课程表</a> 设置一下。</p>
+                <p class="hint">未设置学期起始，周次无法计算 · <a href="/Courses">去设置</a></p>
             }
             else if (Model.TodayCourses.Count == 0)
             {
-                <p class="hint">今天没有课。去 <a href="/Courses">课程表</a> 看本周安排。</p>
+                <p class="hint">今天没有课 · <a href="/Courses">本周课表</a></p>
             }
             else
             {
@@ -167,7 +151,7 @@
             <h2>📅 未来 7 天日程</h2>
             @if (Model.Upcoming.Count == 0)
             {
-                <p class="hint">未来 7 天没有安排。去 <a href="/Schedule">日程</a> 新建一个吧。</p>
+                <p class="hint">未来 7 天没有安排 · <a href="/Schedule">新建日程</a></p>
             }
             else
             {
@@ -198,10 +182,10 @@
     {
         <div class="card" data-card="memo">
             <button type="button" class="card-pin" data-pin="memo" title="置顶到最上面">@Html.Raw(Icons.Svg("pin", 14))</button>
-            <h2>✎ 置顶便签</h2>
+            <h2>✎ 置顶备忘</h2>
             @if (Model.PinnedMemos.Count == 0)
             {
-                <p class="hint">还没有置顶便签。去 <a href="/Memo">备忘</a> 新建一张并点图钉置顶。</p>
+                <p class="hint">还没有置顶备忘 · <a href="/Memo">去备忘</a></p>
             }
             else
             {
@@ -247,7 +231,7 @@
             }
             else
             {
-                <p class="hint">还没有纪念日。去 <a href="/Anniversaries">纪念日</a> 添加一个吧。</p>
+                <p class="hint">还没有纪念日 · <a href="/Anniversaries">去添加</a></p>
             }
         </div>
     }
@@ -260,7 +244,7 @@
             <h2>📬 邮件</h2>
             @if (!Model.HasMailAccounts)
             {
-                <p class="hint">还没有绑定邮箱。去 <a href="/Email/Accounts">绑定邮箱</a>，新邮件就会出现在这里。</p>
+                <p class="hint">还没有绑定邮箱 · <a href="/Email/Accounts">去绑定</a></p>
             }
             else
             {
@@ -270,7 +254,7 @@
                 </div>
                 @if (Model.RecentMails.Count == 0)
                 {
-                    <p class="hint">邮箱还是空的，等同步几封信就有啦。</p>
+                    <p class="hint">还没有收到邮件</p>
                 }
                 else
                 {
@@ -305,7 +289,7 @@
             <h2>💬 留言板</h2>
             @if (Model.RecentBoard.Count == 0)
             {
-                <p class="hint">还没有留言。去 <a href="/Board">留言板</a> 写第一条吧。</p>
+                <p class="hint">还没有留言 · <a href="/Board">去写第一条</a></p>
             }
             else
             {
@@ -365,7 +349,7 @@
             }
             else
             {
-                <p class="hint">还没设置在一起的日期，去 <a href="/Couples">情侣空间</a> 设置。</p>
+                <p class="hint">未设置在一起的日期 · <a href="/Couples">去设置</a></p>
             }
             @if (Model.LastNote is var ln && ln is not null)
             {
@@ -393,34 +377,14 @@
             }
             else
             {
-                <p class="hint">还没有记录。去 <a href="/Period">经期助手</a> 记一笔吧。</p>
+                <p class="hint">还没有记录 · <a href="/Period">去记录</a></p>
             }
             <p class="hint hint-foot"><a href="/Period">打开经期助手 →</a></p>
         </div>
     }
 
-    @* ---------- 建设进展 ---------- *@
-    <div class="card" data-card="build">
-        <button type="button" class="card-pin" data-pin="build" title="置顶到最上面">@Html.Raw(Icons.Svg("pin", 14))</button>
-        <h2>🏗️ 建设进展</h2>
-        <p class="hint">
-            <span class="chip">M1 地基</span><span class="chip">M2 管理后台</span><span class="chip">M3 日程</span><span class="chip">M4 备忘</span><span class="chip">M5 生活模块群</span><span class="chip">M6 AI</span><span class="chip">M7 邮件</span>
-            打卡 / 课程表 / 纪念日 / 情侣空间 / 留言板 / 记账 / 经期 / 提醒 / 统计 / 导出 / 邮件 / AI 助手 全员到齐。
-        </p>
-    </div>
-
-    @* ---------- 管理后台 ---------- *@
-    @if (Me.Has("admin.users") || Me.Has("admin.roles"))
-    {
-        <div class="card dash-span" data-card="admin">
-            <button type="button" class="card-pin" data-pin="admin" title="置顶到最上面">@Html.Raw(Icons.Svg("pin", 14))</button>
-            <h2>🛠️ 管理后台</h2>
-            <p class="hint">
-                侧栏「管理」分组可进 <a href="/Admin/Users">用户管理</a> 与 <a href="/Admin/Roles">角色权限</a>。
-                建号、重置密码、自定义角色与权限矩阵都已上线。
-            </p>
-        </div>
-    }
+    @* ---------- 建设进展与管理后台自述卡已删除：那是开发期的记录，
+       用户每天打开工作台不需要看「哪些模块已上线」；侧栏本来就有管理入口。 *@
 </div>
 
 @section Scripts {

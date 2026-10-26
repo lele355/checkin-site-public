@@ -1,7 +1,5 @@
+const QA = require('./_env');
 const { chromium } = require('playwright');
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 const BASE = 'http://127.0.0.1:5188';
 const OUT = 'D:/projects/checkin/qa/shots/app';
 
@@ -16,8 +14,8 @@ const OUT = 'D:/projects/checkin/qa/shots/app';
 
   // 登录
   await page.goto(BASE + '/Login');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await Promise.all([page.waitForNavigation(), page.click('form:has(#Username) button[type=submit]')]);
 
   for (const [name, url] of [['about', '/About'], ['privacy', '/Privacy'], ['terms', '/Terms'], ['download', '/Download']]) {
@@ -34,8 +32,8 @@ const OUT = 'D:/projects/checkin/qa/shots/app';
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
   const mp = await m.newPage();
   await mp.goto(BASE + '/Login');
-  await mp.fill('#Username', ADMIN);
-  await mp.fill('#Password', PW);
+  await mp.fill('#Username', QA.USER);
+  await mp.fill('#Password', QA.PASS);
   await Promise.all([mp.waitForNavigation(), mp.click('form:has(#Username) button[type=submit]')]);
   await mp.goto(BASE + '/Privacy');
   await mp.waitForTimeout(400);

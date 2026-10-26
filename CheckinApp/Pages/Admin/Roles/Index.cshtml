@@ -42,9 +42,9 @@
                     <a href="/Admin/Roles/Edit/@r.Id" style="margin-right:8px;">编辑权限</a>
                     @if (!r.IsBuiltin)
                     {
-                        <form method="post" asp-page-handler="Delete" style="display:inline;" onsubmit="return confirm('确认删除角色「@r.Name」？');">
+                        <form method="post" asp-page-handler="Delete" class="inline-act" data-confirm="确认删除">
                             <input type="hidden" name="id" value="@r.Id" />
-                            <button type="submit" style="background:none;border:none;color:var(--danger);cursor:pointer;font:inherit;font-size:.9rem;">删除</button>
+                            <button type="submit" class="link-danger">删除</button>
                         </form>
                     }
                 </td>

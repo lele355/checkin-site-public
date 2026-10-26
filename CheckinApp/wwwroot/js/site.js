@@ -649,3 +649,77 @@ document.addEventListener('page:load', initViewSwitch);   // 无刷新换主区�
   document.addEventListener('DOMContentLoaded', restoreNavFold);
   document.addEventListener('page:load', restoreNavFold);
 })();
+
+// =========================================================
+// 危险操作：就地二次确认（替代浏览器原生 confirm）
+//   <form data-confirm="确认删除">…<button>删除</button></form>
+//   <button data-confirm="确认恢复默认">恢复默认</button>
+//
+// 为什么不用 confirm()：它会打断整个流程、样式跟着系统走（暗色主题下更是刺眼）、
+// 手机上还常被当成广告弹窗直接关掉。这里的做法是「在用户本来就要点的地方再确认一次」：
+// 按钮就地变成红色的确认态，3.5 秒内没有再点就自动退回 —— 不弹窗、不挪焦点、不加说明文字。
+//
+// 放在捕获阶段执行，必须早于 site.js 的防重复提交锁和 modal.js 的 fetch 提交，
+// 否则第一次点击会被「已提交」标记吞掉，看起来像按钮坏了。
+// =========================================================
+(function () {
+  'use strict';
+
+  var ARMED = 'is-armed';
+  var timers = new WeakMap();
+
+  function disarm(el, btn) {
+    var t = timers.get(el);
+    if (t) { clearTimeout(t); timers.delete(el); }
+    if (!btn) return;
+    btn.classList.remove(ARMED);
+    if (btn.dataset.cfLabel != null) {
+      btn.innerHTML = btn.dataset.cfLabel;
+      delete btn.dataset.cfLabel;
+    }
+  }
+
+  function arm(el, btn, text) {
+    if (!btn) return;
+    btn.dataset.cfLabel = btn.innerHTML;      // 记下原样（可能带图标）
+    btn.textContent = text;
+    btn.classList.add(ARMED);
+    var t = setTimeout(function () { disarm(el, btn); }, 3500);
+    timers.set(el, t);
+  }
+
+  function confirmText(el) {
+    return el.getAttribute('data-confirm') || '确认';
+  }
+
+  // ---- 表单：提交前拦一次 ----
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form.matches || !form.matches('form[data-confirm]')) return;
+
+    // 清掉上一个监听留下的「已提交」锁，否则第二次点永远是死的
+    if (form.dataset) delete form.dataset.submitted;
+
+    if (form.dataset.cfArmed === '1') {
+      form.dataset.cfArmed = '';
+      return;                                  // 已确认，放行
+    }
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    form.dataset.cfArmed = '1';
+    arm(form, form.querySelector('[type=submit], button'), confirmText(form));
+    // 撤回：3.5 秒后清掉待确认标记
+    setTimeout(function () { if (form.dataset) form.dataset.cfArmed = ''; }, 3500);
+  }, true);
+
+  // ---- 单独按钮 / 链接（非表单提交，如「恢复默认作息」）----
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('button[data-confirm], a[data-confirm]') : null;
+    if (!btn || btn.closest('form[data-confirm]')) return;   // 表单里的交给上面处理
+    if (btn.classList.contains(ARMED)) return;               // 已确认态：放行，原行为继续
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    arm(btn, btn, confirmText(btn));
+  }, true);
+})();

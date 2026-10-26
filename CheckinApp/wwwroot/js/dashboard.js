@@ -15,7 +15,7 @@
     hello: '问候', reminders: '提醒', habits: '今日打卡', courses: '今日课程',
     schedule: '未来 7 天日程', memo: '置顶便签', anniversary: '最近的纪念日',
     email: '邮件', board: '留言板', expense: '本月记账', couples: '情侣空间',
-    period: '经期助手', build: '建设进展', admin: '管理后台'
+    period: '经期助手'
   };
 
   // ---- 工具 ----

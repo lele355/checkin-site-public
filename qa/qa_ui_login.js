@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // UI 控件改造截图目检 + 登录新功能测试
 // 用法: NODE_PATH=... node qa_ui_login.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 
@@ -41,15 +39,15 @@ function check(name, ok, extra = '') { results.push({ name, ok, extra }); consol
   check('二次失败剩余次数递减', /还可尝试 3 次/.test(err2 || ''), (err2 || '').trim().slice(0, 45));
 
   // 记住密码：勾选后正确登录 → 重新打开登录页应预填（模拟：登出后看预填）
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.check('input[name="RememberMode"][value="autologin"]');   // 自动进入=持久 cookie
   await page.click('#loginForm button[type="submit"]');
   await page.waitForTimeout(900);
   check('勾选记住密码后登录成功', page.url().includes('/Login') === false, page.url().replace(BASE, ''));
 
   const saved = await page.evaluate(() => localStorage.getItem('checkin_remember'));
-  check('记住密码写入 localStorage', !!saved && JSON.parse(saved).u === ADMIN);
+  check('记住密码写入 localStorage', !!saved && JSON.parse(saved).u === QA.USER);
 
   // 持久 cookie：Expires 不为会话级
   const cookies = await ctx.cookies(BASE);
@@ -66,12 +64,12 @@ function check(name, ok, extra = '') { results.push({ name, ok, extra }); consol
   const preU = await page.inputValue('#Username').catch(() => '');
   const preP = await page.inputValue('#Password').catch(() => '');
   const preR = await page.isChecked('input[name="RememberMode"][value="autologin"]').catch(() => false);
-  check('重开登录页自动预填账号密码', preU === ADMIN && preP.length > 0 && preR, `u=${preU} p=${preP ? '***' : '空'} r=${preR}`);
+  check('重开登录页自动预填账号密码', preU === QA.USER && preP.length > 0 && preR, `u=${preU} p=${preP ? '***' : '空'} r=${preR}`);
   await page.screenshot({ path: `${OUT}/login-prefill.png`, clip: { x: 380, y: 60, width: 520, height: 640 } });
 
   // ---------- 五主题控件截图 ----------
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.click('#loginForm button[type="submit"]');
   await page.waitForTimeout(900);
 

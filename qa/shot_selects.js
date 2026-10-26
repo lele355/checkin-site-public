@@ -1,13 +1,11 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 体检：PyLab 下拉框在五个主题下的真实渲染 + 计算样式
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 
 const BASE = process.env.QA_BASE || 'http://127.0.0.1:5188';
-const USER = process.env.QA_USER || ADMIN;
-const PASS = process.env.QA_PASS || PW;
+const USER = QA.USER;
+const PASS = QA.PASS;
 const SHOTS = 'D:/projects/checkin/qa/shots/pylab';
 
 (async () => {

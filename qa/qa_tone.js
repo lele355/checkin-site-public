@@ -1,8 +1,8 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
+// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
+const ADMIN = process.env.QA_USER || 'admin';
 // 底色系（data-tone）测试：切换生效 + localStorage + 服务端落库 + 截图目检
 // 用法: NODE_PATH=... node qa_tone.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -23,8 +23,8 @@ function dbq(sql) { return JSON.parse(execSync(`"${PY}" D:/projects/checkin/qa/d
 
   // 登录
   await page.goto(BASE + '/Login');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.click('#loginForm button[type="submit"]');
   await page.waitForTimeout(800);
 

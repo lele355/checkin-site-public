@@ -1,16 +1,14 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // PyLab（Python 教学平台）整块删除专项（2026-10-22）
 // 验证：/PyLab 404、侧栏与侧栏自定义里没有入口、权限页没有 pylab.use、
 //       其余模块照常工作、无 JS 错误。
 // 本地：node qa_module_removed.js   线上：QA_BASE=https://example.com QA_PASS=xxx node qa_module_removed.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 
 const BASE = process.env.QA_BASE || 'http://127.0.0.1:5188';
-const USER = process.env.QA_USER || ADMIN;
-const PASS = process.env.QA_PASS || PW;
+const USER = QA.USER;
+const PASS = QA.PASS;
 const SHOTS = 'D:/projects/checkin/qa/shots/pylab';
 
 let pass = 0, fail = 0;

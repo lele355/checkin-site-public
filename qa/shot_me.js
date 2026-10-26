@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // shot_me.js — 个人主页目检截图（桌面 + 手机，滚动分段截，避免 fullPage 被固定底栏/内滚动容器干扰）
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const BASE = 'http://localhost:5188';
 const QA_DIR = 'D:/projects/checkin/qa';
@@ -13,8 +11,8 @@ const QA_DIR = 'D:/projects/checkin/qa';
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     const p = await ctx.newPage();
     await p.goto(BASE + '/Login');
-    await p.fill('#Username', ADMIN);
-    await p.fill('#Password', PW);
+    await p.fill('#Username', QA.USER);
+    await p.fill('#Password', QA.PASS);
     await p.click('form button[type=submit]');
     await p.waitForLoadState('networkidle').catch(() => { });
     await p.goto(BASE + '/Me');
@@ -29,8 +27,8 @@ const QA_DIR = 'D:/projects/checkin/qa';
     const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', isMobile: true, hasTouch: true });
     const m = await ctx2.newPage();
     await m.goto(BASE + '/Login');
-    await m.fill('#Username', ADMIN);
-    await m.fill('#Password', PW);
+    await m.fill('#Username', QA.USER);
+    await m.fill('#Password', QA.PASS);
     await m.click('form button[type=submit]');
     await m.waitForLoadState('networkidle').catch(() => { });
     await m.goto(BASE + '/Me');

@@ -9,7 +9,12 @@
 <div class="card">
     <div class="page-head">
         <h2>课程表</h2>
-        <a class="btn" href="/Courses/New">@Html.Raw(Icons.Svg("plus", 16)) 添加课程</a>
+        @* 截图导入：跳到 AI 页并带上提示，用户在那边选一张课表截图，
+           AI 识别后生成「导入 N 条课程」的建议卡，点确认就落库 *@
+        <div class="head-actions">
+            <a class="btn secondary" href="/Ai?hint=courses">@Html.Raw(Icons.Svg("spark", 16)) 从截图导入</a>
+            <a class="btn" href="/Courses/New">@Html.Raw(Icons.Svg("plus", 16)) 添加课程</a>
+        </div>
     </div>
 
     @* ---- 周次导航：上一周 / 第N周 / 下一周 / 本周 ---- *@
@@ -28,13 +33,13 @@
 
     @* ---- 学期起始 + 节次时间设置 ---- *@
     <form method="post" asp-page-handler="SemesterStart" class="tt-semester">
-        <label class="mini" for="SemesterStartInput">学期起始（第 1 周的周一）</label>
-        <input type="date" asp-for="SemesterStartInput" style="height:36px;" />
+        <label class="mini" for="SemesterStartInput">学期起始</label>
+        <input type="date" asp-for="SemesterStartInput" />
         <button class="btn secondary" type="submit">保存</button>
         <a class="btn secondary" href="/Courses/Periods">@Html.Raw(Icons.Svg("settings-2", 16)) 节次时间</a>
         @if (!Model.SemesterConfigured)
         {
-            <span class="hint">未设置过，默认把本周当第 1 周算</span>
+            <span class="hint">未设置，默认按本周算第 1 周</span>
         }
     </form>
 </div>

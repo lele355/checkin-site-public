@@ -4,14 +4,15 @@
 // 用法（需要服务端以较高配额启动，否则功能用例会先被限流打掉）：
 //   Security__RegisterPerHour=12 dotnet run --no-launch-profile --urls 'http://*:5188'
 //   NODE_PATH=... node test_register.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 
 const BASE = 'http://localhost:5188';
 const PY = 'C:/Users/An/AppData/Local/Programs/Python/Python314/python.exe';
 const QA_DIR = 'D:/projects/checkin/qa';
-const ADMIN_USER = ADMIN;
-const ADMIN_PASS = PW;
+const ADMIN_USER = QA.USER;
+const ADMIN_PASS = QA.PASS;
 
 const results = [];
 let curSec = '';

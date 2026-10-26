@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 页脚备案号目检（桌面 + 手机 + 登录页）
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const BASE = 'http://localhost:5188';
 const OUT = 'D:/projects/checkin/_shots';
@@ -20,8 +18,8 @@ const OUT = 'D:/projects/checkin/_shots';
   console.log('登录页页脚:', JSON.stringify(login));
   await pd.screenshot({ path: OUT + '/foot_login.png' });
 
-  await pd.fill('#Username', ADMIN);
-  await pd.fill('#Password', PW);
+  await pd.fill('#Username', QA.USER);
+  await pd.fill('#Password', QA.PASS);
   await pd.click('button[type=submit]');
   await pd.waitForURL(u => !u.pathname.toLowerCase().includes('login'));
   await pd.goto(BASE + '/');
@@ -44,8 +42,8 @@ const OUT = 'D:/projects/checkin/_shots';
   const ctxM = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   const pm = await ctxM.newPage();
   await pm.goto(BASE + '/Login');
-  await pm.fill('#Username', ADMIN);
-  await pm.fill('#Password', PW);
+  await pm.fill('#Username', QA.USER);
+  await pm.fill('#Password', QA.PASS);
   await pm.click('button[type=submit]');
   await pm.waitForURL(u => !u.pathname.toLowerCase().includes('login'));
   await pm.goto(BASE + '/');

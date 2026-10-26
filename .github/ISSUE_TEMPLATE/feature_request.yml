@@ -1,0 +1,30 @@
+name: 功能建议
+description: 想要某个功能，或者觉得现在的做法别扭
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先说清楚：这个项目的功能是按个人需求长的，不一定接受"通用产品"式的建议。
+        但**你觉得哪里用着别扭**这类反馈很有价值，往往能指出设计上的真问题。
+
+  - type: textarea
+    id: scene
+    attributes:
+      label: 你在做什么的时候觉得别扭
+      description: 描述场景，而不是直接给方案。场景比方案更能说明问题。
+      placeholder: 每次记一笔账都要先选手动分类，我通常只有三四种，想更快一点。
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你想怎么改
+      description: 有想法就写，没有也可以只留上面那段。
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: 现在怎么绕过去的
+      description: 如果已经有凑合的办法，写出来，能帮助判断值不值得改。

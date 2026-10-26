@@ -16,7 +16,7 @@ public class AiOptions
     public string BaseUrl { get; set; } = "https://api.xiaomimimo.com/v1";
     public string Model { get; set; } = "mimo-v2.6-flash";
     public string ApiKey { get; set; } = "";
-    public int TimeoutSeconds { get; set; } = 30;
+    public int TimeoutSeconds { get; set; } = 120;
     public int MaxCompletionTokens { get; set; } = 4096;
     /// <summary>每用户每天可发的对话条数上限（防滥用兜底）</summary>
     public int DailyRequestLimit { get; set; } = 60;

@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 手机端外观面板截图（复现/验收用）
 // 用法: NODE_PATH=... node shot_appearance.js before|after [theme]
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const tag = process.argv[2] || 'shot';
 const theme = process.argv[3] || '';
@@ -15,8 +13,8 @@ const OUT = 'D:/projects/checkin/_shots';
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await page.goto(BASE + '/Login');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.click('#loginForm button[type="submit"]');
   await page.waitForTimeout(800);
 

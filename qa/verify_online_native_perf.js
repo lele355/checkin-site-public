@@ -1,12 +1,13 @@
 // 线上发版抽验：确认「视觉零改动」版真的上线生效。
 // 检查点：主题样式原样 → 入场动画仍在 → 元素提前进入动画 → 无 JS 报错。
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 
 const BASE = 'https://example.com';
 const OUT = 'D:/projects/checkin/qa/shots/native-perf';
-const USER = process.env.CHECKIN_ADMIN || ADMIN;
-const PW = process.env.CHECKIN_PW || PW;
+const USER = QA.USER;
+const PW = process.env.CHECKIN_PW || QA.PASS_ONLINE;
 
 (async () => {
     fs.mkdirSync(OUT, { recursive: true });

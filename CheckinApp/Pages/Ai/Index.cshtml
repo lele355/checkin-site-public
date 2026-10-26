@@ -7,7 +7,7 @@
 <div class="card">
     <div class="page-head">
         <h2>AI 助手</h2>
-        <form method="post" asp-page-handler="Clear" onsubmit="return confirm('清空全部对话历史？此操作不可撤销。');">
+        <form method="post" asp-page-handler="Clear" data-confirm="确认清空">
             <button class="btn secondary" type="submit">清空历史</button>
         </form>
     </div>
@@ -81,7 +81,7 @@
 </div>
 
 <div class="card ai-input-card">
-    <form method="post" asp-page-handler="Send" id="aiForm">
+    <form method="post" asp-page-handler="Send" id="aiForm" data-autopick="@(Model.AutoPickImage ? "1" : "0")">
         @* 待发送图片预览（选图后由前端压缩成 data URL 塞进隐藏字段） *@
         <div class="ai-preview" id="aiPreview" hidden>
             <img id="aiPreviewImg" alt="待发送图片" />
@@ -91,7 +91,7 @@
             <button type="button" class="ai-attach" id="aiAttach" aria-label="添加图片" title="添加图片">@Html.Raw(Icons.Svg("paperclip", 18))</button>
             <input type="file" id="aiFile" accept="image/*" hidden />
             <input type="hidden" name="image" id="aiImageData" />
-            <textarea name="text" rows="2" maxlength="2000" placeholder="问点什么，或让我帮你记日程/备忘/账…"></textarea>
+            <textarea name="text" rows="2" maxlength="2000" placeholder="问点什么，或让我帮你记日程/备忘/账…">@Model.DraftText</textarea>
             <button class="btn" type="submit" id="aiSend">发送</button>
         </div>
     </form>
@@ -147,7 +147,7 @@
         }
 
         if (attach && fileInput) {
-            attach.addEventListener('click', function () { fileInput.click(); });
+            attach.addEventListener('click', function () { fileInput.click(); attach.classList.remove('pulse'); });
             fileInput.addEventListener('change', function () {
                 var f = fileInput.files && fileInput.files[0];
                 fileInput.value = '';                        // 允许重复选同一张
@@ -156,6 +156,7 @@
                     imgData.value = dataUrl;
                     previewImg.src = dataUrl;
                     preview.hidden = false;
+                    attach.classList.remove('pulse');
                 }).catch(function () {
                     alert('这张图片读不出来，换一张试试。');
                 });
@@ -167,6 +168,13 @@
                 previewImg.removeAttribute('src');
                 preview.hidden = true;
             });
+        }
+
+        // 从课程表页「从截图导入」跳过来：浏览器的安全策略不允许在没有用户手势的情况下
+        // 直接弹出文件选择框，所以这里先试一次，打不开就把附件按钮打成呼吸灯引导用户点。
+        if (form.dataset.autopick === '1' && attach) {
+            attach.classList.add('pulse');
+            try { fileInput.click(); } catch (e) { /* 被拦就靠呼吸灯 */ }
         }
 
         // ---------- 发送：防连点 + 纯图也能发 ----------

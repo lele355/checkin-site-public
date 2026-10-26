@@ -2,7 +2,7 @@
 """生成 PWA 图标：圆角方块 + 主色底 + 白色「家」字（用系统微软雅黑）。"""
 from PIL import Image, ImageDraw, ImageFont
 
-OUT = "D:/projects/checkin/CheckinApp/wwwroot/icons"
+OUT = "D:/checkin/site/CheckinApp/wwwroot/icons"
 import os
 os.makedirs(OUT, exist_ok=True)
 

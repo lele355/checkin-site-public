@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 手机端 UI 紧凑化目检截图（390×844，iPhone 14 逻辑分辨率）
 // 用法：node shot_mobile.js   （需 5188 开发站运行中）
+const QA = require('./_env');
 const { chromium } = require('playwright');
 
 const BASE = 'http://localhost:5188';
@@ -21,8 +19,8 @@ const OUT = 'D:/projects/checkin/_shots';
 
   // 登录
   await page.goto(BASE + '/Login');
-  await page.fill('input[name="Username"]', ADMIN);
-  await page.fill('input[name="Password"]', PW);
+  await page.fill('input[name="Username"]', QA.USER);
+  await page.fill('input[name="Password"]', QA.PASS);
   await page.click('button[type="submit"]');
   await page.waitForURL(u => !u.pathname.includes('Login'), { timeout: 10000 });
 

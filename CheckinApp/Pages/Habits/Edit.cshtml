@@ -30,8 +30,8 @@
     </form>
 
     <hr class="rule" />
-    <form method="post" asp-page-handler="Delete" onsubmit="return confirm('确认删除这个习惯？历史打卡记录会一并删除。');" style="text-align:right;">
+    <form method="post" asp-page-handler="Delete" data-confirm="确认删除" class="danger-row">
         <input type="hidden" name="id" value="@Model.Id" />
-        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除此习惯</button>
+        <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除习惯</button>
     </form>
 </div>

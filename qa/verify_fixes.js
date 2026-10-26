@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 四修复验证（2026-10-18 晚）：日历缓存版本号 / 图钉免刷新+FLIP / 置顶标 45° / 侧栏竞态
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const BASE = 'http://localhost:5188';
 const OUT = 'D:/projects/checkin/_shots';
@@ -16,8 +14,8 @@ const OUT = 'D:/projects/checkin/_shots';
   const ok = (n, c, extra) => console.log((c ? 'PASS' : 'FAIL') + ' | ' + n + (extra ? ' | ' + extra : ''));
 
   await page.goto(BASE + '/Login');
-  await page.fill('input#Username, input[name="Username"]', ADMIN);
-  await page.fill('input[type="password"]', PW);
+  await page.fill('input#Username, input[name="Username"]', QA.USER);
+  await page.fill('input[type="password"]', QA.PASS);
   await page.click('button[type="submit"]');
   await page.waitForLoadState('networkidle');
 
@@ -129,8 +127,8 @@ const OUT = 'D:/projects/checkin/_shots';
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   const mp = await mctx.newPage();
   await mp.goto(BASE + '/Login');
-  await mp.fill('input#Username, input[name="Username"]', ADMIN);
-  await mp.fill('input[type="password"]', PW);
+  await mp.fill('input#Username, input[name="Username"]', QA.USER);
+  await mp.fill('input[type="password"]', QA.PASS);
   await mp.click('button[type="submit"]');
   await mp.waitForLoadState('networkidle');
   await mp.goto(BASE + '/Schedule?view=calendar');

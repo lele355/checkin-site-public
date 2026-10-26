@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 全站 UI 审计：所有页面截图（桌面/手机 × 暗/亮）+ 自动检查横向溢出/JS 错误
 // 产物：D:/projects/checkin/_shots/audit/*.png + audit-report.json
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 const BASE = 'http://localhost:5188';
@@ -37,8 +35,8 @@ const report = [];
 
 async function login(page) {
   await page.goto(BASE + '/Login');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.click('button[type=submit]');
   await page.waitForURL(u => !u.pathname.toLowerCase().includes('login'), { timeout: 10000 });
 }

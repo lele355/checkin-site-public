@@ -1,11 +1,11 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
+// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
+const ADMIN = process.env.QA_USER || 'admin';
 // qa_ui2.js — UI/交互专项测试（滚动保持 / 弹窗焦点 / 日历小卡片 / 表单布局增强）
 // 用法: NODE_PATH=... node qa_ui2.js   → 输出 report-ui2.json + console 明细 + _shots 截图
 // 基建约定同 qa_full.js / qa_email.js：playwright 用系统 Edge；toast 断言用 hasText 防竞态；
 // 直接 goto URL 不走弹窗（modal.js 只拦链接点击）；button[type=submit] 裸选择器会命中侧栏退出表单。
 // dbq 铁律：Python sqlite3 一次只执行一条语句——多条必须拆开逐条执行（dbqMulti）。
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -88,7 +88,7 @@ async function modalOpen(page) { return await page.evaluate(() => { const d = do
     page.on('dialog', d => d.accept().catch(() => { }));   // 删除表单有 confirm()
 
     try {
-        await login(page, ADMIN, PW);
+        await login(page, QA.USER, QA.PASS);
         T('admin 登录成功', !page.url().includes('Login'), page.url());
 
         // ================= S1 普通表单 PRG 后滚动保持（打卡） =================
@@ -141,7 +141,7 @@ async function modalOpen(page) { return await page.evaluate(() => { const d = do
         const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
         const mp = await mctx.newPage();
         mp.on('dialog', d => d.accept().catch(() => { }));
-        await login(mp, ADMIN, PW);
+        await login(mp, QA.USER, QA.PASS);
         await mp.goto(BASE + '/Habits?view=list');
         await mp.waitForSelector('.row-item');
         await mp.locator('a[href^="/Habits/Edit/"]').first().click();

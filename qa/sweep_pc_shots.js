@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // PC 1920 全页面巡检截图（侧栏收起）：看布局是否铺满、有无溢出/错位
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 
@@ -27,8 +25,8 @@ const PAGES = [
     p.on('pageerror', e => errs.push(p.url() + ' :: ' + e.message));
 
     await p.goto(BASE + '/Login', { waitUntil: 'domcontentloaded' });
-    await p.fill('#Username', ADMIN);
-    await p.fill('#Password', PW);
+    await p.fill('#Username', QA.USER);
+    await p.fill('#Password', QA.PASS);
     await p.locator('form:has(#Username) button[type=submit]').click();
     await p.waitForLoadState('domcontentloaded');
     await p.evaluate(() => localStorage.setItem('layout.sidebar', 'hidden'));

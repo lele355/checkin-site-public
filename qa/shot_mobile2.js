@@ -1,7 +1,5 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 本轮目检：AI 输入行布局 / 手机课表网格 / 节次时间设置页（390×844）
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const BASE = 'http://localhost:5188';
 const OUT = 'D:/projects/checkin/_shots';
@@ -14,8 +12,8 @@ const OUT = 'D:/projects/checkin/_shots';
   });
   const page = await ctx.newPage();
   await page.goto(BASE + '/Login');
-  await page.fill('input[name="Username"]', ADMIN);
-  await page.fill('input[name="Password"]', PW);
+  await page.fill('input[name="Username"]', QA.USER);
+  await page.fill('input[name="Password"]', QA.PASS);
   await page.click('button[type="submit"]');
   await page.waitForURL(u => !u.pathname.includes('Login'), { timeout: 10000 });
 

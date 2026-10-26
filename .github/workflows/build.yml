@@ -1,0 +1,29 @@
+name: build
+
+# 只做编译自检：确认仓库拉到本地能 build 过。
+# 不跑测试——回归脚本依赖正在跑的站点和真实账号，属于本机工具，不适合进 CI。
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 还原
+        run: dotnet restore CheckinApp/CheckinApp.csproj
+
+      - name: 编译（警告视为错误，与本地口径一致）
+        run: dotnet build CheckinApp/CheckinApp.csproj -c Release --no-restore -warnaserror

@@ -1,11 +1,11 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
+// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
+const ADMIN = process.env.QA_USER || 'admin';
 // qa_ui3.js — UI 动效专项测试（进度条 / 淡入交错 / sticky 分组标题 / 按压回弹 / 加载对勾 / 主题水波 / 磁吸 / 降级）
 // 用法: NODE_PATH=... node qa_ui3.js   → 输出 report-ui3.json + console 明细 + _shots 截图
 // 基建约定同 qa_full.js / qa_ui2.js：playwright 用系统 Edge（channel:'msedge'）；
 // dbq 铁律：Python sqlite3 一次只执行一条语句——多条必须拆开逐条执行（dbqMulti）；
 // 直接 goto URL 不弹窗；#appModal 作用域内定位按钮防命中侧栏退出表单。
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -87,7 +87,7 @@ async function modalOpen(page) { return await page.evaluate(() => { const d = do
     page.on('dialog', d => d.accept().catch(() => { }));
 
     try {
-        await login(page, ADMIN, PW);
+        await login(page, QA.USER, QA.PASS);
         T('admin 登录成功', !page.url().includes('Login'), page.url());
 
         // ================= S1 阅读进度条绑定滚动进度 =================
@@ -380,7 +380,7 @@ async function modalOpen(page) { return await page.evaluate(() => { const d = do
         const rctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, reducedMotion: 'reduce' });
         const rp = await rctx.newPage();
         rp.on('dialog', d => d.accept().catch(() => { }));
-        await login(rp, ADMIN, PW);
+        await login(rp, QA.USER, QA.PASS);
         await rp.goto(BASE + '/Habits?view=grid');
         await rp.waitForSelector('.habit-card');
         await rp.waitForTimeout(250);
@@ -404,7 +404,7 @@ async function modalOpen(page) { return await page.evaluate(() => { const d = do
         const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
         const mp = await mctx.newPage();
         mp.on('dialog', d => d.accept().catch(() => { }));
-        await login(mp, ADMIN, PW);
+        await login(mp, QA.USER, QA.PASS);
         await mp.goto(BASE + '/Habits?view=list');
         await mp.waitForSelector('.row-item');
         await mp.waitForTimeout(1300);

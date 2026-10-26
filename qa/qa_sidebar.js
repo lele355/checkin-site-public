@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // PC 侧栏测试：独立滚动 / 收起展开 / 偏好持久化 / 手机不受影响 + 截图
 // 用法: NODE_PATH=... node qa_sidebar.js
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 
@@ -19,8 +17,8 @@ function check(name, ok, extra = '') { results.push({ name, ok, extra }); consol
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
   await page.goto(BASE + '/Login');
-  await page.fill('#Username', ADMIN);
-  await page.fill('#Password', PW);
+  await page.fill('#Username', QA.USER);
+  await page.fill('#Password', QA.PASS);
   await page.click('#loginForm button[type="submit"]');
   await page.waitForTimeout(800);
 
@@ -125,8 +123,8 @@ function check(name, ok, extra = '') { results.push({ name, ok, extra }); consol
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const mpage = await mctx.newPage();
   await mpage.goto(BASE + '/Login');
-  await mpage.fill('#Username', ADMIN);
-  await mpage.fill('#Password', PW);
+  await mpage.fill('#Username', QA.USER);
+  await mpage.fill('#Password', QA.PASS);
   await mpage.click('#loginForm button[type="submit"]');
   await mpage.waitForTimeout(800);
   const mToggleVisible = await mpage.locator('.sidebar-toggle').isVisible();

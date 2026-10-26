@@ -40,7 +40,7 @@
             <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
             <a class="btn secondary" href="/Courses">@Html.Raw(Icons.Svg("x", 16)) 返回</a>
             <button class="btn secondary" type="submit" asp-page-handler="Reset" formnovalidate
-                    onclick="return confirm('恢复默认 12 小节作息？当前自定义会被覆盖。');">
+                    data-confirm="确认恢复默认">
                 恢复默认
             </button>
         </div>

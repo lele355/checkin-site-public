@@ -1,7 +1,7 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
+// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
+const ADMIN = process.env.QA_USER || 'admin';
 // test_user_delete.js — 用户管理「删除用户」：5 秒确认、防自删、级联清数据
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const BASE = 'http://localhost:5188';
@@ -31,9 +31,9 @@ const TARGET = 'qa_del_' + TS;
 
     // ---------- 登录 ----------
     await p.goto(BASE + '/Login', { waitUntil: 'domcontentloaded' });
-    await p.fill('#Username', ADMIN);
+    await p.fill('#Username', QA.USER);
     let okLogin = false;
-    for (const pw of [PW, PW]) {
+    for (const pw of [QA.PASS, QA.PASS_ONLINE]) {
         await p.fill('#Password', pw);
         await p.click('form button[type=submit]');
         await sleep(1200);

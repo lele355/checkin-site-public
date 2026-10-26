@@ -1,0 +1,68 @@
+name: Bug 报告
+description: 某个页面报错、样式错乱、数据不对
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。这个项目是自用的，复现信息给得越全，越有可能被修掉。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 期望的结果 vs 实际的结果。
+      placeholder: |
+        期望：点「保存」后回到列表并提示成功
+        实际：页面刷了一下，内容没保存
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 /Courses/Periods
+        2. 把第 1 节开始时间改成 07:30
+        3. 点保存
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: 在哪一端
+      options:
+        - 网页端（桌面浏览器）
+        - 网页端（手机浏览器）
+        - Android App
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: 浏览器与版本 / 手机型号与系统版本 / App 版本号
+      placeholder: Edge 141 / Windows 11；或 Pixel 7 / Android 16 / App 2.3.0
+
+  - type: dropdown
+    id: theme
+    attributes:
+      label: 用的哪套主题
+      description: 主题差异很大，同样的布局问题在某些主题下才出现。
+      options:
+        - 不确定 / 默认
+        - editorial（杂志）
+        - neumorphism（新拟物）
+        - natural（自然有机）
+        - macos（毛玻璃暗色）
+        - clay（粘土）
+        - 与主题无关
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充
+      description: 截图、控制台报错、相关日志。注意先抹掉真实姓名、域名和密码。

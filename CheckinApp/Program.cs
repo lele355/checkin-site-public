@@ -10,6 +10,12 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ---------- 全站时钟与文化 ----------
+// 必须在任何业务代码之前：容器默认 UTC，会让「今天」在北京时间 08:00 前算成昨天
+// （打卡记到昨天、日程「今天」分组错位、倒计时差一天）；文化不设成 zh-CN 时
+// ToString("dddd") 会输出 Sunday。详见 Services/SiteClock.cs 的说明。
+SiteClock.Init();
+
 // 本地私密配置（API Key 等）：gitignored，绝不入库。
 // 也支持环境变量覆盖（Ai__ApiKey 或 MIMO_API_KEY），服务器部署用环境变量更省事。
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
@@ -183,7 +189,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-    Seeder.Seed(db);
+    Seeder.Seed(db, builder.Configuration["Seed:AdminPassword"]);
 }
 
 // ---------- 中间件管线 ----------

@@ -1,8 +1,6 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
 // 原生壳性能优化后的视觉校验：三个主题各截一张，并读回关键计算样式，
 // 确认渐变底 / 32px 圆角 / 三层阴影 / 入场动画这些「视觉」一个都没被动到。
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const fs = require('fs');
 
@@ -18,8 +16,8 @@ const OUT = 'D:/projects/checkin/qa/shots/native-perf';
     p.on('pageerror', e => errs.push(e.message));
 
     await p.goto(BASE + '/Login', { waitUntil: 'domcontentloaded' });
-    await p.fill('#Username', ADMIN);
-    await p.fill('#Password', PW);
+    await p.fill('#Username', QA.USER);
+    await p.fill('#Password', QA.PASS);
     await p.locator('form:has(#Username) button[type=submit]').click();
     await p.waitForLoadState('domcontentloaded');
     await p.waitForTimeout(800);

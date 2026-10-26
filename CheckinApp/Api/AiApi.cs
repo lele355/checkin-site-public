@@ -117,6 +117,9 @@ public static class AiApi
                 else if (retry.Ok) { (_, var a2) = AiActionParser.Split(retry.Content); actionsJson = a2; }
             }
 
+            // 有结构化建议时正文只留一句结论（模型爱在正文复述明细，还容易写错）
+            display = AiPrompt.CompactDisplay(display, actionsJson);
+
             db.AiMessages.Add(new AiMessage
             {
                 UserId = uid, Role = "assistant", Content = display, ActionsJson = actionsJson ?? "",

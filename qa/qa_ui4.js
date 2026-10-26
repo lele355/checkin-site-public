@@ -1,10 +1,10 @@
-// 测试账号从环境变量取，仓库里不放真实口令：CHECKIN_ADMIN / CHECKIN_PW
-const ADMIN = process.env.CHECKIN_ADMIN || 'admin';
-const PW = process.env.CHECKIN_PW || 'ChangeMe!123456';
+// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
+const ADMIN = process.env.QA_USER || 'admin';
 // qa_ui4.js — 本批专项：工作台自定义（排序/显隐/快捷置顶）+ 备忘快捷置顶 + 手机端尺寸收紧
 // 用法: NODE_PATH=... node qa_ui4.js   → 输出 report-ui4.json + console 明细 + _shots 截图
 // 约定同 qa_ui2.js：playwright 用系统 Edge；toast 断言用 hasText 防竞态；dbq 一次一条语句；
 // 测试尾声把工作台布局恢复默认、清掉 UIQ4 测试数据。
+const QA = require('./_env');
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -69,7 +69,7 @@ async function toastOk(page, text) {
     page.on('dialog', d => d.accept().catch(() => { }));
 
     try {
-        await login(page, ADMIN, PW);
+        await login(page, QA.USER, QA.PASS);
         T('admin 登录成功', !page.url().includes('Login'), page.url());
 
         // ================= S1 工作台快捷置顶（即点即存） =================

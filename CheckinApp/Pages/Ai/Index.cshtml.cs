@@ -37,6 +37,15 @@ public class IndexModel(AppDbContext db, CurrentUser me, AiClient ai, AiActionEx
     /// <summary>每日 token 上限（appsettings 的 Ai.DailyTokenLimit，默认 100 万）</summary>
     public long TokenLimit => _opt.DailyTokenLimit;
 
+    /// <summary>从别的页面带过来的场景提示（如 Courses 页的「从截图导入」→ hint=courses）</summary>
+    [BindProperty(SupportsGet = true)] public string? Hint { get; set; }
+
+    /// <summary>输入框预填文案</summary>
+    public string DraftText { get; private set; } = "";
+
+    /// <summary>进页面就自动唤起选图（从课程表页跳过来时用，省得用户再找附件按钮）</summary>
+    public bool AutoPickImage { get; private set; }
+
     private void Load()
     {
         if (_me.UserId is not int uid) return;
@@ -92,6 +101,13 @@ public class IndexModel(AppDbContext db, CurrentUser me, AiClient ai, AiActionEx
         Load();
         if (TempData["AiNotice"] is string n) { Notice = n; NoticeIsError = false; }
         if (TempData["AiError"] is string e) { Notice = e; NoticeIsError = true; }
+
+        // 从课程表页的「从截图导入」跳过来：预填一句直白的指令，并自动弹出选图
+        if (string.Equals(Hint, "courses", StringComparison.OrdinalIgnoreCase))
+        {
+            DraftText = "帮我把这张课表导进课程表：一门课一条，周次、教师、地点照着图填。";
+            AutoPickImage = true;
+        }
     }
 
     /// <summary>发消息：打包上下文 → AI 回复 → 存历史（建议单拆出来待确认）</summary>
@@ -216,6 +232,9 @@ public class IndexModel(AppDbContext db, CurrentUser me, AiClient ai, AiActionEx
                 actionsJson = a2;
             }
         }
+
+        // 有结构化建议时正文只留一句结论（模型爱在正文复述明细，还容易写错）
+        display = AiPrompt.CompactDisplay(display, actionsJson);
 
         _db.AiMessages.Add(new AiMessage
         {

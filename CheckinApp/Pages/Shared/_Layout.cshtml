@@ -6,7 +6,8 @@
     var hideBack = path is "/" or "/index" or "/login" or "/changepassword";
 }
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="@(Me.Theme)" data-accent="@(Me.Accent)" data-tone="@(Me.Tone)" data-local="@(CheckinApp.Services.LocalMode.Enabled ? "1" : "0")">
+<html lang="zh-CN" data-theme="@(Me.Theme)" data-accent="@(Me.Accent)" data-tone="@(Me.Tone)" data-local="@(CheckinApp.Services.LocalMode.Enabled ? "1" : "0")"
+      data-server-today="@CheckinApp.Services.SiteClock.Today.ToString("yyyy-MM-dd")">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -155,13 +156,17 @@
                 </div>
             }
 
-            @* 侧栏底部：个人主页 + 自定义（勾选显示哪些模块）。
-               这两项不进 NavCatalog——它们不是模块，不该被「自定义侧栏」藏掉，
+            @* 侧栏底部：个人主页 + 下载 App + 自定义（勾选显示哪些模块）。
+               这几项不进 NavCatalog——它们不是模块，不该被「自定义侧栏」藏掉，
                也不受权限码控制（外观按钮仍在顶栏，手机上点调色板即可）。 *@
             <div class="sidebar-foot">
                 <a class="nav-item nav-foot-item @(path == "/me" ? "active" : "")" href="/Me" title="个人主页">
                     <span class="ico">@Html.Raw(Icons.Svg("user-cog"))</span>
                     <span class="label">我的</span>
+                </a>
+                <a class="nav-item nav-foot-item @(path == "/download" ? "active" : "")" href="/Download" title="下载安卓客户端">
+                    <span class="ico">@Html.Raw(Icons.Svg("download"))</span>
+                    <span class="label">下载 App</span>
                 </a>
                 <button class="nav-item nav-foot-item" type="button" onclick="openNavCustomize()" title="自定义侧栏">
                     <span class="ico">@Html.Raw(Icons.Svg("settings-2"))</span>
@@ -184,6 +189,7 @@
         <footer class="site-foot">
             <nav class="foot-links">
                 <a href="/About">关于</a>
+                <a href="/Download">下载 App</a>
                 <a href="/Privacy">隐私政策</a>
                 <a href="/Terms">用户协议</a>
             </nav>
@@ -253,6 +259,7 @@
 
 <script src="~/js/theme.js" asp-append-version="true"></script>
 <script src="~/js/site.js" asp-append-version="true"></script>
+<script src="~/js/datepicker.js" asp-append-version="true"></script>
 <script src="~/js/modal.js" asp-append-version="true"></script>
 @* 安卓 App 壳适配（返回键 / 状态栏）：浏览器里自动跳过，无副作用 *@
 <script src="~/js/app-shell.js" asp-append-version="true"></script>
