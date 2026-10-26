@@ -47,6 +47,9 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     public DateTime WeekStart { get; private set; }      // 显示周的周一
     public DateTime SemesterStart { get; private set; }  // 学期第 1 周的周一
     public bool SemesterConfigured { get; private set; }
+
+    /// <summary>当前学期（页面顶部要显示它的名字，学期切换也靠它）</summary>
+    public Semester CurrentSemester { get; private set; } = new();
     public DateTime Today { get; private set; } = DateTime.Today;
 
     /// <summary>节次配置（节数 = Periods.Count，可自定义）</summary>
@@ -70,11 +73,11 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         if (_me.UserId is not int uid) return;
         Today = DateTime.Today;
 
-        // 学期起始：设置过用设置的，没设置默认「本周=第 1 周」
-        var setting = _db.AppSettings.FirstOrDefault(s => s.Key == "courses.semester-start");
-        SemesterConfigured = setting is not null && DateTime.TryParse(setting.Value, out _);
-        var raw = SemesterConfigured && DateTime.TryParse(setting!.Value, out var parsed) ? parsed : Today;
-        SemesterStart = MondayOf(raw);
+        // 学期：现在是一张表（可多个、可切换）。没有就自动建一个，起始日沿用老的 AppSetting。
+        var sem = SemesterService.Current(_db, uid);
+        CurrentSemester = sem;
+        SemesterConfigured = true;
+        SemesterStart = sem.StartDate;
         SemesterStartInput = SemesterStart;
 
         CurrentWeek = Math.Max(1, (int)((Today - SemesterStart).TotalDays / 7) + 1);
@@ -90,7 +93,8 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         var offSetting = _db.AppSettings.FirstOrDefault(s => s.Key == ShowOffWeekKey);
         ShowOffWeek = offSetting is null || offSetting.Value != "0";
 
-        var courses = _db.Courses.Where(c => c.UserId == uid).ToList();
+        // 只取当前学期的课：切到上学期就该看到上学期的课表，而不是所有学期的课叠在一起
+        var courses = _db.Courses.Where(c => c.UserId == uid && c.SemesterId == sem.Id).ToList();
         foreach (var c in courses)
         {
             // 本周上不上：非本周的照样进网格（虚化显示），但不算进 ThisWeekCount
@@ -172,19 +176,14 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         }
     }
 
-    /// <summary>设置学期起始（自动对齐到所在周的周一），重算教学周</summary>
+    /// <summary>设置当前学期的起始日（自动对齐到所在周的周一）</summary>
     public IActionResult OnPostSemesterStart()
     {
         if (_me.UserId is not int uid) return RedirectToPage("/Login");
         if (SemesterStartInput is null) return RedirectToPage("/Courses/Index");
 
-        var monday = MondayOf(SemesterStartInput.Value.Date).ToString("yyyy-MM-dd");
-        var setting = _db.AppSettings.FirstOrDefault(s => s.Key == "courses.semester-start");
-        if (setting is null)
-            _db.AppSettings.Add(new AppSetting { Key = "courses.semester-start", Value = monday });
-        else
-            setting.Value = monday;
-        _db.SaveChanges();
+        var sem = SemesterService.Current(_db, uid);
+        SemesterService.Update(_db, uid, sem.Id, null, SemesterStartInput.Value);
         return RedirectToPage("/Courses/Index");
     }
 

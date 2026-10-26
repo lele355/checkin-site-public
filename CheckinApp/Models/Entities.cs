@@ -177,6 +177,12 @@ public class Course
     public int Id { get; set; }
     public int UserId { get; set; }
     public User? User { get; set; }
+    /// <summary>
+    /// 所属学期。可空是为了兼容迁移前的旧数据 —— 迁移时会把它们挂到自动建好的默认学期上，
+    /// 之后新建的课程一律带 SemesterId。
+    /// </summary>
+    public int? SemesterId { get; set; }
+    public Semester? Semester { get; set; }
     public required string Name { get; set; }
     public string Teacher { get; set; } = "";
     public string Location { get; set; } = "";
@@ -200,6 +206,29 @@ public class Course
 }
 
 /// <summary>全局小设置（键值对）。目前存课程表学期起始周一日期（courses.semester-start，ISO 日期）。</summary>
+
+/// <summary>
+/// 学期。一门课属于某一个学期，「切换学期」= 换一个当前学期，课表只显示它下面的课。
+///
+/// 【为什么单独建表而不是塞进 AppSetting】
+/// 学期要能有好几个并存（这学期 / 上学期 / 下学期），还要给每个学期存名字和起始日、
+/// 以及「哪一个是当前」。用 JSON 塞进 AppSetting 的话，删除学期时课程归谁、当前学期是谁
+/// 这些一致性全靠字符串约定，出错难查；建表让数据库管外键和级联。
+/// </summary>
+public class Semester
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    /// <summary>学期名，如「2026 秋」。空则由起始日自动生成</summary>
+    public string Name { get; set; } = "";
+    /// <summary>第 1 周的周一（周次都从这里推）</summary>
+    public DateTime StartDate { get; set; }
+    /// <summary>是不是「当前学期」。同一个用户只会有一个为 true（切换时在服务端保证）</summary>
+    public bool IsCurrent { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public class AppSetting
 {
     public int Id { get; set; }

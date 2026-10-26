@@ -60,6 +60,14 @@
 
     <div class="cs-block">
         <div class="cs-block-head">
+            <b>学期</b>
+            <span class="mini">当前：@Model.SemesterName</span>
+        </div>
+        <a class="btn secondary" href="/Courses/Semesters">@Html.Raw(Icons.Svg("grid", 16)) 管理学期（切换 / 新建 / 删除）</a>
+    </div>
+
+    <div class="cs-block">
+        <div class="cs-block-head">
             <b>节次与时间</b>
             <span class="mini">当前 @Model.PeriodCount 节</span>
         </div>

@@ -77,12 +77,13 @@ public static class CoreApi
             {
                 var setting = db.AppSettings.FirstOrDefault(s => s.Key == "courses.semester-start");
                 semesterConfigured = setting is not null && DateTime.TryParse(setting.Value, out _);
-                var raw = semesterConfigured && DateTime.TryParse(setting!.Value, out var parsed) ? parsed : today;
-                var semStart = MondayOf(raw);
+                // 学期表：起始日和「哪些课算今天的」都跟着当前学期走
+                var sem = SemesterService.Current(db, uid);
+                var semStart = sem.StartDate;
                 currentWeek = Math.Max(1, (int)((today - semStart).TotalDays / 7) + 1);
                 var weekday = ((int)today.DayOfWeek + 6) % 7 + 1;
                 var periods = CoursesConfig.Load(db);
-                foreach (var c in db.Courses.Where(c => c.UserId == uid && c.Weekday == weekday)
+                foreach (var c in db.Courses.Where(c => c.UserId == uid && c.SemesterId == sem.Id && c.Weekday == weekday)
                              .ToList().Where(c => Weeks.Includes(c.WeeksText, currentWeek))
                              .OrderBy(c => c.StartPeriod).Take(6))
                 {

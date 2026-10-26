@@ -516,6 +516,9 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
             // 两边都没有（课名为空或全符号）→ 留空，读的时候按名字现算，不落库
         }
 
+        // 挂到当前学期（AI 导入的课跟手动加的课一样，属于「现在这一学期」）
+        var curSem = SemesterService.Current(db, uid);
+        foreach (var c in add) c.SemesterId = curSem.Id;
         db.Courses.AddRange(add);
 
         // 学期开始日顺手一起写：「本周是第几周」全靠它，不设的话课程表永远停在第 1 周

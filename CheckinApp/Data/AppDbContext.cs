@@ -16,6 +16,7 @@ public partial class AppDbContext : DbContext
     public DbSet<Habit> Habits => Set<Habit>();
     public DbSet<HabitCheckin> HabitCheckins => Set<HabitCheckin>();
     public DbSet<Course> Courses => Set<Course>();
+    public DbSet<Semester> Semesters => Set<Semester>();
     public DbSet<AnniversaryItem> Anniversaries => Set<AnniversaryItem>();
     public DbSet<CoupleSetting> CoupleSettings => Set<CoupleSetting>();
     public DbSet<LoveNote> LoveNotes => Set<LoveNote>();
@@ -44,7 +45,22 @@ public partial class AppDbContext : DbContext
             e.HasOne(x => x.Role).WithMany(r => r.Users).HasForeignKey(x => x.RoleId);
         });
 
-        m.Entity<Role>(e =>
+        // 学期：删学期时连带删掉它下面的课（课离开学期没有意义，留着只会变成孤儿数据）
+        m.Entity<Semester>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.IsCurrent });
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId);
+        });
+
+        m.Entity<Course>(e =>
+        {
+            e.HasOne(x => x.Semester).WithMany()
+                .HasForeignKey(x => x.SemesterId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.UserId, x.SemesterId });
+        });
+
+                m.Entity<Role>(e =>
         {
             e.HasIndex(x => x.Name).IsUnique();
             e.HasMany(x => x.RolePermissions).WithOne(x => x.Role).HasForeignKey(x => x.RoleId);

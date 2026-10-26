@@ -15,6 +15,8 @@ public static class LifeApi
                             int StartPeriod, int EndPeriod, string? WeeksText, string? Category,
                             string? Color);
     public record PeriodsReq(List<string>? Start, List<string>? End);
+    /// <summary>学期新建 / 改名用。StartDate 可空 = 这次不改起始日（只改名时就靠它）</summary>
+    public record SemesterReq(string? Name, string? StartDate);
     public record CourseSettingsReq(string? SemesterStart, List<PeriodPair>? Periods);
     public record PeriodPair(string? S, string? E);
 
@@ -231,14 +233,14 @@ public static class LifeApi
         {
             var uid = ApiKit.MeId(ctx);
             var today = DateTime.Today;
-            var setting = db.AppSettings.FirstOrDefault(s => s.Key == "courses.semester-start");
-            var configured = setting is not null && DateTime.TryParse(setting.Value, out _);
-            var raw = configured && DateTime.TryParse(setting!.Value, out var parsed) ? parsed : today;
-            var semStart = MondayOf(raw);
+            // 学期现在是一张表：起始日和名字都从「当前学期」拿，课也只取这一学期的
+            var sem = SemesterService.Current(db, uid);
+            var semStart = sem.StartDate;
             var week = Math.Max(1, (int)((today - semStart).TotalDays / 7) + 1);
 
             var periods = CoursesConfig.Load(db);
-            var items = db.Courses.Where(c => c.UserId == uid).OrderBy(c => c.Weekday).ThenBy(c => c.StartPeriod)
+            var items = db.Courses.Where(c => c.UserId == uid && c.SemesterId == sem.Id)
+                .OrderBy(c => c.Weekday).ThenBy(c => c.StartPeriod)
                 .ToList().Select(c => new
                 {
                     id = c.Id, name = c.Name, teacher = c.Teacher, location = c.Location,
@@ -254,19 +256,74 @@ public static class LifeApi
                 items,
                 periods = periods.Select(p => new { start = p.Start, end = p.End }).ToList(),
                 semesterStart = ApiKit.D(semStart),
-                semesterConfigured = configured,
+                semesterConfigured = true,
+                // 当前学期（App 顶部要显示名字，学期弹层也要知道自己是谁）
+                semesterId = sem.Id,
+                semesterName = sem.Name,
                 currentWeek = week,
                 todayWeekday = ((int)today.DayOfWeek + 6) % 7 + 1,
             });
+        });
+
+        // ---------- 学期管理 ----------
+        co.MapGet("/semesters", (AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var cur = SemesterService.Current(db, uid);
+            var counts = db.Courses.Where(c => c.UserId == uid && c.SemesterId != null)
+                .GroupBy(c => c.SemesterId!.Value)
+                .Select(g => new { Id = g.Key, N = g.Count() })
+                .ToDictionary(x => x.Id, x => x.N);
+            var items = SemesterService.List(db, uid).Select(s => new
+            {
+                id = s.Id, name = s.Name, startDate = ApiKit.D(s.StartDate),
+                courseCount = counts.GetValueOrDefault(s.Id), isCurrent = s.Id == cur.Id,
+            }).ToList();
+            return ApiKit.Ok(new { items, currentId = cur.Id });
+        });
+
+        co.MapPost("/semesters", (SemesterReq req, AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            if (req.StartDate is null) throw new ApiBadRequest("请选择起始日");
+            var start = ApiKit.ParseDT(req.StartDate) ?? throw new ApiBadRequest("起始日格式不对");
+            var sem = SemesterService.Create(db, uid, ApiKit.Cut(req.Name, 20), start);
+            return ApiKit.Ok(new { id = sem.Id, name = sem.Name, startDate = ApiKit.D(sem.StartDate) });
+        });
+
+        co.MapPut("/semesters/{id:int}", (int id, SemesterReq req, AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var start = req.StartDate is null ? (DateTime?)null : ApiKit.ParseDT(req.StartDate);
+            var sem = SemesterService.Update(db, uid, id, ApiKit.Cut(req.Name, 20), start)
+                      ?? throw new ApiBadRequest("学期不存在或已删除");
+            return ApiKit.Ok(new { id = sem.Id, name = sem.Name, startDate = ApiKit.D(sem.StartDate) });
+        });
+
+        co.MapPost("/semesters/{id:int}/switch", (int id, AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var sem = SemesterService.SwitchTo(db, uid, id) ?? throw new ApiBadRequest("学期不存在或已删除");
+            return ApiKit.Ok(new { id = sem.Id, currentWeek = Math.Max(1, (int)((DateTime.Today - sem.StartDate).TotalDays / 7) + 1) });
+        });
+
+        co.MapDelete("/semesters/{id:int}", (int id, AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var (ok, error, deleted) = SemesterService.Delete(db, uid, id);
+            if (!ok) throw new ApiBadRequest(error ?? "删除失败");
+            return ApiKit.Ok(new { deletedCourses = deleted });
         });
 
         co.MapPost("", (CourseReq req, AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
             var (s, e) = NormalizePeriods(db, req.StartPeriod, req.EndPeriod);
+            var sem = SemesterService.Current(db, uid);
             var c = new Course
             {
                 UserId = uid,
+                SemesterId = sem.Id,
                 Name = ApiKit.Req(req.Name, "课程名", 50),
                 Teacher = ApiKit.Cut(req.Teacher, 30),
                 Location = ApiKit.Cut(req.Location, 40),

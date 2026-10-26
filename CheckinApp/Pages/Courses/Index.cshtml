@@ -13,7 +13,10 @@
             <a class="tt-arrow" href="/Courses?week=@(Model.Week - 1)" aria-label="上一周">‹</a>
             <div class="tt-week">
                 <strong>第 @Model.Week 周</strong>
-                <span class="mini">@Model.WeekStart.ToString("MM-dd") ～ @Model.WeekStart.AddDays(6).ToString("MM-dd")</span>
+                <span class="mini">
+                    @Model.WeekStart.ToString("MM-dd") ～ @Model.WeekStart.AddDays(6).ToString("MM-dd")
+                    · <a class="tt-sem-link" href="/Courses/Semesters" title="切换或管理学期">@Model.CurrentSemester.Name ›</a>
+                </span>
             </div>
             <a class="tt-arrow" href="/Courses?week=@(Model.Week + 1)" aria-label="下一周">›</a>
             @if (Model.Week != Model.CurrentWeek)

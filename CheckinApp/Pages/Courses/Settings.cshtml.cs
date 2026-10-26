@@ -22,10 +22,10 @@ public class SettingsModel(AppDbContext db, CurrentUser me) : PageModel
 
     /// <summary>设置键：是否把「本周不上」的课程以虚化形式画出来</summary>
     public const string ShowOffWeekKey = "courses.show-offweek";
-    private const string SemesterKey = "courses.semester-start";
 
     public DateTime SemesterStart { get; private set; } = DateTime.Today;
     public bool SemesterConfigured { get; private set; }
+    public string SemesterName { get; private set; } = "";
     public bool ShowOffWeek { get; private set; } = true;
     public int PeriodCount { get; private set; }
     public int CurrentWeek { get; private set; }
@@ -41,10 +41,10 @@ public class SettingsModel(AppDbContext db, CurrentUser me) : PageModel
 
     private void Load()
     {
-        var setting = _db.AppSettings.FirstOrDefault(s => s.Key == SemesterKey);
-        SemesterConfigured = setting is not null && DateTime.TryParse(setting.Value, out _);
-        var raw = SemesterConfigured && DateTime.TryParse(setting!.Value, out var parsed) ? parsed : DateTime.Today;
-        SemesterStart = MondayOf(raw);
+        var sem = SemesterService.Current(_db, _me.UserId ?? 0);
+        SemesterName = sem.Name;
+        SemesterConfigured = true;
+        SemesterStart = sem.StartDate;
         SemesterStartInput = SemesterStart;
 
         var today = DateTime.Today;
@@ -62,13 +62,9 @@ public class SettingsModel(AppDbContext db, CurrentUser me) : PageModel
         if (_me.UserId is null) return RedirectToPage("/Login");
         if (SemesterStartInput is null) return RedirectToPage("/Courses/Settings");
 
-        var monday = MondayOf(SemesterStartInput.Value.Date).ToString("yyyy-MM-dd");
-        var setting = _db.AppSettings.FirstOrDefault(s => s.Key == SemesterKey);
-        if (setting is null)
-            _db.AppSettings.Add(new AppSetting { Key = SemesterKey, Value = monday });
-        else
-            setting.Value = monday;
-        _db.SaveChanges();
+        var uid = _me.UserId ?? 0;
+        var sem = SemesterService.Current(_db, uid);
+        SemesterService.Update(_db, uid, sem.Id, null, SemesterStartInput.Value);
         return RedirectToPage("/Courses/Settings", new { saved = true });
     }
 

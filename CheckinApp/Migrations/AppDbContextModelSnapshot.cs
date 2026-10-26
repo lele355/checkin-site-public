@@ -258,6 +258,9 @@ namespace CheckinApp.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("SemesterId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("StartPeriod")
                         .HasColumnType("INTEGER");
 
@@ -279,6 +282,10 @@ namespace CheckinApp.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SemesterId");
+
+                    b.HasIndex("UserId", "SemesterId");
 
                     b.HasIndex("UserId", "Weekday", "StartPeriod");
 
@@ -872,6 +879,35 @@ namespace CheckinApp.Migrations
                     b.ToTable("Schedules");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.Semester", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IsCurrent");
+
+                    b.ToTable("Semesters");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -1007,11 +1043,18 @@ namespace CheckinApp.Migrations
 
             modelBuilder.Entity("CheckinApp.Models.Course", b =>
                 {
+                    b.HasOne("CheckinApp.Models.Semester", "Semester")
+                        .WithMany()
+                        .HasForeignKey("SemesterId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("CheckinApp.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Semester");
 
                     b.Navigation("User");
                 });
@@ -1187,6 +1230,17 @@ namespace CheckinApp.Migrations
                 });
 
             modelBuilder.Entity("CheckinApp.Models.ScheduleItem", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.Semester", b =>
                 {
                     b.HasOne("CheckinApp.Models.User", "User")
                         .WithMany()

@@ -730,6 +730,40 @@ body {
 /* ---- 课表卡片：手机上贴边，让表格占满整屏（参考课程格子 APP 的形态） ---- */
 .tt-board { padding: 10px 12px 12px; }
 
+/* 周次下面那行里的学期名：可点，进学期管理 */
+.tt-sem-link { color: var(--accent-strong); text-decoration: none; white-space: nowrap; }
+.tt-sem-link:hover { text-decoration: underline; }
+
+/* ---- 学期管理（/Courses/Semesters） ---- */
+.sem-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.sem-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-in);
+  background: var(--card-soft, var(--bg-soft));
+}
+.sem-row.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.sem-main { flex: 1; min-width: 130px; }
+.sem-name { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.sem-badge {
+  font-size: .68rem; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+  background: var(--accent); color: var(--on-accent, #fff);
+}
+.sem-acts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sem-acts form { margin: 0; }
+.sem-edit { position: relative; }
+.sem-edit > summary { list-style: none; cursor: pointer; }
+.sem-edit > summary::-webkit-details-marker { display: none; }
+.sem-edit-form {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 8px; padding: 8px; border-radius: var(--radius-in);
+  border: 1px solid var(--border); background: var(--card);
+}
+.sem-edit-form input { max-width: 150px; }
+.sem-new {
+  margin-top: 16px; padding: 12px 14px; border-radius: var(--radius-in);
+  border: 1px dashed var(--border-strong); background: var(--card-soft, var(--bg-soft));
+}
+
 /* ---- 设置页（二级） ---- */
 .cs-block {
   margin-top: 14px; padding: 12px 14px;
