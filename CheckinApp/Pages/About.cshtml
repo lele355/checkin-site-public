@@ -39,6 +39,22 @@
                     @:App 备案：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">@Model.AppBeiAn</a>
                 }
             </div>
+            <div class="hint">
+                @* 公安联网备案的编号是按域名/网站发的，App 不发号 ——
+                   公共查询里查网站会列出「公安备案号」，查 App 只有名称/主体/开办者/注册地/注册时间。
+                   所以这里写「已备案」并给核验入口，不编号，也不拿网站的 01655 顶上。 *@
+                App 公安备案：
+                @if (string.IsNullOrEmpty(Model.AppPoliceBeiAn))
+                {
+                    <a href="https://beian.mps.gov.cn/" target="_blank" rel="noreferrer noopener">已备案</a>
+                    <span>（公安机关按网站发号，App 备案不发编号，可按应用名称查询核验）</span>
+                }
+                else
+                {
+                    var code = new string(Model.AppPoliceBeiAn.Where(char.IsDigit).ToArray());
+                    <a href="https://beian.mps.gov.cn/#/query/webSearch?code=@code" target="_blank" rel="noreferrer noopener">@Model.AppPoliceBeiAn</a>
+                }
+            </div>
         </div>
 
         <div>

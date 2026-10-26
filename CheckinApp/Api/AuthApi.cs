@@ -166,10 +166,13 @@ public static class AuthApi
                 versionCode = int.TryParse(v["ClientVersionCode"], out var c) ? c : 2,
                 url = v["ClientApk"] ?? "/download/app-release.apk",
                 notes = v["ClientNotes"] ?? "",
-                // App 备案号随接口下发：法规要求「关于/设置」页显著位置标注，
+                // 两个备案号都随接口下发：法规要求「关于/设置」页显著位置标注，
                 // 但号一旦要更正（补正、换号）就得重新发版，所以不写死在 APK 里。
                 // 空串 = 服务端没配，App 端回落到内置的兜底常量。
                 beiAn = v["AppBeiAn"] ?? "",
+                // 公安联网备案是独立的一套号（每个网站/App 各一个），
+                // 不能拿网站的 `陕公网安备…01655号` 顶上 —— 那是网站的备案。
+                policeBeiAn = v["AppPoliceBeiAn"] ?? "",
             });
         }).AllowAnonymous();
     }
