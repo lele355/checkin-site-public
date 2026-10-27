@@ -390,6 +390,16 @@ public class EmailAccount
     public string AuthCodeEnc { get; set; } = "";
     /// <summary>最近一次同步时间（UTC）</summary>
     public DateTime? LastSyncAt { get; set; }
+    /// <summary>
+    /// 同步时间范围（天）。0 = 用全局默认。
+    /// 拉新邮件时按「最近 N 天」过滤，超出的旧邮件不落库。
+    /// </summary>
+    public int SyncDays { get; set; }
+    /// <summary>
+    /// 同步条数上限。0 = 用全局默认。
+    /// 拉新邮件时按「最近 N 封」兜底，防止一次同步把几年的信全灌进来。
+    /// </summary>
+    public int SyncCount { get; set; }
     /// <summary>最近一次同步错误（空 = 正常）；网络/授权码问题都记这里，页面直接展示</summary>
     public string LastSyncError { get; set; } = "";
     /// <summary>IMAP UIDVALIDITY —— 服务器邮箱「指纹」，若变化说明服务器重建过邮箱，本地缓存作废重拉</summary>

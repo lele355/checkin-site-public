@@ -338,6 +338,12 @@ namespace CheckinApp.Migrations
                     b.Property<int>("SmtpPort")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("SyncCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SyncDays")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long>("UidValidity")
                         .HasColumnType("INTEGER");
 

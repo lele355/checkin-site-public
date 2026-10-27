@@ -8,8 +8,12 @@ namespace CheckinApp.Api;
 /// <summary>邮件：账号绑定 / 合并收件箱 / 读信（正文首次阅读时才拉取）/ 手动同步。</summary>
 public static class EmailApi
 {
+    public record SyncScopeReq(int? SyncDays, int? SyncCount);
+    public record MarkReadReq(int? AccountId, string? FromAddress);
     public record AccountReq(string? DisplayName, string? Address, string? Provider,
-                             string? ImapHost, int? ImapPort, string? SmtpHost, int? SmtpPort, string? AuthCode);
+                             string? ImapHost, int? ImapPort, string? SmtpHost, int? SmtpPort, string? AuthCode,
+                             // 同步范围（天 / 封）。留空或 0 = 跟全局默认
+                             int? SyncDays = null, int? SyncCount = null);
 
     public static void Map(WebApplication app)
     {
@@ -40,8 +44,50 @@ public static class EmailApi
                     lastSyncAt = ApiKit.StampUtc(a.LastSyncAt ?? default),
                     lastSyncError = a.LastSyncError,
                     unread = db.EmailMessages.Count(m => m.AccountId == a.Id && !m.IsRead),
+                    // 同步范围：0 = 跟全局默认（下面那两个 setting）
+                    syncDays = a.SyncDays,
+                    syncCount = a.SyncCount,
                 }).ToList();
-            return ApiKit.Ok(new { items, unreadTotal = db.EmailMessages.Count(m => m.UserId == uid && !m.IsRead) });
+
+            int readInt(string key, int d)
+            {
+                var row = db.AppSettings.FirstOrDefault(x => x.Key == key);
+                return row is not null && int.TryParse(row.Value, out var v) && v > 0 ? v : d;
+            }
+            return ApiKit.Ok(new
+            {
+                items,
+                unreadTotal = db.EmailMessages.Count(m => m.UserId == uid && !m.IsRead),
+                // 全局默认（账号没单独设时用它）
+                defaultSyncDays = readInt("email.sync-days", 7),
+                defaultSyncCount = readInt("email.sync-count", 40),
+            });
+        });
+
+        // ---------- 全局默认同步范围（「最近 xx 天 / 最近 xx 封」） ----------
+        g.MapGet("/settings", (AppDbContext db, HttpContext ctx) =>
+        {
+            int readInt(string key, int d)
+            {
+                var row = db.AppSettings.FirstOrDefault(x => x.Key == key);
+                return row is not null && int.TryParse(row.Value, out var v) && v > 0 ? v : d;
+            }
+            return ApiKit.Ok(new { syncDays = readInt("email.sync-days", 7), syncCount = readInt("email.sync-count", 40) });
+        });
+
+        g.MapPost("/settings", (SyncScopeReq req, AppDbContext db, HttpContext ctx) =>
+        {
+            void write(string key, int val, int def)
+            {
+                var v = val > 0 ? val : def;
+                var row = db.AppSettings.FirstOrDefault(x => x.Key == key);
+                if (row is null) db.AppSettings.Add(new AppSetting { Key = key, Value = v.ToString() });
+                else row.Value = v.ToString();
+            }
+            write("email.sync-days", req.SyncDays ?? 0, 7);
+            write("email.sync-count", req.SyncCount ?? 0, 40);
+            db.SaveChanges();
+            return ApiKit.Ok();
         });
 
         // ---------- 绑定 ----------
@@ -57,6 +103,8 @@ public static class EmailApi
                 UserId = uid, DisplayName = display, Address = address, Provider = provider,
                 ImapHost = imapHost, ImapPort = imapPort, SmtpHost = smtpHost, SmtpPort = smtpPort,
                 AuthCodeEnc = crypto.Encrypt(code), CreatedAt = DateTime.UtcNow,
+                SyncDays = Math.Clamp(req.SyncDays ?? 0, 0, 3650),
+                SyncCount = Math.Clamp(req.SyncCount ?? 0, 0, 500),
             };
             db.EmailAccounts.Add(ac);
             db.SaveChanges();
@@ -73,6 +121,9 @@ public static class EmailApi
 
             ac.DisplayName = display; ac.Address = address; ac.Provider = provider;
             ac.ImapHost = imapHost; ac.ImapPort = imapPort; ac.SmtpHost = smtpHost; ac.SmtpPort = smtpPort;
+            // 同步范围：传 null 表示不改；0 = 退回「跟全局默认」
+            if (req.SyncDays is int sd) ac.SyncDays = Math.Clamp(sd, 0, 3650);
+            if (req.SyncCount is int sc) ac.SyncCount = Math.Clamp(sc, 0, 500);
             if (code.Length > 0) ac.AuthCodeEnc = crypto.Encrypt(code);
             db.SaveChanges();
             return ApiKit.Ok(new { id });
@@ -114,6 +165,59 @@ public static class EmailApi
                 }).ToList();
 
             return ApiKit.Ok(new { items, hasMore = items.Count == 50 });
+        });
+
+        // ---------- 一键已读 ----------
+        // 三个粒度：全部（不传参）/ 某账号（account=）/ 某发件人（from=，配合聚合列表用）
+        g.MapPost("/messages/mark-all-read", (MarkReadReq req, AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var q = db.EmailMessages.Where(m => m.UserId == uid && !m.IsRead);
+            if (req.AccountId is int aid && aid > 0) q = q.Where(m => m.AccountId == aid);
+            if (!string.IsNullOrWhiteSpace(req.FromAddress))
+                q = q.Where(m => m.FromAddress == req.FromAddress.Trim());
+            var n = q.ExecuteUpdate(u => u.SetProperty(x => x.IsRead, true));
+            return ApiKit.Ok(new { marked = n });
+        });
+
+        // ---------- 按发件人聚合（同一发件人的信并成一组） ----------
+        // 列表模式是「按时间倒序的平铺」，信多的时候同一个发件人会散落各处；
+        // 聚合模式把它们归到一行：发件人 / 未读数 / 最近一封标题与时间。
+        g.MapGet("/messages/grouped", (AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var accountId = ApiKit.IntQ(ctx, "account", 0);
+            var limit = Math.Clamp(ApiKit.IntQ(ctx, "limit", 50), 1, 200);
+
+            var q = db.EmailMessages.AsNoTracking().Where(m => m.UserId == uid);
+            if (accountId > 0) q = q.Where(m => m.AccountId == accountId);
+
+            var groups = q.ToList()
+                .GroupBy(m => string.IsNullOrWhiteSpace(m.FromAddress) ? (m.FromName ?? "").Trim() : m.FromAddress.Trim().ToLowerInvariant())
+                .Select(g =>
+                {
+                    var rows = g.OrderByDescending(x => x.SentAt).ToList();
+                    var last = rows[0];
+                    return new
+                    {
+                        // 同组 key 可能是邮箱也可能只有名字，前端展示用 name+address
+                        fromName = last.FromName, fromAddress = last.FromAddress,
+                        unread = rows.Count(x => !x.IsRead),
+                        total = rows.Count,
+                        lastSubject = last.Subject,
+                        lastSnippet = last.Snippet,
+                        lastAt = ApiKit.StampUtc(last.SentAt),
+                        // 这一组最新的那封（点进去读）
+                        lastId = last.Id,
+                        // 一键已读时给它
+                        groupKey = string.IsNullOrWhiteSpace(last.FromAddress) ? "" : last.FromAddress.Trim(),
+                    };
+                })
+                .OrderByDescending(x => x.lastAt)
+                .Take(limit)
+                .ToList();
+
+            return ApiKit.Ok(new { items = groups, hasMore = groups.Count == limit });
         });
 
         // ---------- 读信（正文首次阅读时才去 IMAP 拉，之后走缓存） ----------

@@ -40,6 +40,23 @@ public class EmailSyncService(AppDbContext db, EmailCrypto crypto)
             using var client = new ImapClient();
             client.Timeout = 15000;
             await client.ConnectAsync(ac.ImapHost, ac.ImapPort, SecureSocketOptions.SslOnConnect, ct);
+            // ⚠️ 网易（163 / 126 / yeah）强制要求 IMAP ID 命令：登录前先自报客户端，
+            // 否则直接拒绝：「Unsafe Login. Please contact kefu@188.com」。
+            // QQ / Gmail 不强制，但发了也无害，所以全平台统一发。
+            try
+            {
+                await client.IdentifyAsync(new ImapImplementation
+                {
+                    Name = "CheckinApp",
+                    Version = "1.0",
+                    Vendor = "anlele",
+                    SupportUrl = "https://example.com",
+                }, ct);
+            }
+            catch
+            {
+                // 不支持 ID 扩展的服务器会抛 NotSupported —— 忽略，继续登录
+            }
             await client.AuthenticateAsync(ac.Address, authCode, ct);
             var inbox = client.Inbox;
             await inbox.OpenAsync(FolderAccess.ReadOnly, ct);
@@ -59,7 +76,10 @@ public class EmailSyncService(AppDbContext db, EmailCrypto crypto)
 
             var uids = new List<UniqueId>();
             for (var u = Math.Max(maxUid + 1, 1); next > 0 && u < next; u++) uids.Add(new UniqueId((uint)u));
-            if (uids.Count > 40) uids = uids.Skip(uids.Count - 40).ToList();   // 一次最多 40 封，防首次绑定被洪水冲垮
+            // 同步范围：每账号可覆盖（SyncDays / SyncCount），没填就用全局默认
+            var (syncDays, syncCount) = ResolveScope(db, ac);
+            if (uids.Count > syncCount) uids = uids.Skip(uids.Count - syncCount).ToList();
+            var cutoff = DateTime.UtcNow.AddDays(-syncDays);
 
             var added = 0;
             if (uids.Count > 0)
@@ -70,6 +90,8 @@ public class EmailSyncService(AppDbContext db, EmailCrypto crypto)
                     MessageSummaryItems.BodyStructure | MessageSummaryItems.PreviewText, ct);
                 foreach (var s in summaries)
                 {
+                    // 超出时间范围的旧信不落库（取到才过滤：UID 范围本身不知道日期）
+                    if (s.Date.DateTime < cutoff) continue;
                     var env = s.Envelope;
                     var from = env?.From?.FirstOrDefault() as MailboxAddress;
                     var to = env?.To?.FirstOrDefault() as MailboxAddress;
@@ -225,6 +247,25 @@ public class EmailSyncService(AppDbContext db, EmailCrypto crypto)
         t = System.Text.RegularExpressions.Regex.Replace(t, @"[ \t　]+", " ");
         t = System.Text.RegularExpressions.Regex.Replace(t, @"\n{3,}", "\n\n");
         return t.Trim();
+    }
+
+
+    /// <summary>
+    /// 同步范围解析：账号自己的设置优先（SyncDays / SyncCount &gt; 0），没设就用全局默认；
+    /// 全局默认也没改过就用内置值（7 天 / 40 封）。
+    /// </summary>
+    public static (int Days, int Count) ResolveScope(AppDbContext db, EmailAccount ac)
+    {
+        const int fallbackDays = 7, fallbackCount = 40;
+        var days = ac.SyncDays > 0 ? ac.SyncDays : ReadInt(db, "email.sync-days", fallbackDays);
+        var count = ac.SyncCount > 0 ? ac.SyncCount : ReadInt(db, "email.sync-count", fallbackCount);
+        return (days, count);
+    }
+
+    private static int ReadInt(AppDbContext db, string key, int d)
+    {
+        var row = db.AppSettings.FirstOrDefault(x => x.Key == key);
+        return row is not null && int.TryParse(row.Value, out var v) && v > 0 ? v : d;
     }
 
     private static string Friendly(Exception ex) => ex switch
