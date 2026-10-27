@@ -104,18 +104,23 @@ public class RegistrationGuard(IMemoryCache cache, IDataProtectionProvider dp)
         return new string(buf);
     }
 
-    /// <summary>去掉分隔符并转大写（用户手抄时爱加空格/短横，也常抄成小写）</summary>
+    /// <summary>
+    /// 归一化邀请码：**只保留字母和数字**，其余全丢，再转大写。
+    ///
+    /// 为什么不只去 ASCII 短横：用户从微信/备忘录复制过来的常常是
+    /// 全角短横 `－`(U+FF0D)、en dash `–`(U+2013) 或 em dash `—`，
+    /// 以前只白名单了 `-` 和空格，这些字符留着就变成 14 位 → 直接报「格式不对」。
+    /// 现在只认字母数字，加不加横杠、加的是哪种横杠，结果都一样。
+    /// </summary>
     public static string NormalizeCode(string? code)
     {
         if (string.IsNullOrWhiteSpace(code)) return "";
-        Span<char> buf = stackalloc char[code.Length];
-        var n = 0;
+        var sb = new System.Text.StringBuilder(code.Length);
         foreach (var ch in code)
         {
-            if (ch is '-' or ' ' or '\t') continue;
-            buf[n++] = char.ToUpperInvariant(ch);
+            if (char.IsLetterOrDigit(ch)) sb.Append(char.ToUpperInvariant(ch));
         }
-        return new string(buf[..n]);
+        return sb.ToString();
     }
 
     /// <summary>把 12 位裸码格式化成 XXXX-XXXX-XXXX（展示用）</summary>

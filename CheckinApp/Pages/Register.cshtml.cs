@@ -61,7 +61,7 @@ public class RegisterModel(
         {
             _logger.LogWarning("注册被限流 ip={Ip}", ip);
             IssueForm();
-            Error = $"同一网络一小时内最多提交 {_throttle.PerHour} 次，请稍后再试。";
+            Error = $"同一网络一分钟内最多提交 {_throttle.PerMinute} 次，请稍后再试。";
             return Page();
         }
 
@@ -95,7 +95,7 @@ public class RegisterModel(
         if (!RegistrationGuard.LooksLikeCode(normalized))
         {
             IssueForm();
-            Error = "邀请码格式不对：应为 12 位，形如 ANLE-8F3K-2Q7M（短横可省略）。";
+            Error = "邀请码格式不对：应为 12 位字母数字，形如 ANLE-8F3K-2Q7M（横杠可省略，全角半角都行）。";
             return Page();
         }
 

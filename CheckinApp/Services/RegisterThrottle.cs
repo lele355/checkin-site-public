@@ -12,14 +12,17 @@ namespace CheckinApp.Services;
 /// </summary>
 public class RegisterThrottle(IConfiguration cfg)
 {
-    private static readonly TimeSpan Window = TimeSpan.FromHours(1);
+    // 窗口从「1 小时」收到「1 分钟」：填错邀请码时用户要能马上重试，等一小时太劝退。
+    private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
     private const int HardLimit = 20;   // 配置写错时的兜底上限，防止自己被刷爆
 
     private readonly ConcurrentDictionary<string, List<DateTime>> _hits = new();
-    private readonly int _perWindow = Math.Clamp(cfg.GetValue("Security:RegisterPerHour", 3), 1, HardLimit);
+    // 兼容旧键名：老配置里写 RegisterPerHour 也能用，但优先读新键 RegisterPerMinute
+    private readonly int _perWindow = Math.Clamp(
+        cfg.GetValue("Security:RegisterPerMinute", cfg.GetValue("Security:RegisterPerHour", 3)), 1, HardLimit);
     private DateTime _lastSweep = DateTime.UtcNow;
 
-    public int PerHour => _perWindow;
+    public int PerMinute => _perWindow;
 
     /// <summary>记一次提交；返回 false = 超出配额（调用方给用户看提示，不入库）</summary>
     public bool TryAcquire(string ip)

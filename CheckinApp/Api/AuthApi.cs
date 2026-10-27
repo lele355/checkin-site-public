@@ -10,6 +10,8 @@ public static class AuthApi
 {
     public record LoginReq(string? Username, string? Password, string? Device);
 
+    public record RegisterReq(string? Code, string? Username, string? DisplayName, string? Password);
+
     public record PrefsReq(
         string? Theme, string? Accent, string? Tone,
         string[]? NavHidden, string? DashboardLayout,
@@ -57,6 +59,67 @@ public static class AuthApi
                 expiresAt = ApiKit.StampUtc(row.ExpiresAt),
                 user = ApiDtos.Me(db, user.Id),
             });
+        }).AllowAnonymous();
+
+        // ---------- 注册（App 内自助注册，与网页 Register 同一套规则） ----------
+        // 与网页版差异：不做「一次性表单令牌 / 填写时长」那两道 —— 那是防网页脚本批量提交的，
+        // App 是装在手机上的应用，这两道在原生界面里没意义。保留 IP 限流 + 邀请码 + 格式校验。
+        g.MapPost("/auth/register", async (RegisterReq req, HttpContext ctx, AppDbContext db,
+            CheckinApp.Services.RegisterThrottle throttle) =>
+        {
+            var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            if (!throttle.TryAcquire(ip))
+                return ApiKit.Err($"提交太频繁，一分钟内最多 {throttle.PerMinute} 次，请稍后再试");
+
+            // 邀请码只留字母数字：横杠加不加、全角半角都一样
+            var code = CheckinApp.Services.RegistrationGuard.NormalizeCode(req.Code);
+            if (!CheckinApp.Services.RegistrationGuard.LooksLikeCode(code))
+                return ApiKit.Err("邀请码格式不对：应为 12 位字母数字，形如 ANLE-8F3K-2Q7M（横杠可省略）");
+
+            var now = DateTime.UtcNow;
+            var invite = await db.Invitations.Include(i => i.Role)
+                .FirstOrDefaultAsync(i => i.Code == code);
+            if (invite is null || invite.UsedAt is not null || invite.Revoked || invite.ExpiresAt <= now)
+                return ApiKit.Err("邀请码无效、已被使用或已过期，请找管理员要一个新的");
+
+            var uname = (req.Username ?? "").Trim();
+            if (!IsValidUsername(uname))
+                return ApiKit.Err("用户名需 2–20 位，只能包含中英文、数字、下划线或短横");
+            if (await db.Users.AnyAsync(u => u.Username == uname))
+                return ApiKit.Err("这个用户名已被占用，换一个试试");
+
+            var pwd = req.Password ?? "";
+            if (pwd.Length < 8 || !pwd.Any(char.IsLetter) || !pwd.Any(char.IsDigit))
+                return ApiKit.Err("密码至少 8 位，且须同时包含字母与数字");
+
+            var user = new CheckinApp.Models.User
+            {
+                Username = uname,
+                DisplayName = string.IsNullOrWhiteSpace(req.DisplayName) ? uname : req.DisplayName!.Trim(),
+                RoleId = invite.RoleId,
+                PasswordHash = CheckinApp.Security.PasswordHasher.Hash(pwd),
+                IsActive = true,
+                MustChangePassword = false,
+                RegisterIp = ip,
+            };
+
+            try
+            {
+                db.Users.Add(user);
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                db.Entry(user).State = EntityState.Detached;
+                return ApiKit.Err("用户名刚被别人用了，换一个再试");
+            }
+
+            invite.UsedAt = now;
+            invite.UsedByUserId = user.Id;
+            await db.SaveChangesAsync();
+
+            return ApiKit.Ok(new { id = user.Id, username = user.Username, displayName = user.DisplayName });
         }).AllowAnonymous();
 
         // ---------- 登出（吊销当前令牌） ----------
@@ -193,5 +256,16 @@ public static class AuthApi
                 policeBeiAn = v["AppPoliceBeiAn"] ?? "",
             });
         }).AllowAnonymous();
+    }
+
+    /// <summary>用户名规则：2–20 位，只允许中英文/数字/下划线/短横（与网页注册一致）</summary>
+    private static bool IsValidUsername(string s)
+    {
+        if (s.Length < 2 || s.Length > 20) return false;
+        foreach (var ch in s)
+        {
+            if (!char.IsLetterOrDigit(ch) && ch != '_' && ch != '-') return false;
+        }
+        return true;
     }
 }
