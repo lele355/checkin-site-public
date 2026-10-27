@@ -100,9 +100,13 @@ public class RegisterModel(
         }
 
         var now = DateTime.UtcNow;
+        // ⚠️ 库里历史上存在两种写法：裸码 `7BDWPQ98QXMP` 和带横杠 `7BDW-PQ98-QXMP`。
+        // 生成时存的是裸码，但早期/手工导入的记录存了带横杠的 —— 只按裸码查会「码明明在库里却说无效」。
+        // 两种都认，用户输哪种都能登进来。
+        var formatted = RegistrationGuard.FormatCode(normalized);
         var invite = await _db.Invitations
             .Include(i => i.Role)
-            .FirstOrDefaultAsync(i => i.Code == normalized);
+            .FirstOrDefaultAsync(i => i.Code == normalized || i.Code == formatted);
 
         if (invite is null || invite.UsedAt is not null || invite.Revoked || invite.ExpiresAt <= now)
         {

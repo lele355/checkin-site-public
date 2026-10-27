@@ -130,12 +130,19 @@ public class RegistrationGuard(IMemoryCache cache, IDataProtectionProvider dp)
         return s.Length == 12 ? $"{s[..4]}-{s[4..8]}-{s[8..]}" : s;
     }
 
-    /// <summary>形状校验（不做数据库查询）：长度与字符集都对才算「像邀请码」</summary>
+    /// <summary>
+    /// 形状校验（不做数据库查询）：只要求「12 位字母数字」。
+    ///
+    /// ⚠️ 这里**不套用** <see cref="CodeAlphabet"/>：那个字符集排除 B/I/O/0/1 是为了
+    /// **生成**时避免易混，不是给人看的规则。一旦拿它做校验，管理员手填的码（含 B）就会被
+    /// 判成「格式不对」—— 用户看到的是「明明是 12 位却说格式错」，完全无从排查。
+    /// 真假交给数据库查（`Invitations.Code == normalized`）。
+    /// </summary>
     public static bool LooksLikeCode(string normalized)
     {
         if (normalized.Length != 12) return false;
         foreach (var ch in normalized)
-            if (!CodeAlphabet.Contains(ch)) return false;
+            if (!char.IsLetterOrDigit(ch)) return false;
         return true;
     }
 }

@@ -78,8 +78,10 @@ public static class AuthApi
                 return ApiKit.Err("邀请码格式不对：应为 12 位字母数字，形如 ANLE-8F3K-2Q7M（横杠可省略）");
 
             var now = DateTime.UtcNow;
+            // 兼容库里的两种写法（裸码 / 带横杠），详见 Pages/Register.cshtml.cs 的说明
+            var formatted = CheckinApp.Services.RegistrationGuard.FormatCode(code);
             var invite = await db.Invitations.Include(i => i.Role)
-                .FirstOrDefaultAsync(i => i.Code == code);
+                .FirstOrDefaultAsync(i => i.Code == code || i.Code == formatted);
             if (invite is null || invite.UsedAt is not null || invite.Revoked || invite.ExpiresAt <= now)
                 return ApiKit.Err("邀请码无效、已被使用或已过期，请找管理员要一个新的");
 
