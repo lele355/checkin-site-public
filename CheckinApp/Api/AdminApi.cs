@@ -207,7 +207,9 @@ public static class AdminApi
                 .OrderByDescending(i => i.Id).Take(100).ToList()
                 .Select(i => new
                 {
-                    id = i.Id, code = i.Code, note = i.Note,
+                    // 展示用带横杠（库里是裸码）：网页端用 FormatCode 显示，App 这里也统一，
+                    // 否则同一个码在两处长得不一样，用户会以为是两个码。
+                    id = i.Id, code = CheckinApp.Services.RegistrationGuard.FormatCode(i.Code), note = i.Note,
                     roleId = i.RoleId, roleName = i.Role?.Name ?? "-",
                     createdAt = ApiKit.StampUtc(i.CreatedAt),
                     expiresAt = ApiKit.StampUtc(i.ExpiresAt),
@@ -227,7 +229,9 @@ public static class AdminApi
             if (!db.Roles.Any(r => r.Id == req.RoleId)) throw new ApiBadRequest("角色不存在");
             var days = Math.Clamp(req.ValidDays ?? 7, 1, 90);
 
-            var code = NewCode(db);
+            // ⚠️ 库里一律存**裸码**，与网页端 /Pages/Admin/Invitations 保持一致。
+            // 这里以前自己拼了带横杠的码存进去，结果注册校验按裸码查 → 「码明明在库里却说无效」。
+            var code = CheckinApp.Services.RegistrationGuard.NewCode();
             var row = new Invitation
             {
                 Code = code,
@@ -239,7 +243,14 @@ public static class AdminApi
             };
             db.Invitations.Add(row);
             db.SaveChanges();
-            return ApiKit.Ok(new { id = row.Id, code, expiresAt = ApiKit.StampUtc(row.ExpiresAt) });
+            // 返回展示用的带横杠写法（库里存裸码，两不误）
+            return ApiKit.Ok(new
+            {
+                id = row.Id,
+                code = CheckinApp.Services.RegistrationGuard.FormatCode(code),
+                raw = code,
+                expiresAt = ApiKit.StampUtc(row.ExpiresAt),
+            });
         });
 
         iv.MapPost("/{id:int}/revoke", (int id, AppDbContext db) =>
@@ -267,20 +278,6 @@ public static class AdminApi
         db.SaveChanges();
     }
 
-    private static string NewCode(AppDbContext db)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // 去掉易混的 I/O/0/1
-        var rng = Random.Shared;
-        for (var attempt = 0; attempt < 20; attempt++)
-        {
-            var parts = new string[3];
-            for (var p = 0; p < 3; p++)
-                parts[p] = new string(Enumerable.Range(0, 4).Select(_ => alphabet[rng.Next(alphabet.Length)]).ToArray());
-            var code = string.Join("-", parts);
-            if (!db.Invitations.Any(i => i.Code == code)) return code;
-        }
-        throw new ApiBadRequest("生成邀请码失败，请重试");
-    }
 
     private static string RandomPassword()
     {
