@@ -1,0 +1,80 @@
+@page
+@model CheckinApp.Pages.Schedule.IndexModel
+@using CheckinApp.Models
+@{
+    ViewData["Title"] = "日程";
+    var order = new[] { "今天", "明天", "一周内", "更远", "已过" };
+    var groups = Model.Items.GroupBy(x => x.Group)
+        .ToDictionary(g => g.Key, g => g.Select(x => x.Item).ToList());
+}
+<div class="card">
+    <div class="page-head">
+        <h2>日程</h2>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <div class="view-switch" data-viewkey="schedule">
+                <button type="button" class="vs-btn@(Model.View == "list" ? " on" : "")" data-view="list" title="列表视图">@Html.Raw(Icons.Svg("list", 15))<span>列表</span></button>
+                <button type="button" class="vs-btn@(Model.View == "calendar" ? " on" : "")" data-view="calendar" title="日历视图">@Html.Raw(Icons.Svg("calendar", 15))<span>日历</span></button>
+            </div>
+            <a class="btn" href="/Schedule/New">@Html.Raw(Icons.Svg("plus", 16)) 新建日程</a>
+        </div>
+    </div>
+</div>
+
+@if (Model.View == "calendar")
+{
+    @* 照片式日历：‹ 年月 › 一组明显的大按钮翻月；点日期 → 下方直接显示当日日程；
+       右下角浮动「今」一键回今天；左右滑动也能翻月 *@
+    <div class="card" id="calCard">
+        <div class="cal-head">
+            <button type="button" class="cal-btn" id="calPrev" title="上个月" aria-label="上个月">@Html.Raw(Icons.Svg("chevron-left", 18))</button>
+            <button type="button" class="cal-ym" id="calYm" title="回到今天"></button>
+            <button type="button" class="cal-btn" id="calNext" title="下个月" aria-label="下个月">@Html.Raw(Icons.Svg("chevron-right", 18))</button>
+        </div>
+        <div class="cal-body" id="calBody">
+            <div class="cal-grid cal-dow">
+                <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+            <button type="button" class="cal-fab" id="calToday" title="回到今天">今</button>
+        </div>
+    </div>
+    <div class="card cal-agenda" id="calAgenda" aria-live="polite"></div>
+    <script type="application/json" id="calData">@Html.Raw(Model.CalendarJson)</script>
+    <script src="~/js/calendar.js" asp-append-version="true"></script>
+}
+else
+{
+    <p class="hint" style="margin-top:8px;">按时间排序，保留最近 7 天已过的便于回看。</p>
+
+    @if (groups.Count == 0)
+    {
+        <div class="card"><div class="empty"><span class="big">📅</span>还没有日程</div></div>
+    }
+
+    @foreach (var g in order)
+    {
+        if (!groups.TryGetValue(g, out var list)) continue;
+        @* overflow:clip 而不是 hidden —— hidden 会吞掉子元素的 position:sticky（分组标题要能吸附顶替） *@
+        <div class="card" style="padding:0;overflow:clip;">
+            <div class="group-head">@g</div>
+            @foreach (var s in list)
+            {
+                <div class="row-item">
+                    <div class="meta" style="flex-shrink:0;min-width:64px;">
+                        @(s.AllDay ? s.StartAt.ToString("M月d日") + " 全天" : s.StartAt.ToString("M月d日\nHH:mm"))
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;">@s.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(s.Description))
+                        {
+                            <div class="hint" style="margin-top:2px;white-space:pre-wrap;">@s.Description</div>
+                        }
+                    </div>
+                    <div style="flex-shrink:0;font-size:.85rem;">
+                        <a href="/Schedule/Edit/@s.Id" style="margin-right:8px;">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}

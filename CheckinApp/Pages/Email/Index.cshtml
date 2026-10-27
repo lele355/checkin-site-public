@@ -1,0 +1,102 @@
+@page
+@model CheckinApp.Pages.Email.IndexModel
+@{
+    ViewData["Title"] = "邮件";
+}
+<div class="card">
+    <div class="page-head">
+        <h2>收件箱</h2>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <select id="mailAccountFilter" class="filter-input" aria-label="按账号筛选">
+                <option value="">全部账号</option>
+                @foreach (var a in Model.Accounts)
+                {
+                    <option value="@a.Id">@a.DisplayName</option>
+                }
+            </select>
+            <input id="mailSearch" class="filter-input" type="search" placeholder="搜索发件人或主题…" aria-label="搜索邮件" />
+            <form method="post" asp-page-handler="Sync">
+                <button class="btn" type="submit">@Html.Raw(Icons.Svg("rotate-ccw", 16)) 同步</button>
+            </form>
+            <a class="btn secondary" href="/Email/Accounts">@Html.Raw(Icons.Svg("mail", 16)) 管理账号</a>
+        </div>
+    </div>
+    <p class="hint" style="margin-top:8px;">
+        多个邮箱的信汇成一个列表；点开自动标已读。
+        @if (Model.UnreadTotal > 0)
+        {
+            <span>当前 <b style="color:var(--accent-strong);">@Model.UnreadTotal</b> 封未读。</span>
+        }
+    </p>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Note))
+{
+    <div class="msg">@Model.Note</div>
+}
+
+@if (Model.Accounts.Count == 0)
+{
+    <div class="card"><div class="empty"><span class="big">📬</span>还没有绑定邮箱，去<a href="/Email/Accounts">管理账号</a>添加一个吧（QQ / 163 / Gmail 都行）。</div></div>
+}
+else if (Model.Messages.Count == 0)
+{
+    <div class="card"><div class="empty"><span class="big">📭</span>还没有邮件，点右上角「同步」拉取第一封信试试。</div></div>
+}
+else
+{
+    <div id="mailEmpty" class="card" hidden><div class="empty"><span class="big">🔍</span>没有匹配的邮件。</div></div>
+    <div class="card" style="padding:0;overflow:hidden;">
+        <div id="mailRows">
+            @foreach (var row in Model.Messages)
+            {
+                var m = row.Msg;
+                <a class="mail-row@(m.IsRead ? " read" : " unread")" href="/Email/Read/@m.Id"
+                   data-search="@((m.Subject + " " + m.FromName + " " + m.FromAddress + " " + row.AccountLabel).ToLowerInvariant())"
+                   data-account="@m.AccountId">
+                    <span class="mdot" aria-hidden="true"></span>
+                    <span class="mfrom">@(string.IsNullOrWhiteSpace(m.FromName) ? m.FromAddress : m.FromName)</span>
+                    <span class="msubject">@m.Subject</span>
+                    @if (!string.IsNullOrWhiteSpace(m.Snippet))
+                    {
+                        <span class="msnippet">@m.Snippet</span>
+                    }
+                    <span class="mright">
+                        @if (m.HasAttachment)
+                        {
+                            <span title="带附件">@Html.Raw(Icons.Svg("paperclip", 13))</span>
+                        }
+                        <span class="chip">@row.AccountLabel</span>
+                        <span class="mini">@CheckinApp.Services.SiteClock.ToLocal(m.SentAt).ToString("MM-dd HH:mm")</span>
+                    </span>
+                </a>
+            }
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+    // 收件箱即时过滤：搜索词 + 账号筛选组合，都不区分大小写
+    (function () {
+        var input = document.getElementById('mailSearch');
+        var sel = document.getElementById('mailAccountFilter');
+        var empty = document.getElementById('mailEmpty');
+        if (!input) return;
+        var items = document.querySelectorAll('.mail-row');
+        function apply() {
+            var q = (input.value || '').trim().toLowerCase();
+            var acc = sel ? sel.value : '';
+            var shown = 0;
+            items.forEach(function (c) {
+                var hit = (!q || (c.dataset.search || '').indexOf(q) !== -1) && (!acc || c.dataset.account === acc);
+                c.style.display = hit ? '' : 'none';
+                if (hit) shown++;
+            });
+            if (empty) empty.hidden = shown > 0;
+        }
+        input.addEventListener('input', apply);
+        if (sel) sel.addEventListener('change', apply);
+    })();
+</script>
+}

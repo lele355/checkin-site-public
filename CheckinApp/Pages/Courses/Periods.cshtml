@@ -1,0 +1,92 @@
+@page
+@model CheckinApp.Pages.Courses.PeriodsModel
+@{
+    ViewData["Title"] = "节次时间";
+}
+
+<div class="card" style="max-width:520px;margin:4vh auto 0;">
+    <h2>节次时间设置</h2>
+    <p class="hint">自定义课程节数（1～16）和每节的起止时间。课表网格、「开始/结束节次」下拉、大节视图都按这里的配置来。</p>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+    @if (Model.Saved)
+    {
+        <div class="msg ok">已保存。</div>
+    }
+
+    <form method="post">
+        <div class="pp-rows" id="ppRows">
+            @for (var i = 0; i < Model.Periods.Count; i++)
+            {
+                <div class="pp-row">
+                    <span class="pp-no">第 @(i + 1) 节</span>
+                    <input type="time" name="Periods[@i].Start" value="@Model.Periods[i].Start" required />
+                    <span class="pp-tilde">～</span>
+                    <input type="time" name="Periods[@i].End" value="@Model.Periods[i].End" required />
+                    <button type="button" class="pp-del" title="删除这节">✕</button>
+                </div>
+            }
+        </div>
+
+        <div class="pp-actions">
+            <button type="button" class="btn secondary" id="ppAdd">@Html.Raw(Icons.Svg("plus", 16)) 加一节</button>
+            <span class="mini" id="ppCount">共 @Model.Periods.Count 节</span>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
+            <a class="btn secondary" href="/Courses">@Html.Raw(Icons.Svg("x", 16)) 返回</a>
+            <button class="btn secondary" type="submit" asp-page-handler="Reset" formnovalidate
+                    data-confirm="确认恢复默认">
+                恢复默认
+            </button>
+        </div>
+    </form>
+
+    <p class="hint" style="margin-top:12px;">
+        注意：节数改小后，排在靠后节次的已有课程不会显示在课表里（数据不丢，把节数改回去就能看到）。
+    </p>
+</div>
+
+<script>
+    (function () {
+        var rows = document.getElementById('ppRows');
+        if (!rows) return;
+        var addBtn = document.getElementById('ppAdd');
+        var countEl = document.getElementById('ppCount');
+
+        function reindex() {
+            Array.prototype.forEach.call(rows.querySelectorAll('.pp-row'), function (row, i) {
+                row.querySelector('.pp-no').textContent = '第 ' + (i + 1) + ' 节';
+                row.querySelectorAll('input').forEach(function (inp) {
+                    inp.name = 'Periods[' + i + '].' + (inp.type === 'time' && inp === row.querySelectorAll('input')[0] ? 'Start' : 'End');
+                });
+            });
+            var n = rows.querySelectorAll('.pp-row').length;
+            if (countEl) countEl.textContent = '共 ' + n + ' 节';
+        }
+
+        rows.addEventListener('click', function (e) {
+            var del = e.target.closest('.pp-del');
+            if (!del) return;
+            if (rows.querySelectorAll('.pp-row').length <= 1) return;   // 至少保留 1 节
+            del.closest('.pp-row').remove();
+            reindex();
+        });
+
+        if (addBtn) addBtn.addEventListener('click', function () {
+            var n = rows.querySelectorAll('.pp-row').length;
+            if (n >= 16) return;
+            var div = document.createElement('div');
+            div.className = 'pp-row';
+            div.innerHTML = '<span class="pp-no"></span>' +
+                '<input type="time" required /><span class="pp-tilde">～</span>' +
+                '<input type="time" required /><button type="button" class="pp-del" title="删除这节">✕</button>';
+            rows.appendChild(div);
+            reindex();
+        });
+    })();
+</script>

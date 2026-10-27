@@ -1,0 +1,143 @@
+@page
+@model CheckinApp.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = "用户管理";
+}
+<div class="card">
+    <div class="page-head">
+        <h2>用户管理</h2>
+        <span style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a class="btn secondary" href="/Admin/Invitations">@Html.Raw(Icons.Svg("ticket", 16)) 邀请码</a>
+            <a class="btn" href="/Admin/Users/New">@Html.Raw(Icons.Svg("plus", 16)) 新建用户</a>
+        </span>
+    </div>
+    @if (TempData["Ok"] is string ok)
+    {
+        <div class="msg ok" style="margin-top:12px;">@ok</div>
+    }
+    @if (Model.Error is string err)
+    {
+        <div class="msg error sticky" style="margin-top:12px;">@err</div>
+    }
+</div>
+
+<div class="card scroll-x" style="padding:0;">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>用户名</th>
+                <th>显示名</th>
+                <th>角色</th>
+                <th>状态</th>
+                <th>创建于</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var u in Model.Users)
+        {
+            <tr>
+                <td style="font-weight:600;">@u.Username@(u.IsSelf ? "（你）" : "")</td>
+                <td>@u.DisplayName</td>
+                <td><span class="chip">@u.RoleName</span></td>
+                <td style="color:@(u.IsActive ? "var(--ok)" : "var(--text-weak)");">@(u.IsActive ? "启用" : "停用")</td>
+                <td class="meta">@CheckinApp.Services.SiteClock.ToLocal(u.CreatedAt).ToString("yyyy-MM-dd")</td>
+                <td style="white-space:nowrap;">
+                    <a href="/Admin/Users/Edit/@u.Id" style="margin-right:8px;">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                    <a href="/Admin/Users/Reset/@u.Id" style="margin-right:8px;">重置密码</a>
+                    @if (!u.IsSelf)
+                    {
+                        <button class="link-danger" type="button"
+                                data-del-id="@u.Id"
+                                data-del-user="@u.Username"
+                                data-del-name="@u.DisplayName">删除</button>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@* 删除确认：先等 5 秒才允许点「确认删除」，防手滑；真正的校验在服务端 *@
+<dialog class="app-modal" id="delUserModal" aria-labelledby="delUserTitle">
+    <header class="modal-head">
+        <h2 class="modal-title" id="delUserTitle">删除用户</h2>
+        <button type="button" class="modal-close" aria-label="关闭"
+                onclick="document.getElementById('delUserModal').close()">@Html.Raw(Icons.Svg("x", 18))</button>
+    </header>
+    <div class="modal-body">
+        <p class="hint" style="margin-top:0;">
+            即将删除 <strong id="delUserLabel">—</strong>。
+            该账号的日程、备忘、打卡、账目、邮件缓存等数据会一起删除，<strong>无法恢复</strong>。
+        </p>
+        <p class="hint" id="delWait">
+            为避免手滑，请等待 <strong id="delSec">5</strong> 秒后再确认。
+        </p>
+        <form method="post" asp-page-handler="Delete" id="delUserForm">
+            <input type="hidden" name="id" id="delUserId" value="0" />
+            <div class="form-actions">
+                <button class="btn danger" type="submit" id="delConfirmBtn" disabled>确认删除（5）</button>
+                <button class="btn secondary" type="button"
+                        onclick="document.getElementById('delUserModal').close()">取消</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<script>
+(function () {
+    var modal = document.getElementById('delUserModal');
+    if (!modal) return;
+    var idInput = document.getElementById('delUserId');
+    var label = document.getElementById('delUserLabel');
+    var confirmBtn = document.getElementById('delConfirmBtn');
+    var secEl = document.getElementById('delSec');
+    var waitLine = document.getElementById('delWait');
+    var timer = null;
+
+    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-del-id]');
+        if (!btn) return;
+        e.preventDefault();
+
+        var user = btn.getAttribute('data-del-user');
+        var name = btn.getAttribute('data-del-name') || '';
+        idInput.value = btn.getAttribute('data-del-id');
+        label.textContent = name && name !== user ? user + '（' + name + '）' : user;
+
+        stop();
+        waitLine.hidden = false;
+        var left = 5;
+        secEl.textContent = left;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = '确认删除（' + left + '）';
+
+        timer = setInterval(function () {
+            left--;
+            if (left <= 0) {
+                stop();
+                waitLine.hidden = true;
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '确认删除';
+            } else {
+                secEl.textContent = left;
+                confirmBtn.textContent = '确认删除（' + left + '）';
+            }
+        }, 1000);
+
+        modal.showModal();
+    });
+
+    // 关窗（取消 / Esc / 点确认后）一律清掉倒计时，下次打开重新计 5 秒
+    modal.addEventListener('close', function () {
+        stop();
+        confirmBtn.disabled = true;
+        waitLine.hidden = false;
+        secEl.textContent = 5;
+        confirmBtn.textContent = '确认删除（5）';
+    });
+})();
+</script>

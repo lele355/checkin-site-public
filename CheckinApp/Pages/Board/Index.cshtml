@@ -1,0 +1,53 @@
+@page
+@model CheckinApp.Pages.Board.IndexModel
+@inject CheckinApp.Services.CurrentUser Me
+@{
+    ViewData["Title"] = "留言板";
+}
+<div class="card">
+    <div class="page-head">
+        <h2>留言板</h2>
+    </div>
+    <p class="hint" style="margin-top:6px;">小圈子的公共留言板，大家都看得到。</p>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post" class="inline-form">
+        <input asp-for="Body" placeholder="说点什么…" autocomplete="off" />
+        <button class="btn" type="submit">发布</button>
+    </form>
+</div>
+
+@if (Model.Messages.Count == 0)
+{
+    <div class="card"><div class="empty"><span class="big">🗨️</span>还没有留言</div></div>
+}
+else
+{
+    <div class="card">
+        <div class="stack">
+            @foreach (var m in Model.Messages)
+            {
+                <div class="row-item" style="display:flex;align-items:flex-start;gap:10px;">
+                    <div style="flex-shrink:0;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--accent-strong);">
+                        @(string.IsNullOrEmpty(m.User?.DisplayName) ? "?" : m.User!.DisplayName.Substring(0, 1))
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="mini">@m.User?.DisplayName · @CheckinApp.Services.SiteClock.ToLocal(m.CreatedAt).ToString("M月d日 HH:mm")</div>
+                        <div style="white-space:pre-wrap;margin-top:2px;">@m.Content</div>
+                    </div>
+                    @if (m.UserId == Me.UserId)
+                    {
+                        <form method="post" asp-page-handler="Delete">
+                            <input type="hidden" name="id" value="@m.Id" />
+                            <button class="mini" type="submit" style="border:none;background:none;cursor:pointer;color:var(--text-muted);">删除</button>
+                        </form>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}

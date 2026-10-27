@@ -1,0 +1,105 @@
+@page
+@model CheckinApp.Pages.Period.IndexModel
+@{
+    ViewData["Title"] = "经期助手";
+}
+<div class="card">
+    <div class="page-head">
+        <h2>经期助手</h2>
+    </div>
+    <p class="hint" style="margin-top:6px;">只有你自己看得到的数据。记录越全，预测越准。</p>
+
+    @if (Model.Records.Count > 0)
+    {
+        <div class="stat-row">
+            <div class="stat-box">
+                <div class="mini">平均周期</div>
+                <div class="stat-num">@Model.AvgCycle <span class="mini">天</span></div>
+            </div>
+            <div class="stat-box">
+                <div class="mini">平均经期</div>
+                <div class="stat-num">@Model.AvgDuration <span class="mini">天</span></div>
+            </div>
+            <div class="stat-box">
+                <div class="mini">预计下次</div>
+                @if (Model.NextPredicted is DateTime np)
+                {
+                    <div class="stat-num" style="font-size:16px;">
+                        @np.ToString("M月d日")
+                        @if (Model.DaysToNext >= 0)
+                        {
+                            <span class="mini">（还有 @Model.DaysToNext 天）</span>
+                        }
+                        else
+                        {
+                            <span class="mini">（已推迟 @(-Model.DaysToNext) 天）</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+        @if (!Model.HasEnoughData)
+        {
+            <p class="mini" style="margin-top:8px;">记录满两次后才会显示周期预测。</p>
+        }
+    }
+</div>
+
+<div class="card">
+    <h2>记录一次</h2>
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+    <form method="post" asp-page-handler="Add" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;">
+        <div class="field" style="margin:0;">
+            <label>开始日期</label>
+            <input asp-for="NewStartDate" type="date" required />
+        </div>
+        <div class="field" style="margin:0;">
+            <label>结束日期（可后补）</label>
+            <input asp-for="NewEndDate" type="date" />
+        </div>
+        <div class="field" style="margin:0;flex:1;min-width:140px;">
+            <label>备注</label>
+            <input asp-for="NewNote" autocomplete="off" placeholder="可留空" />
+        </div>
+        <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
+    </form>
+</div>
+
+@if (Model.Records.Count == 0)
+{
+    <div class="card"><div class="empty"><span class="big">🌸</span>还没有记录</div></div>
+}
+else
+{
+    <div class="card">
+        <div class="group-head">历史记录</div>
+        <div class="stack">
+            @foreach (var r in Model.Records)
+            {
+                <div class="row-item" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:180px;">
+                        <div style="font-weight:600;">
+                            @r.StartDate.ToString("yyyy年M月d日")
+                            @if (r.EndDate is DateTime e)
+                            {
+                                <span class="mini">→ @e.ToString("M月d日")（@((e.Date - r.StartDate.Date).Days + 1) 天）</span>
+                            }
+                            else
+                            {
+                                <span class="chip">进行中</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(r.Note))
+                        {
+                            <div class="mini">@r.Note</div>
+                        }
+                    </div>
+                    <a class="mini" href="/Period/Edit/@r.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                </div>
+            }
+        </div>
+    </div>
+}

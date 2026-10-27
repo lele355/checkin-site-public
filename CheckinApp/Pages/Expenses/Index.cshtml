@@ -1,0 +1,114 @@
+@page
+@model CheckinApp.Pages.Expenses.IndexModel
+@{
+    ViewData["Title"] = "记账";
+    var prev = Model.Month.AddMonths(-1).ToString("yyyy-MM");
+    var next = Model.Month.AddMonths(1).ToString("yyyy-MM");
+    var v = Model.View;
+}
+<div class="card">
+    <div class="page-head">
+        <h2>
+            <a href="?m=@prev&view=@v" class="mini" style="text-decoration:none;">←</a>
+            @Model.Month.ToString("yyyy年M月")
+            <a href="?m=@next&view=@v" class="mini" style="text-decoration:none;">→</a>
+        </h2>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <div class="view-switch" data-viewkey="expenses">
+                <button type="button" class="vs-btn@(v == "list" ? " on" : "")" data-view="list" title="明细视图">@Html.Raw(Icons.Svg("list", 15))<span>明细</span></button>
+                <button type="button" class="vs-btn@(v == "month" ? " on" : "")" data-view="month" title="月度汇总">@Html.Raw(Icons.Svg("grid", 15))<span>月度</span></button>
+            </div>
+            <a class="btn" href="/Expenses/New">@Html.Raw(Icons.Svg("plus", 16)) 记一笔</a>
+        </div>
+    </div>
+
+    <div class="stat-row">
+        <div class="stat-box">
+            <div class="mini">支出</div>
+            <div class="stat-num" style="color:#e24b4a;">¥@Model.TotalOut.ToString("0.##")</div>
+        </div>
+        <div class="stat-box">
+            <div class="mini">收入</div>
+            <div class="stat-num" style="color:#639922;">¥@Model.TotalIn.ToString("0.##")</div>
+        </div>
+        <div class="stat-box">
+            <div class="mini">结余</div>
+            <div class="stat-num">¥@((Model.TotalIn - Model.TotalOut).ToString("0.##"))</div>
+        </div>
+    </div>
+
+    @if (v == "list" && Model.ByCategory.Count > 0)
+    {
+        <div style="margin-top:12px;">
+            <div class="bar-caption">支出分类</div>
+            <div class="bar-list">
+            @foreach (var (cat, sum) in Model.ByCategory)
+            {
+                var pct = Model.TotalOut == 0 ? 0 : (int)Math.Round((double)(sum / Model.TotalOut) * 100);
+                <div class="bar-row">
+                    <div class="bar-head">
+                        <span class="bar-label">@cat</span><span class="bar-val">¥@sum.ToString("0.##")（@pct%）</span>
+                    </div>
+                    <div class="bar-track"><div class="bar-fill" style="width:@pct%;"></div></div>
+                </div>
+            }
+            </div>
+        </div>
+    }
+</div>
+
+@if (v == "month")
+{
+    var max = Model.MonthRows.Count == 0 ? 0m : Model.MonthRows.Max(r => Math.Max(r.TotalIn, r.TotalOut));
+    <div class="card">
+        <div class="group-head">近 12 个月收支</div>
+        @if (max == 0)
+        {
+            <div class="empty"><span class="big">📊</span>近 12 个月还没有账目。</div>
+        }
+        else
+        {
+            @foreach (var r in Model.MonthRows)
+            {
+                var outPct = (int)Math.Round((double)(r.TotalOut / max) * 100);
+                var inPct = (int)Math.Round((double)(r.TotalIn / max) * 100);
+                <a class="month-row" href="?m=@r.Month.ToString("yyyy-MM")&view=list" title="查看 @r.Month.ToString("yyyy年M月") 明细">
+                    <div class="mr-name">@r.Month.ToString("yyyy年M月")</div>
+                    <div class="mr-bar">
+                        <div class="mr-out" style="width:@(outPct / 2)%;"></div>
+                        <div class="mr-in" style="width:@(inPct / 2)%;"></div>
+                    </div>
+                    <div class="mr-sum">
+                        <span style="color:#e24b4a;">-¥@r.TotalOut.ToString("0.##")</span>
+                        <span style="color:#639922;">+¥@r.TotalIn.ToString("0.##")</span>
+                    </div>
+                </a>
+            }
+        }
+    </div>
+}
+else if (Model.Items.Count == 0)
+{
+    <div class="card"><div class="empty"><span class="big">💰</span>本月还没有账目</div></div>
+}
+else
+{
+    <div class="card">
+        <div class="stack">
+            @foreach (var x in Model.Items)
+            {
+                <div class="row-item" style="display:flex;align-items:center;gap:12px;">
+                    <div class="chip" style="flex-shrink:0;">@x.Category</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;">@(string.IsNullOrWhiteSpace(x.Note) ? x.Category : x.Note)</div>
+                        <div class="mini">@x.OccurDate.ToString("M月d日")</div>
+                    </div>
+                    <div style="font-weight:700;color:@(x.Type == "out" ? "#e24b4a" : "#639922");">
+                        @(x.Type == "out" ? "-" : "+")¥@x.Amount.ToString("0.##")
+                    </div>
+                    <a class="mini" href="/Expenses/Edit/@x.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                </div>
+            }
+        </div>
+    </div>
+}

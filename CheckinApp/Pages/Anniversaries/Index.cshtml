@@ -1,0 +1,110 @@
+@page
+@model CheckinApp.Pages.Anniversaries.IndexModel
+@{
+    ViewData["Title"] = "纪念日";
+}
+<div class="card">
+    <div class="page-head">
+        <h2>纪念日</h2>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <div class="view-switch" data-viewkey="anniversaries">
+                <button type="button" class="vs-btn@(Model.View == "list" ? " on" : "")" data-view="list" title="列表视图">@Html.Raw(Icons.Svg("list", 15))<span>列表</span></button>
+                <button type="button" class="vs-btn@(Model.View == "cards" ? " on" : "")" data-view="cards" title="倒计时卡片">@Html.Raw(Icons.Svg("grid", 15))<span>卡片</span></button>
+            </div>
+            <a class="btn" href="/Anniversaries/New">@Html.Raw(Icons.Svg("plus", 16)) 新建纪念日</a>
+        </div>
+    </div>
+    <p class="hint" style="margin-top:8px;">值得记住的日子，勾选「每年重复」就会循环倒计时。</p>
+</div>
+
+@if (Model.Upcoming.Count == 0 && Model.Past.Count == 0)
+{
+    <div class="card"><div class="empty"><span class="big">💛</span>还没有纪念日</div></div>
+}
+else if (Model.View == "cards")
+{
+    <div class="anni-cards">
+        @foreach (var row in Model.Upcoming)
+        {
+            <a class="card anni-card@(row.DaysLeft == 0 ? " is-today" : "")" href="/Anniversaries/Edit/@row.Item.Id">
+                @if (row.DaysLeft == 0)
+                {
+                    <div class="ac-days">🎉</div>
+                    <div class="ac-unit">就是今天！</div>
+                }
+                else
+                {
+                    <div class="ac-days">@row.DaysLeft<span class="ac-unit"> 天</span></div>
+                    <div class="ac-unit">倒计时</div>
+                }
+                <div class="ac-title">@row.Item.Title</div>
+                <div class="mini">@row.Item.Date.ToString("yyyy年M月d日")@(row.Item.RepeatYearly ? " · 每年" : "")</div>
+            </a>
+        }
+        @foreach (var row in Model.Past)
+        {
+            <a class="card anni-card" href="/Anniversaries/Edit/@row.Item.Id" style="opacity:.72;">
+                <div class="ac-days" style="color:var(--muted);">@(-row.DaysLeft)<span class="ac-unit"> 天前</span></div>
+                <div class="ac-title">@row.Item.Title</div>
+                <div class="mini">@row.Item.Date.ToString("yyyy年M月d日")</div>
+            </a>
+        }
+    </div>
+}
+else
+{
+    @if (Model.Upcoming.Count > 0)
+    {
+        <div class="card">
+            <div class="group-head">即将到来</div>
+            <div class="stack">
+                @foreach (var row in Model.Upcoming)
+                {
+                    <div class="row-item" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:160px;">
+                            <div style="font-weight:600;">
+                                @row.Item.Title
+                                @if (row.Item.RepeatYearly)
+                                {
+                                    <span class="chip">每年</span>
+                                }
+                            </div>
+                            <div class="mini">@row.Item.Date.ToString("yyyy年M月d日")@(string.IsNullOrWhiteSpace(row.Item.Note) ? "" : " · " + row.Item.Note)</div>
+                        </div>
+                        <div style="text-align:right;">
+                            @if (row.DaysLeft == 0)
+                            {
+                                <div style="font-weight:700;color:var(--accent-strong);">就是今天！</div>
+                            }
+                            else
+                            {
+                                <div class="mini">还有</div>
+                                <div style="font-weight:700;font-size:20px;color:var(--accent-strong);">@row.DaysLeft <span class="mini">天</span></div>
+                            }
+                        </div>
+                        <a class="mini" href="/Anniversaries/Edit/@row.Item.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    @if (Model.Past.Count > 0)
+    {
+        <div class="card">
+            <div class="group-head">已过去</div>
+            <div class="stack">
+                @foreach (var row in Model.Past)
+                {
+                    <div class="row-item" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:160px;">
+                            <div style="font-weight:600;">@row.Item.Title</div>
+                            <div class="mini">@row.Item.Date.ToString("yyyy年M月d日")</div>
+                        </div>
+                        <div class="mini">已过 @(-row.DaysLeft) 天</div>
+                        <a class="mini" href="/Anniversaries/Edit/@row.Item.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}

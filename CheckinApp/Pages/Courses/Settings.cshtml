@@ -1,0 +1,76 @@
+@page
+@model CheckinApp.Pages.Courses.SettingsModel
+@{
+    ViewData["Title"] = "课表设置";
+}
+
+<div class="card" style="max-width:560px;margin:2vh auto 0;">
+    <div class="page-head">
+        <h2>课表设置</h2>
+        <div class="head-actions">
+            <a class="btn secondary" href="/Courses">@Html.Raw(Icons.Svg("arrow-left", 16)) 返回课表</a>
+        </div>
+    </div>
+    <p class="hint" style="margin-top:6px;">
+        学期起始日决定「第几周」怎么算；节次决定左侧那列的节数与上下课时间。
+        这些不常改，所以从课表页收进来了。
+    </p>
+
+    @if (Model.Saved)
+    {
+        <div class="msg ok">已保存。</div>
+    }
+
+    <div class="cs-block">
+        <div class="cs-block-head">
+            <b>学期起始日</b>
+            <span class="mini">开学第一周任意一天，会自动对齐到那周的周一</span>
+        </div>
+        <form method="post" asp-page-handler="Semester" class="cs-inline">
+            <input type="date" asp-for="SemesterStartInput" />
+            <button class="btn" type="submit">保存</button>
+        </form>
+        <p class="mini" style="margin-top:6px;">
+            @if (Model.SemesterConfigured)
+            {
+                <text>当前：@Model.SemesterStart.ToString("yyyy年M月d日")（周一）· 今天在第 @Model.CurrentWeek 周</text>
+            }
+            else
+            {
+                <text>还没设置过（上面预填的是本周一）；保存后才会按它算周次。</text>
+            }
+        </p>
+    </div>
+
+    <div class="cs-block">
+        <div class="cs-block-head">
+            <b>非本周的课</b>
+            <span class="mini">有些课只是排在这学期、这周不上</span>
+        </div>
+        <form method="post" asp-page-handler="ToggleOffWeek" class="cs-inline">
+            <input type="hidden" name="show" value="@(Model.ShowOffWeek ? "0" : "1")" />
+            <button class="tt-opt-toggle @(Model.ShowOffWeek ? "on" : "")" type="submit"
+                    aria-pressed="@(Model.ShowOffWeek ? "true" : "false")">
+                <span class="tt-opt-dot" aria-hidden="true"></span>
+                @(Model.ShowOffWeek ? "显示（淡色虚线）" : "不显示")
+            </button>
+            <span class="mini">@(Model.ShowOffWeek ? "这周不上的课会淡画出来，方便对整学期" : "只看这周真正要上的课")</span>
+        </form>
+    </div>
+
+    <div class="cs-block">
+        <div class="cs-block-head">
+            <b>学期</b>
+            <span class="mini">当前：@Model.SemesterName</span>
+        </div>
+        <a class="btn secondary" href="/Courses/Semesters">@Html.Raw(Icons.Svg("grid", 16)) 管理学期（切换 / 新建 / 删除）</a>
+    </div>
+
+    <div class="cs-block">
+        <div class="cs-block-head">
+            <b>节次与时间</b>
+            <span class="mini">当前 @Model.PeriodCount 节</span>
+        </div>
+        <a class="btn secondary" href="/Courses/Periods">@Html.Raw(Icons.Svg("settings-2", 16)) 编辑节次时间</a>
+    </div>
+</div>

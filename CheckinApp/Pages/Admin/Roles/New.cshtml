@@ -1,0 +1,29 @@
+@page
+@model CheckinApp.Pages.Admin.Roles.NewModel
+@{
+    ViewData["Title"] = "新建角色";
+}
+<div class="card" style="max-width:480px;margin:4vh auto 0;">
+    <h2>新建角色</h2>
+    <p class="hint">先起名，建好后到编辑页勾选它拥有哪些权限。</p>
+
+    @if (Model.Error is string err)
+    {
+        <div class="msg error">@err</div>
+    }
+
+    <form method="post">
+        <div class="field">
+            <label>角色名</label>
+            <input asp-for="Name" required autocomplete="off" />
+        </div>
+        <div class="field">
+            <label>说明（可选）</label>
+            <input asp-for="Description" autocomplete="off" />
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">创建</button>
+            <a class="btn secondary" href="/Admin/Roles">@Html.Raw(Icons.Svg("x", 16)) 取消</a>
+        </div>
+    </form>
+</div>
