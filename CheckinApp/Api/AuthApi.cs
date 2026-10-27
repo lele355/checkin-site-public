@@ -156,6 +156,24 @@ public static class AuthApi
             return ApiKit.Ok(new { user = ApiDtos.Me(db, id) });
         });
 
+        // ---------- 完整更新日志（App 内「设置 → 更新日志」） ----------
+        // 数据来自 appsettings.json 的 App:Changelog（每版一条），不用改代码，
+        // 以后发版只要往那个数组里补一条即可。
+        g.MapGet("/app/changelog", (IConfiguration cfg) =>
+        {
+            var items = cfg.GetSection("App:Changelog").GetChildren()
+                .Select(c => new
+                {
+                    version = c["version"] ?? "",
+                    versionCode = int.TryParse(c["versionCode"], out var vc) ? vc : 0,
+                    date = c["date"] ?? "",
+                    notes = c["notes"] ?? "",
+                })
+                .Where(x => x.version.Length > 0)
+                .ToList();
+            return ApiKit.Ok(new { items });
+        }).AllowAnonymous();   // 更新日志公开可读（未登录也能看，和 /app/version 一致）
+
         // ---------- 版本信息（App 内「检查更新」用） ----------
         g.MapGet("/app/version", (IConfiguration cfg) =>
         {
