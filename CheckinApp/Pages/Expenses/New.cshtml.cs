@@ -20,7 +20,8 @@ public class NewModel(AppDbContext db, CurrentUser me) : PageModel
     [BindProperty] public string Note { get; set; } = "";
     public string? Error { get; private set; }
 
-    public readonly string[] Categories = ["餐饮", "交通", "学习", "娱乐", "日用", "医疗", "其他"];
+    /// <summary>分类下拉项 = 用户在 App「管理分类」里配的那份列表（没配过就是内置 7 个）</summary>
+    public List<string> Categories => _me.ExpenseCategories;
 
     public void OnGet() { }
 

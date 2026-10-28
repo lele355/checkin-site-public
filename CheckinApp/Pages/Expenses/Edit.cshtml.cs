@@ -21,7 +21,20 @@ public class EditModel(AppDbContext db, CurrentUser me) : PageModel
     [BindProperty] public string Note { get; set; } = "";
     public string? Error { get; private set; }
 
-    public readonly string[] Categories = ["餐饮", "交通", "学习", "娱乐", "日用", "医疗", "其他"];
+    /// <summary>
+    /// 分类下拉项 = 用户在 App 里配的分类（没配过就是内置 7 个），
+    /// 外加「这一笔原本用的分类」—— 分类被删掉之后老账还在，不补进去的话
+    /// 打开编辑页会静默把分类改成列表第一项，等于把历史数据改坏了。
+    /// </summary>
+    public List<string> Categories
+    {
+        get
+        {
+            var list = _me.ExpenseCategories;
+            if (!string.IsNullOrWhiteSpace(Category) && !list.Contains(Category)) list.Add(Category);
+            return list;
+        }
+    }
 
     public IActionResult OnGet(int id)
     {

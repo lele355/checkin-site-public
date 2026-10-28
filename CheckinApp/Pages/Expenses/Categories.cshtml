@@ -1,0 +1,68 @@
+@page
+@model CheckinApp.Pages.Expenses.CategoriesModel
+@using CheckinApp.Services
+@{
+    ViewData["Title"] = "记账分类";
+    var count = Model.Categories.Count;
+}
+<div class="card">
+
+    <div class="page-head">
+        <h2>记账分类</h2>
+        <a class="btn secondary" href="/Expenses">@Html.Raw(Icons.Svg("chevron-left", 16)) 回到记账</a>
+    </div>
+    <p class="hint">
+        记一笔时能选的分类就是下面这些。点一个分类就把它删掉 —— 已有账目不受影响，
+        它们还挂在原来的名字下，只是新账不能再选它了。
+        同一份列表在 App 的「记账 → 管理分类」里也能改，两端同步。
+    </p>
+
+    @* 提示条会被 modal.js 转成浮动 Toast（.msg 元素随即从文档里移除），
+       所以这里只负责输出内容，视觉上看到的是右上角那条提示。 *@
+    @if (!string.IsNullOrEmpty(Model.Ok))
+    {
+        <div class="msg ok">@Model.Ok</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Err))
+    {
+        <div class="msg error">@Model.Err</div>
+    }
+
+    <div class="field" style="margin-top:16px;">
+        <label>已有分类（@count 个，上限 @ExpenseCategoryCatalog.MaxCount）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+            @foreach (var c in Model.Categories)
+            {
+                @* 每个分类一个独立表单：删除是不可逆动作，必须单独 POST，
+                   外层不能再套 form（HTML 不允许嵌套 form）。 *@
+                <form method="post" asp-page-handler="Delete"
+                      data-confirm="删除「@c」？已有账目不受影响，只是新账不能再选它。"
+                      style="margin:0;">
+                    <input type="hidden" name="name" value="@c" />
+                    <button class="btn secondary" type="submit" title="点击删除这个分类"
+                            style="padding:7px 12px;font-size:.85rem;">
+                        @c @Html.Raw(Icons.Svg("x", 12))
+                    </button>
+                </form>
+            }
+        </div>
+    </div>
+
+    <form method="post" asp-page-handler="Add" style="margin-top:18px;">
+        <div class="field">
+            <label>新增分类</label>
+            <input name="NewName" maxlength="@ExpenseCategoryCatalog.MaxLen" autocomplete="off"
+                   placeholder="如：宠物、房租、奶茶（最多 @ExpenseCategoryCatalog.MaxLen 个字）" />
+        </div>
+        <div class="form-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("plus", 16)) 添加</button>
+        </div>
+    </form>
+
+    <form method="post" asp-page-handler="Reset" data-confirm="恢复成内置的那 7 个分类？自己加的分类会没了。"
+          style="margin-top:6px;">
+        <div class="form-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn secondary" type="submit">@Html.Raw(Icons.Svg("rotate-ccw", 16)) 恢复默认</button>
+        </div>
+    </form>
+</div>

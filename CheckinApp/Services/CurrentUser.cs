@@ -138,6 +138,19 @@ public class CurrentUser(IHttpContextAccessor accessor, AppDbContext db)
         }
     }
 
+    /// <summary>
+    /// 记账分类（用户自定义；没自定义过 = 内置默认那 7 个）。
+    /// 网页端的新建/编辑记账表单用它渲染下拉，与 App 用的是同一份数据。
+    /// </summary>
+    public List<string> ExpenseCategories
+    {
+        get
+        {
+            EnsureUser();
+            return ExpenseCategoryCatalog.Load(_user?.ExpenseCategories);
+        }
+    }
+
     private void EnsureUser()
     {
         if (_user is not null || !IsAuthenticated) return;

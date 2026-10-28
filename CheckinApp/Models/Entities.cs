@@ -40,6 +40,12 @@ public class User
     /// 只存「藏了哪些」，不存全量顺序 —— 以后新增模块不用改用户数据，默认就是显示。
     /// </summary>
     public string NavHidden { get; set; } = "";
+    /// <summary>
+    /// 记账分类（JSON 数组，如 ["餐饮","交通","宠物"]）。空 = 用内置默认那 7 个。
+    /// 存**全量列表**而不是「改了哪些」：用户删掉的分类不该下次又被自动加回来。
+    /// 写入前统一走 ExpenseCategoryCatalog.Normalize（去重 / 限长 / 限量）。
+    /// </summary>
+    public string ExpenseCategories { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
 }

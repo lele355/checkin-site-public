@@ -11,6 +11,8 @@ public static class LifeApi
 {
     public record HabitReq(string? Name, string? Icon);
     public record ExpenseReq(decimal Amount, string? Type, string? Category, string? OccurDate, string? Note);
+    /// <summary>记账自定义分类（全量列表；服务端会 Normalize 去重限长限量）</summary>
+    public record CategoryReq(List<string>? Categories);
     public record CourseReq(string? Name, string? Teacher, string? Location, int Weekday,
                             int StartPeriod, int EndPeriod, string? WeeksText, string? Category,
                             string? Color);
@@ -117,6 +119,33 @@ public static class LifeApi
         // ==================== 记账 ====================
         var ex = g.MapGroup("/expenses").RequireAuthorization("perm:expense.use");
 
+        // ---------- 分类（自定义分类，2026-10-28 加） ----------
+        // 挂在 /expenses 下面而不是 /me/prefs：分类是记账的领域数据，
+        // 权限也跟记账一致，独立成端点后 App 不必为了改分类去动整份偏好。
+        ex.MapGet("/categories", (AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var raw = db.Users.Where(u => u.Id == uid).Select(u => u.ExpenseCategories).FirstOrDefault();
+            return ApiKit.Ok(new
+            {
+                categories = ExpenseCategoryCatalog.Load(raw),
+                defaults = ExpenseCategoryCatalog.Defaults,
+                maxCount = ExpenseCategoryCatalog.MaxCount,
+                maxLen = ExpenseCategoryCatalog.MaxLen,
+            });
+        });
+
+        ex.MapPut("/categories", (CategoryReq req, AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var user = db.Users.FirstOrDefault(u => u.Id == uid)
+                       ?? throw new ApiBadRequest("账号不存在");
+            var list = ExpenseCategoryCatalog.Normalize(req.Categories);
+            user.ExpenseCategories = ExpenseCategoryCatalog.Store(list);
+            db.SaveChanges();
+            return ApiKit.Ok(new { categories = list });
+        });
+
         ex.MapGet("", (AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
@@ -169,6 +198,10 @@ public static class LifeApi
             {
                 month = month.ToString("yyyy-MM"),
                 items,
+                // 顺手带上分类：记账页一打开就要渲染分类选择器，
+                // 再让 App 多打一个 /expenses/categories 是白等一个来回。
+                categories = ExpenseCategoryCatalog.Load(
+                    db.Users.Where(u => u.Id == uid).Select(u => u.ExpenseCategories).FirstOrDefault()),
                 summary = new
                 {
                     totalOut = rows.Where(x => x.Type == "out").Sum(x => x.Amount),
