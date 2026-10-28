@@ -1,6 +1,6 @@
 # 日常管理 · 网页端
 
-个人生活管理站点（打卡 / 日程 / 备忘 / 课表 / 记账 / 纪念日 / 统计 / 邮件 / AI 助手）。
+个人生活管理站点（工作台 / 日程 / 备忘 / 打卡 / 课表 / 记账 / 纪念日 / 经期 / 情侣 / 留言 / 统计 / 提醒 / 邮件 / AI 助手 / 导出）。
 邀请制，上限 10 人，不做公网注册。
 
 技术栈：ASP.NET Core 10 · Razor Pages · EF Core + SQLite · 原生 JS/CSS（无构建步骤）。
@@ -45,7 +45,7 @@ dotnet run --urls http://localhost:5188
 | `CheckinApp/Security/` | 权限目录、认证、限流 |
 | `CheckinApp/Models/` | EF 实体 + API DTO |
 | `CheckinApp/wwwroot/css/` | `tokens.css`（设计令牌）→ `site.css`（布局组件）→ `themes.css`（主题差异） |
-| `CheckinApp/wwwroot/js/` | `theme` / `site` / `datepicker` / `modal` / `calendar` / `dashboard` |
+| `CheckinApp/wwwroot/js/` | `theme` / `site` / `app-shell` / `datepicker` / `modal` / `calendar` / `dashboard` |
 | `docs/` | 历史截图与调研报告（过程资料） |
 | `qa/` | 专项回归脚本（Playwright） |
 
