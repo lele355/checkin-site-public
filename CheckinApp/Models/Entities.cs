@@ -46,6 +46,14 @@ public class User
     /// 写入前统一走 ExpenseCategoryCatalog.Normalize（去重 / 限长 / 限量）。
     /// </summary>
     public string ExpenseCategories { get; set; } = "";
+
+    /// <summary>
+    /// 小游戏的默认设置（JSON 对象，见 Services/GameSettingsCatalog.cs）。空 = 全部默认。
+    /// 只影响**自己新建的房间**：盘面大小、规则、限时这些一开局就快照进 GameRoom，
+    /// 已开打的房间不会因为你改设置而中途变形。
+    /// </summary>
+    public string GameSettings { get; set; } = "";
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
 }
@@ -468,4 +476,79 @@ public class AiUsageDaily
     public long TotalTokens { get; set; }
     /// <summary>当天请求次数（含兜底重试）</summary>
     public int Requests { get; set; }
+}
+
+// ==================== 小游戏 ====================
+
+/// <summary>
+/// 对局房间 —— 目前只有五子棋（GameKey = "gomoku"），字段留了扩展位。
+///
+/// 为什么走「一行房间 + 走子 JSON」而不是「一手一行」：
+/// 五子棋一盘最多 225 手，整盘序列化也就几 KB；一行 = 一次读取拿到全量状态，
+/// 轮询接口不用 join、也不用分页。落子用 <see cref="Revision"/> 做条件更新防并发双落。
+/// </summary>
+public class GameRoom
+{
+    public int Id { get; set; }
+
+    /// <summary>房间码（6 位，去掉易混的 0/O/1/I）。口头报给朋友就能进</summary>
+    public required string Code { get; set; }
+
+    /// <summary>游戏类型：gomoku（将来可加别的，一套房间/轮询逻辑复用）</summary>
+    public string GameKey { get; set; } = "gomoku";
+
+    public int HostUserId { get; set; }
+    public User? Host { get; set; }
+    public int? GuestUserId { get; set; }
+    public User? Guest { get; set; }
+
+    /// <summary>房主执哪一方：1 = 黑（先手），2 = 白。对手方自动取另一方</summary>
+    public int HostSide { get; set; } = 1;
+
+    /// <summary>waiting（等人）/ playing（进行中）/ finished（终局，棋盘保留可复盘）</summary>
+    public string Status { get; set; } = "waiting";
+
+    /// <summary>轮到哪一方（1 黑 / 2 白）</summary>
+    public int Turn { get; set; } = 1;
+
+    /// <summary>走子序列 JSON：[{"x":7,"y":7,"s":1}, …]（x 列、y 行，从 0 开始；s 为落子方）</summary>
+    public string MovesJson { get; set; } = "";
+
+    /// <summary>0 = 未分胜负，1 = 黑胜，2 = 白胜，3 = 和棋</summary>
+    public int Winner { get; set; }
+
+    /// <summary>终局原因：five（五连）/ overline（黑方长连判负）/ timeout（超时）/ resign（认输）/ draw（棋盘满）</summary>
+    public string ResultReason { get; set; } = "";
+
+    // ---------------- 本局规则（建房时从房主的默认设置快照过来，两边看到的是同一套） ----------------
+
+    /// <summary>盘面大小：13 / 15 / 19</summary>
+    public int Size { get; set; } = 15;
+
+    /// <summary>黑方长连（六连以上）判负。false = 自由规则，长连也算赢</summary>
+    public bool Forbidden { get; set; }
+
+    /// <summary>单步限时（秒），0 = 不限</summary>
+    public int MoveTimeoutSec { get; set; }
+
+    /// <summary>每方总用时上限（秒），0 = 不限</summary>
+    public int TotalTimeoutSec { get; set; }
+
+    /// <summary>当前这一手从什么时候开始算（落子后重置）</summary>
+    public DateTime? TurnStartedAt { get; set; }
+
+    /// <summary>双方已用毫秒（暂停不扣，只在落子时结算）</summary>
+    public long HostUsedMs { get; set; }
+    public long GuestUsedMs { get; set; }
+
+    /// <summary>状态版本号：任何变化 +1。客户端拿它判断「这轮轮询要不要重绘」</summary>
+    public int Revision { get; set; }
+
+    /// <summary>最后在线时刻（每次轮询刷新）—— 用来显示「对手已离开」</summary>
+    public DateTime? HostSeenAt { get; set; }
+    public DateTime? GuestSeenAt { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? FinishedAt { get; set; }
 }

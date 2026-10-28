@@ -1,0 +1,156 @@
+@page
+@model CheckinApp.Pages.Games.SettingsModel
+@using CheckinApp.Ui
+@{
+    ViewData["Title"] = "小游戏设置";
+    var s = Model.Settings;
+
+    string SizeText(int n) => $"{n} × {n}";
+    string TimeText(int sec) => sec <= 0 ? "不限" : (sec < 60 ? $"{sec} 秒" : $"{sec / 60} 分钟");
+}
+
+<div class="card">
+    <div class="page-head">
+        <h2>小游戏设置</h2>
+        <a class="btn secondary" href="/Games">@Html.Raw(Icons.Svg("chevron-left", 16)) 回到大厅</a>
+    </div>
+    <p class="hint">
+        这里是<b>你新建对局时的默认值</b>：建房那一刻会快照进房间，双方共享同一套。
+        已经开打的局不会因为你改这里而中途变形。「落子确认 / 坐标 / 标记」只影响你自己的画面，
+        对手的显示不受影响。同一份设置在 App 的「小游戏 → 右上角设置」里也能改。
+    </p>
+
+    @if (!string.IsNullOrEmpty(Model.Ok))
+    {
+        <div class="msg ok">@Model.Ok</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Err))
+    {
+        <div class="msg error">@Model.Err</div>
+    }
+
+    <form method="post" asp-page-handler="Save">
+
+        @* 显式包 .field-row：site.js 会把「连续且短」的 .field 自动并成一行，
+           四个下拉并排会挤成一行 150px 的小格子，规则名直接被截断。 *@
+        <div class="group-head" style="margin-top:16px;">对局规则</div>
+
+        <div class="field-row">
+            <div class="field">
+                <label for="size">盘面大小</label>
+                <select id="size" name="size">
+                    @foreach (var n in CheckinApp.Pages.Games.SettingsModel.Sizes)
+                    {
+                        if (n == s.Size)
+                        {
+                            <option value="@n" selected>@SizeText(n)</option>
+                        }
+                        else
+                        {
+                            <option value="@n">@SizeText(n)</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="forbidden">规则</label>
+                <select id="forbidden" name="forbidden">
+                    @if (s.Forbidden)
+                    {
+                        <option value="0">自由规则 —— 长连也算赢</option>
+                        <option value="1" selected>标准规则 —— 黑方长连判负</option>
+                    }
+                    else
+                    {
+                        <option value="0" selected>自由规则 —— 长连也算赢</option>
+                        <option value="1">标准规则 —— 黑方长连判负</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label for="moveTimeoutSec">单步限时</label>
+                <select id="moveTimeoutSec" name="moveTimeoutSec">
+                    @foreach (var t in CheckinApp.Pages.Games.SettingsModel.MoveOptions)
+                    {
+                        if (t == s.MoveTimeoutSec)
+                        {
+                            <option value="@t" selected>@TimeText(t)</option>
+                        }
+                        else
+                        {
+                            <option value="@t">@TimeText(t)</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="totalTimeoutSec">每方总用时</label>
+                <select id="totalTimeoutSec" name="totalTimeoutSec">
+                    @foreach (var t in CheckinApp.Pages.Games.SettingsModel.TotalOptions)
+                    {
+                        if (t == s.TotalTimeoutSec)
+                        {
+                            <option value="@t" selected>@TimeText(t)</option>
+                        }
+                        else
+                        {
+                            <option value="@t">@TimeText(t)</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+        <p class="hint" style="margin:-10px 0 18px;">
+            单步限时：轮到你之后超时未落子 = 判负，别人思考时不计你的时间。
+            总用时：整局累计上限，用完判负。两项都选「不限」就没有时间压力。
+        </p>
+
+        <div class="group-head" style="margin-top:20px;">我的画面</div>
+
+        <div class="field">
+            <label>
+                <input type="checkbox" class="switch" name="tapConfirm" value="1" checked="@s.TapConfirm" />
+                落子二次确认
+            </label>
+            <span class="hint" style="margin:4px 0 0;">第一下点出预览圈，第二下才真正落子。手滑党建议开。</span>
+        </div>
+
+        <div class="field">
+            <label>
+                <input type="checkbox" class="switch" name="showCoord" value="1" checked="@s.ShowCoord" />
+                显示坐标
+            </label>
+            <span class="hint" style="margin:4px 0 0;">棋盘两侧标出 A…O / 1…15，方便口头报点。</span>
+        </div>
+
+        <div class="field">
+            <label>
+                <input type="checkbox" class="switch" name="lastMark" value="1" checked="@s.LastMark" />
+                标记最后一手
+            </label>
+            <span class="hint" style="margin:4px 0 0;">在最后一颗棋子的中心点一个小圆点。</span>
+        </div>
+
+        <div class="field">
+            <label>
+                <input type="checkbox" class="switch" name="vibrate" value="1" checked="@s.Vibrate" />
+                落子震动
+            </label>
+            <span class="hint" style="margin:4px 0 0;">仅 App 生效；网页没有震动接口。</span>
+        </div>
+
+        <div class="form-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+            <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存设置</button>
+        </div>
+    </form>
+
+    <form method="post" asp-page-handler="Reset" data-confirm="恢复成默认设置？盘面回到 15×15、自由规则、不限时。"
+          style="margin-top:8px;">
+        <div class="form-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn secondary" type="submit">@Html.Raw(Icons.Svg("rotate-ccw", 16)) 恢复默认</button>
+        </div>
+    </form>
+</div>

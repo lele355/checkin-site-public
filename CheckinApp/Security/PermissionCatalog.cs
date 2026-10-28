@@ -32,6 +32,8 @@ public static class PermissionCatalog
         new("email.use",       "email",      "邮件（多邮箱收件箱，授权码加密存储）"),
         // ---------- 通知 ----------
         new("notify.use",      "notify",     "通知提醒（本地提醒计划与开关设置）"),
+        // ---------- 小游戏 ----------
+        new("games.use",       "games",      "小游戏（联机对局，目前有五子棋）"),
     ];
 
     /// <summary>普通用户角色的默认权限包（管理员=全部）。
@@ -41,7 +43,7 @@ public static class PermissionCatalog
         "workbench.view", "schedule.use", "memo.use",
         "habits.use", "courses.use", "anniversary.use", "board.use",
         "expense.use", "export.use", "reminders.use", "stats.use", "ai.use",
-        "email.use", "notify.use",
+        "email.use", "notify.use", "games.use",
     ];
 
     /// <summary>「情侣」内置角色 = 普通默认包 + 情侣空间 + 经期助手（给伴侣账号用）</summary>
@@ -67,6 +69,7 @@ public static class PermissionCatalog
         ["ai"]          = "AI 助手",
         ["email"]       = "邮件",
         ["notify"]      = "通知提醒",
+        ["games"]       = "小游戏",
     };
 
     /// <summary>权限码 → 短中文名（工作台徽标等展示用，别把 code 原文甩给用户）</summary>
@@ -90,5 +93,6 @@ public static class PermissionCatalog
         ["ai.use"]          = "AI 助手",
         ["email.use"]       = "邮件",
         ["notify.use"]      = "通知",
+        ["games.use"]       = "小游戏",
     };
 }

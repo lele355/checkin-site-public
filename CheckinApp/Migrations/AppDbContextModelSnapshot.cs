@@ -469,6 +469,100 @@ namespace CheckinApp.Migrations
                     b.ToTable("Expenses");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.GameRoom", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Forbidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("GameKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("GuestSeenAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("GuestUsedMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("GuestUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("HostSeenAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostSide")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("HostUsedMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MoveTimeoutSec")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MovesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResultReason")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Size")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TotalTimeoutSec")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Turn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("TurnStartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Winner")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("GuestUserId");
+
+                    b.HasIndex("HostUserId");
+
+                    b.HasIndex("Status", "UpdatedAt");
+
+                    b.ToTable("GameRooms");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.Habit", b =>
                 {
                     b.Property<int>("Id")
@@ -943,6 +1037,10 @@ namespace CheckinApp.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("GameSettings")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
@@ -1108,6 +1206,24 @@ namespace CheckinApp.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.GameRoom", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "Guest")
+                        .WithMany()
+                        .HasForeignKey("GuestUserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("CheckinApp.Models.User", "Host")
+                        .WithMany()
+                        .HasForeignKey("HostUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Guest");
+
+                    b.Navigation("Host");
                 });
 
             modelBuilder.Entity("CheckinApp.Models.Habit", b =>

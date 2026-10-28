@@ -34,6 +34,8 @@ public partial class AppDbContext : DbContext
     public DbSet<ApiToken> ApiTokens => Set<ApiToken>();
     /// <summary>通知设置（本地提醒），一人一行</summary>
     public DbSet<NotifySetting> NotifySettings => Set<NotifySetting>();
+    /// <summary>小游戏对局房间（五子棋），一行一盘</summary>
+    public DbSet<GameRoom> GameRooms => Set<GameRoom>();
 
     protected override void OnModelCreating(ModelBuilder m)
     {
@@ -213,6 +215,19 @@ public partial class AppDbContext : DbContext
         {
             e.HasIndex(x => x.UserId).IsUnique();
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 小游戏房间：房间码唯一（口头报码就能进，不能撞）；
+        // 大厅按「状态 + 更新时间」筛，所以给这俩建复合索引。
+        // 两级用户外键都 Cascade：删号时他参与的对局一起走，否则大厅里会出现「幽灵对局」。
+        m.Entity<GameRoom>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => new { x.Status, x.UpdatedAt });
+            e.HasIndex(x => x.HostUserId);
+            e.HasIndex(x => x.GuestUserId);
+            e.HasOne(x => x.Host).WithMany().HasForeignKey(x => x.HostUserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Guest).WithMany().HasForeignKey(x => x.GuestUserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

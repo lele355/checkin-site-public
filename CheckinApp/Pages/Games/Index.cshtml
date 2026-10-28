@@ -1,0 +1,152 @@
+@page
+@model CheckinApp.Pages.Games.IndexModel
+@inject CheckinApp.Services.CurrentUser Me
+@{
+    ViewData["Title"] = "小游戏";
+
+    string StatusText(CheckinApp.Pages.Games.IndexModel.RoomRow r)
+    {
+        if (r.Status == "waiting") return "等人进来";
+        if (r.Status == "finished") return "已结束";
+        return r.MyTurn ? "轮到你" : "等对手";
+    }
+
+    string ResultText(CheckinApp.Pages.Games.IndexModel.RoomRow r)
+    {
+        if (r.Winner == 3) return "和棋";
+        if (r.Winner == 0) return "";
+        return r.Winner == r.MySide ? "你赢了" : "你输了";
+    }
+}
+<div class="card">
+    <div class="page-head">
+        <h2>小游戏</h2>
+        <div class="head-actions">
+            <a class="btn secondary" asp-page="/Games/Settings">@Html.Raw(CheckinApp.Ui.Icons.Svg("settings-2", 16)) 设置</a>
+        </div>
+    </div>
+    <p class="hint" style="margin-top:6px;">目前有五子棋。建一盘，把房间码发给朋友，他进大厅输码就能坐下。</p>
+
+    @if (!string.IsNullOrEmpty(Model.Err))
+    {
+        <div class="msg error">@Model.Err</div>
+    }
+
+    @* 两个提交按钮共用一个表单：submit 按钮带 name/value，点哪个就提交哪个 side。
+       盘面/规则下拉默认是我的设置，只影响「这一局」，不会写回默认值。 *@
+    <form method="post" asp-page-handler="Create" class="gm-new" style="margin-top:14px;">
+        <div class="gm-new-opts">
+            <label class="gm-opt">
+                <span>盘面</span>
+                <select name="size">
+                    @foreach (var n in CheckinApp.Pages.Games.SettingsModel.Sizes)
+                    {
+                        if (n == Model.Settings.Size)
+                        {
+                            <option value="@n" selected>@n × @n</option>
+                        }
+                        else
+                        {
+                            <option value="@n">@n × @n</option>
+                        }
+                    }
+                </select>
+            </label>
+            <label class="gm-opt">
+                <span>规则</span>
+                <select name="forbidden">
+                    @if (Model.Settings.Forbidden)
+                    {
+                        <option value="0">自由（长连也算赢）</option>
+                        <option value="1" selected>标准（黑方长连判负）</option>
+                    }
+                    else
+                    {
+                        <option value="0" selected>自由（长连也算赢）</option>
+                        <option value="1">标准（黑方长连判负）</option>
+                    }
+                </select>
+            </label>
+        </div>
+        <div class="gm-new-form">
+            <button class="btn" type="submit" name="side" value="1">
+                @Html.Raw(CheckinApp.Ui.Icons.Svg("plus", 16)) 新建对局（我先手）
+            </button>
+            <button class="btn secondary" type="submit" name="side" value="2">新建对局（我后手）</button>
+        </div>
+    </form>
+
+    <form method="post" asp-page-handler="Join" class="inline-form" style="margin-top:12px;">
+        <input name="code" placeholder="或用房间码加入（6 位）" maxlength="6" autocomplete="off"
+               style="text-transform:uppercase;letter-spacing:2px;" />
+        <button class="btn secondary" type="submit">加入</button>
+    </form>
+</div>
+
+@if (Model.Mine.Count > 0)
+{
+    <div class="card">
+        <div class="group-head">我的对局</div>
+        <div class="stack">
+            @foreach (var r in Model.Mine)
+            {
+                <div class="gm-row">
+                    <a class="gm-row-main" asp-page="/Games/Play" asp-route-id="@r.Id">
+                        <span class="gm-badge @(r.Status == "playing" ? (r.MyTurn ? "hot" : "") : "mute")">@StatusText(r)</span>
+                        <span class="gm-row-title">
+                            @(string.IsNullOrEmpty(r.GuestName) ? "等朋友进来" : $"{r.HostName} vs {r.GuestName}")
+                        </span>
+                        <span class="gm-row-meta">
+                            @if (r.Status == "waiting")
+                            {
+                                <span>房间码 <b>@r.Code</b></span>
+                            }
+                            else
+                            {
+                                <span>@r.MoveCount 手</span>
+                            }
+                            <span>· @r.Size×@r.Size@(r.Forbidden ? " 标准" : "")</span>
+                            @if (!string.IsNullOrEmpty(ResultText(r)))
+                            {
+                                <span>· @ResultText(r)</span>
+                            }
+                            <span>· @r.UpdatedAt</span>
+                        </span>
+                    </a>
+                    @if (r.Status != "playing")
+                    {
+                        <form method="post" asp-page-handler="Leave" data-confirm="确认解散">
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <button class="mini gm-x" type="submit">解散</button>
+                        </form>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="group-head">大厅里的房间</div>
+    @if (Model.Open.Count == 0)
+    {
+        <div class="empty"><span class="big">♟️</span>现在没人开着房间，你先建一盘吧</div>
+    }
+    else
+    {
+        <div class="stack">
+            @foreach (var r in Model.Open)
+            {
+                <a class="gm-row gm-row-main" asp-page="/Games/Play" asp-route-id="@r.Id" asp-route-join="1">
+                    <span class="gm-badge hot">可加入</span>
+                    <span class="gm-row-title">@r.HostName 在等人</span>
+                    <span class="gm-row-meta">
+                        <span>房间码 <b>@r.Code</b></span>
+                        <span>· @r.Size×@r.Size@(r.Forbidden ? " 标准" : "")</span>
+                        <span>· @r.UpdatedAt</span>
+                    </span>
+                </a>
+            }
+        </div>
+    }
+</div>

@@ -268,5 +268,6 @@ CheckinApp.Api.AiApi.Map(app);
 CheckinApp.Api.EmailApi.Map(app);
 CheckinApp.Api.AdminApi.Map(app);
 CheckinApp.Api.NotifyApi.Map(app);
+CheckinApp.Api.GamesApi.Map(app);
 
 app.Run();

@@ -22,6 +22,7 @@ public static class NavCatalog
         new("anniversary", "纪念日", "heart",    "/Anniversaries","anniversary.use",GroupLife, true),
         new("couples",     "情侣空间","couple",  "/Couples",     "couples.view",   GroupLife, true),
         new("board",       "留言板", "chat",     "/Board",       "board.use",      GroupLife, true),
+        new("games",       "小游戏", "gamepad",  "/Games",       "games.use",      GroupLife, true),
         new("expense",     "记账",   "wallet",   "/Expenses",    "expense.use",    GroupLife, true),
         new("period",      "经期",   "drop",     "/Period",      "period.use",     GroupLife, true),
         new("reminders",   "提醒",   "bell",     "/Reminders",   "reminders.use",  GroupTool, true),

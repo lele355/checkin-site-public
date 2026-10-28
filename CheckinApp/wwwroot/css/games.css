@@ -1,0 +1,287 @@
+/* ==========================================================================
+   games.css —— 小游戏（五子棋）专用样式
+   只出现在 /Games 与 /Games/Play 两页。颜色一律走 tokens 变量；
+   唯一的例外是棋子黑白与棋盘木色：那是「游戏的语义色」，
+   跟主题无关（任何皮肤下黑子都该是黑子），所以在这里定成局部变量。
+   ========================================================================== */
+
+.gm-new {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.gm-new-form { display: inline; }
+
+/* ---------- 大厅列表 ---------- */
+
+.gm-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.gm-row:last-child { border-bottom: none; }
+
+.gm-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+    margin: -4px -6px;
+    transition: background var(--dur) var(--easing);
+}
+
+.gm-row-main:hover { background: var(--card-soft); }
+
+.gm-row-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gm-row-meta {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    color: var(--text-weak);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.gm-row-meta b { color: var(--text-sub); letter-spacing: 1.5px; font-weight: 600; }
+
+.gm-badge {
+    flex-shrink: 0;
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--card-soft);
+    color: var(--text-sub);
+    border: 1px solid var(--border);
+}
+
+.gm-badge.hot {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-color: transparent;
+}
+
+.gm-badge.mute { color: var(--text-weak); }
+
+.gm-x {
+    border: none;
+    background: none;
+    color: var(--text-weak);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 6px;
+}
+
+.gm-x:hover { color: var(--danger); }
+
+/* ---------- 棋盘页 ---------- */
+
+.gm-code {
+    font-size: 12.5px;
+    color: var(--text-weak);
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.gm-players {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 6px;
+    flex-wrap: wrap;
+}
+
+.gm-player {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card-soft);
+    font-size: 13.5px;
+}
+
+.gm-player.me {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.gm-tag { font-size: 11.5px; color: var(--text-weak); }
+
+.gm-vs { color: var(--text-weak); font-size: 12px; }
+
+.gm-stone-dot {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.gm-stone-dot.b { background: #23232B; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5); }
+.gm-stone-dot.w { background: #F7F4EE; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .22); }
+
+.gm-status {
+    margin: 8px 0 12px;
+    font-size: 13.5px;
+    color: var(--text-sub);
+    min-height: 20px;
+}
+
+.gm-status[data-myturn="1"] { color: var(--accent-strong); font-weight: 600; }
+
+.gm-board-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 2px 0 6px;
+}
+
+.gm-board {
+    width: 100%;
+    max-width: 520px;
+    height: auto;
+    display: block;
+    border-radius: var(--radius);
+    touch-action: manipulation;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 棋盘底面：**故意不跟主题**。它代表一块真实的棋盘（浅木色），
+   五套主题下都长一样 —— 白子黑子在浅底上对比度最好，
+   而如果跟着主题变深色，黑子会直接糊进背景里（实测 macos 主题就是这个问题）。 */
+.gm-board-bg {
+    fill: #E9E0CC;
+    stroke: rgba(0, 0, 0, .16);
+    stroke-width: 1;
+}
+
+.gm-grid line {
+    stroke: #8B7F66;
+    stroke-width: 1.2;
+    stroke-opacity: .62;
+}
+
+.gm-stars circle { fill: #6F6551; fill-opacity: .85; }
+
+/* 黑白子：游戏语义色，同样不跟主题 */
+.gm-stone.b { fill: #24242C; }
+.gm-stone.w { fill: #FBF8F2; stroke: rgba(0, 0, 0, .22); stroke-width: 1.2; }
+
+/* 最后一手的标记：棋子中心的高对比小圆点。
+   不用 --accent：editorial 等主题的强调色接近黑，套环会被看成棋子的描边。 */
+.gm-last { pointer-events: none; }
+.gm-last.b { fill: #F0EADC; }
+.gm-last.w { fill: #2A2A33; }
+
+
+/* ---------------- 设置：大厅建房选项 / 对局规则 chips ---------------- */
+
+.gm-new-opts {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.gm-opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .82rem;
+    color: var(--text-sub);
+}
+
+.gm-opt select {
+    font-family: var(--font-body);
+    font-size: .84rem;
+    color: var(--text);
+    background: var(--card-soft);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+}
+
+.gm-rules {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 8px 0 2px;
+}
+
+/* ---------------- 棋盘坐标 ---------------- */
+
+.gm-coord text {
+    fill: #7A6F58;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    user-select: none;
+}
+
+/* ---------------- 二次确认的预览圈 ---------------- */
+
+/* 站点 CSS 会盖掉 UA 的 [hidden]，SVG 元素尤其不保险 —— 显式关掉 */
+.gm-ghost[hidden] { display: none; }
+.gm-ghost { pointer-events: none; opacity: .45; }
+.gm-ghost.b { fill: #24242C; }
+.gm-ghost.w { fill: #FBF8F2; stroke: rgba(0, 0, 0, .3); stroke-width: 1.4; }
+
+/* ---------------- 计时条 ---------------- */
+
+/* 站点 CSS 里 .gm-clock 的 display 会盖掉 UA 的 [hidden]，显式写一条兜底 */
+.gm-clock[hidden] { display: none; }
+
+.gm-clock {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 1px 9px;
+    border-radius: 999px;
+    font-size: .76rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background: var(--card-soft);
+    border: 1px solid var(--border);
+    color: var(--text-sub);
+}
+
+.gm-clock.low {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: var(--danger-soft);
+}
+
+.gm-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.gm-actions form { display: inline; }
+
+.gm-hint { margin-top: 10px; }
+
+@media (max-width: 430px) {
+    .gm-row-meta { font-size: 11px; }
+    .gm-board { max-width: 100%; }
+}
