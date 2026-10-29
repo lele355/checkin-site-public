@@ -285,3 +285,22 @@
     .gm-row-meta { font-size: 11px; }
     .gm-board { max-width: 100%; }
 }
+
+/* ---------- 游戏列表（/Games 入口第一屏） ---------- */
+.gm-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.gm-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-in);
+  background: var(--card-soft, var(--bg-soft));
+  text-decoration: none; color: inherit;
+}
+a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+.gm-item-icon {
+  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent-strong);
+}
+.gm-item-body { flex: 1; min-width: 0; }
+.gm-item-name { font-weight: 600; font-size: .98rem; }
+.gm-item-sub { margin-top: 2px; font-size: .82rem; color: var(--text-sub); }
+.gm-item > svg { flex: none; color: var(--text-weak); }

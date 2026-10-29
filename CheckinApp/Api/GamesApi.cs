@@ -8,6 +8,18 @@ namespace CheckinApp.Api;
 /// <summary>
 /// 小游戏（目前只有五子棋）—— 网页端与 App 共用同一套接口。
 ///
+/// 【路由是两级的】入口第一屏拿游戏列表，点进某个游戏才有房间：
+///   GET  /games                              游戏列表（GameCatalog）
+///   GET  /games/settings                     游戏总设置（显示偏好，不进房间）
+///   GET  /games/{gameKey}/settings           这个游戏的规则默认（建房时快照进房间）
+///   GET  /games/{gameKey}/rooms              大厅
+///   POST /games/{gameKey}/rooms              建房
+///   GET  /games/{gameKey}/rooms/{id}         房间状态（轮询）
+///   POST /games/{gameKey}/rooms/{id}/…       join / move / resign / rematch / leave
+///   POST /games/join                         凭房间码加入（房间码自带游戏信息）
+/// 加第二种游戏只要在 <see cref="GameCatalog"/> 登记一条 + 补规则实现，
+/// 路由骨架不用动。
+///
 /// 联机方式刻意选了**短轮询**而不是 WebSocket / SignalR：
 /// 回合制棋类对延迟不敏感（1.2 秒刷新完全够用），而轮询在两端实现都很轻
 /// （网页一个 setInterval、App 一个 while+delay），也不用为 Cookie / Bearer
@@ -18,6 +30,10 @@ namespace CheckinApp.Api;
 ///
 /// 规则（盘面大小 / 禁手 / 限时）在**建房时**从房主的默认设置快照进房间，
 /// 之后双方共享同一套，中途改设置不影响已开打的局。
+///
+/// 计时与房间回收都是**懒结算**（没有后台 Timer，服务器内存很紧）：
+/// 超时由 <see cref="GameClock.Enforce"/> 在谁读这一局时顺手判，
+/// 闲置 5 分钟的房间由 <see cref="GameSweeper.Sweep"/> 在谁读大厅时顺手清。
 /// </summary>
 public static class GamesApi
 {
@@ -46,37 +62,90 @@ public static class GamesApi
     {
         var g = app.MapGroup("/api/v1/games").RequireAuthorization("perm:games.use");
 
-        // ==================== 我的默认设置 ====================
+        // ==================== 游戏列表（入口第一屏） ====================
+        // 加第二种游戏只要在 GameCatalog.All 里登记一条，这里一个字都不用改。
+        g.MapGet("", () => ApiKit.Ok(new
+        {
+            games = GameCatalog.All.Select(x => new
+            {
+                key = x.Key, name = x.Name, sub = x.Sub,
+                minPlayers = x.MinPlayers, maxPlayers = x.MaxPlayers, available = x.Available,
+            }).ToList(),
+        }));
+
+        // ==================== 游戏总设置（显示偏好） ====================
+        // 只管「我这台设备怎么显示」：落子确认 / 坐标 / 最后一手标记 / 震动。
+        // 不进房间、不上服务端判定，所以改它不影响任何人，也不用快照。
         g.MapGet("/settings", (AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
             var user = db.Users.FirstOrDefault(x => x.Id == uid);
-            return ApiKit.Ok(GameSettingsCatalog.Load(user?.GameSettings));
+            return ApiKit.Ok(GameSettingsCatalog.ToDisplay(GameSettingsCatalog.Load(user?.GameSettings)));
         });
 
-        g.MapPut("/settings", (GameSettings req, AppDbContext db, HttpContext ctx) =>
+        g.MapPut("/settings", (GameSettingsCatalog.DisplaySettings req, AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
             var user = db.Users.FirstOrDefault(x => x.Id == uid)
                        ?? throw new ApiBadRequest("账号不存在");
-            var clean = GameSettingsCatalog.Normalize(req);
-            user.GameSettings = GameSettingsCatalog.Store(clean);
+            var merged = GameSettingsCatalog.Apply(GameSettingsCatalog.Load(user.GameSettings), req);
+            user.GameSettings = GameSettingsCatalog.Store(merged);
             db.SaveChanges();
-            return ApiKit.Ok(clean);
+            return ApiKit.Ok(GameSettingsCatalog.ToDisplay(merged));
         });
 
-        // ==================== 大厅 ====================
-        g.MapGet("", (AppDbContext db, HttpContext ctx) =>
+        // ==================== 单游戏杂项设置（规则默认） ====================
+        // 这一组是「建房时用什么规则」的默认值：盘面大小 / 禁手 / 单步与总时限。
+        // 只影响**自己新建**的房间（建房那一刻快照进 GameRoom），已开打的局不变。
+        var gs = g.MapGroup("/{gameKey}");
+
+        gs.MapGet("/settings", (string gameKey, AppDbContext db, HttpContext ctx) =>
         {
+            var key = GameCatalog.Require(gameKey);
+            if (key != GameKey) throw new ApiBadRequest("这个游戏还没开放设置");
             var uid = ApiKit.MeId(ctx);
+            var user = db.Users.FirstOrDefault(x => x.Id == uid);
+            return ApiKit.Ok(new
+            {
+                rules = GameSettingsCatalog.ToRules(GameSettingsCatalog.Load(user?.GameSettings)),
+                sizeOptions = GomokuRules.AllowedSizes,
+                moveTimeoutOptions = GameSettingsCatalog.MoveTimeoutOptions,
+                totalTimeoutOptions = GameSettingsCatalog.TotalTimeoutOptions,
+            });
+        });
+
+        gs.MapPut("/settings", (string gameKey, GameSettingsCatalog.RuleDefaults req, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            if (key != GameKey) throw new ApiBadRequest("这个游戏还没开放设置");
+            var uid = ApiKit.MeId(ctx);
+            var user = db.Users.FirstOrDefault(x => x.Id == uid)
+                       ?? throw new ApiBadRequest("账号不存在");
+            var merged = GameSettingsCatalog.Apply(GameSettingsCatalog.Load(user.GameSettings), req);
+            user.GameSettings = GameSettingsCatalog.Store(merged);
+            db.SaveChanges();
+            return ApiKit.Ok(GameSettingsCatalog.ToRules(merged));
+        });
+
+        // ==================== 大厅（这一局游戏的房间列表） ====================
+        gs.MapGet("/rooms", (string gameKey, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            var uid = ApiKit.MeId(ctx);
+
+            // 顺手扫掉闲置 5 分钟的房间：大厅是废弃房间唯一会被看见的地方，
+            // 在这儿清最省事，也不用挂后台 Timer。
+            GameSweeper.Sweep(db);
+
             var cutoff = DateTime.UtcNow.AddHours(-24);      // 别人挂着的空房只留 24 小时
             var keepDone = DateTime.UtcNow.AddDays(-3);      // 我打完的局只留 3 天，免得大厅越攒越长
 
             var rooms = db.GameRooms
                 .Include(x => x.Host).Include(x => x.Guest)
-                .Where(x => ((x.HostUserId == uid || x.GuestUserId == uid) && x.Status != "finished")
-                            || ((x.HostUserId == uid || x.GuestUserId == uid) && x.UpdatedAt > keepDone)
-                            || (x.Status == "waiting" && x.GuestUserId == null && x.CreatedAt > cutoff))
+                .Where(x => x.GameKey == key
+                            && (((x.HostUserId == uid || x.GuestUserId == uid) && x.Status != "finished")
+                                || ((x.HostUserId == uid || x.GuestUserId == uid) && x.UpdatedAt > keepDone)
+                                || (x.Status == "waiting" && x.GuestUserId == null && x.CreatedAt > cutoff)))
                 .OrderByDescending(x => x.UpdatedAt)
                 .Take(LobbyKeep)
                 .ToList();
@@ -109,17 +178,31 @@ public static class GamesApi
                 };
             }).ToList();
 
-            var settings = GameSettingsCatalog.Load(
+            var mine = GameSettingsCatalog.Load(
                 db.Users.FirstOrDefault(x => x.Id == uid)?.GameSettings);
 
-            return ApiKit.Ok(new { items, size = settings.Size, settings });
+            return ApiKit.Ok(new
+            {
+                items,
+                game = new { key, },
+                display = GameSettingsCatalog.ToDisplay(mine),
+                rules = GameSettingsCatalog.ToRules(mine),
+                sizeOptions = GomokuRules.AllowedSizes,
+                moveTimeoutOptions = GameSettingsCatalog.MoveTimeoutOptions,
+                totalTimeoutOptions = GameSettingsCatalog.TotalTimeoutOptions,
+            });
         });
 
         // ==================== 建房 ====================
-        g.MapPost("", (CreateReq req, AppDbContext db, HttpContext ctx) =>
+        gs.MapPost("/rooms", (string gameKey, CreateReq req, AppDbContext db, HttpContext ctx) =>
         {
+            var key = GameCatalog.Require(gameKey);
+            if (key != GameKey) throw new ApiBadRequest("这个游戏还没开放建房");
             var uid = ApiKit.MeId(ctx);
             var side = req.Side == 2 ? 2 : 1;
+
+            // 建新房前顺手清一次闲置房间，免得大厅被自己的旧房填满
+            GameSweeper.Sweep(db);
 
             // 默认规则来自房主的设置，建房时可以用请求里的值覆盖这一局
             var user = db.Users.FirstOrDefault(x => x.Id == uid)
@@ -140,7 +223,7 @@ public static class GamesApi
             var room = new GameRoom
             {
                 Code = NewCode(db),
-                GameKey = GameKey,
+                GameKey = key,
                 HostUserId = uid,
                 HostSide = side,
                 Status = "waiting",
@@ -180,33 +263,36 @@ public static class GamesApi
         });
 
         // ==================== 房间状态（轮询） ====================
-        g.MapGet("/{id:int}", (int id, AppDbContext db, HttpContext ctx) =>
+        gs.MapGet("/rooms/{id:int}", (string gameKey, int id, AppDbContext db, HttpContext ctx) =>
         {
+            var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
-            var room = Load(db, id);
+            var room = Load(db, id, key);
 
             // 超时不靠后台任务：谁来看这一局，就顺手判一次。两边都在 1.2 秒轮询，
             // 所以「超时」最多迟一拍被发现，够用且不用维护定时器。
-            if (GameClock.Enforce(db, room)) room = Load(db, id);
+            if (GameClock.Enforce(db, room)) room = Load(db, id, key);
 
             Touch(db, room, uid);
             return ApiKit.Ok(Snap(room, uid));
         });
 
         // ==================== 加入 ====================
-        g.MapPost("/{id:int}/join", (int id, AppDbContext db, HttpContext ctx) =>
+        gs.MapPost("/rooms/{id:int}/join", (string gameKey, int id, AppDbContext db, HttpContext ctx) =>
         {
+            var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
-            var room = Load(db, id);
+            var room = Load(db, id, key);
             Join_Internal(db, room, uid);
             return ApiKit.Ok(new { id });
         });
 
         // ==================== 落子 ====================
-        g.MapPost("/{id:int}/move", (int id, MoveReq req, AppDbContext db, HttpContext ctx) =>
+        gs.MapPost("/rooms/{id:int}/move", (string gameKey, int id, MoveReq req, AppDbContext db, HttpContext ctx) =>
         {
+            var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
-            var room = Load(db, id);
+            var room = Load(db, id, key);
             var mySide = MySide(room, uid);
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
             if (room.Status == "waiting") throw new ApiBadRequest("对手还没进来，等一下");
@@ -262,14 +348,15 @@ public static class GamesApi
             if (rows == 0) throw new ApiBadRequest("对手刚走过一步，刷新一下再来");
 
             db.ChangeTracker.Clear();
-            return ApiKit.Ok(Snap(Load(db, id), uid));
+            return ApiKit.Ok(Snap(Load(db, id, key), uid));
         });
 
         // ==================== 认输 ====================
-        g.MapPost("/{id:int}/resign", (int id, AppDbContext db, HttpContext ctx) =>
+        gs.MapPost("/rooms/{id:int}/resign", (string gameKey, int id, AppDbContext db, HttpContext ctx) =>
         {
+            var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
-            var room = Load(db, id);
+            var room = Load(db, id, key);
             var mySide = MySide(room, uid);
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
             if (room.Status != "playing") throw new ApiBadRequest("这一局现在没法认输");
@@ -288,14 +375,15 @@ public static class GamesApi
             if (rows == 0) throw new ApiBadRequest("状态刚变过，刷新一下");
 
             db.ChangeTracker.Clear();
-            return ApiKit.Ok(Snap(Load(db, id), uid));
+            return ApiKit.Ok(Snap(Load(db, id, key), uid));
         });
 
         // ==================== 再来一局 ====================
-        g.MapPost("/{id:int}/rematch", (int id, RematchReq req, AppDbContext db, HttpContext ctx) =>
+        gs.MapPost("/rooms/{id:int}/rematch", (string gameKey, int id, RematchReq req, AppDbContext db, HttpContext ctx) =>
         {
+            var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
-            var room = Load(db, id);
+            var room = Load(db, id, key);
             var mySide = MySide(room, uid);
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
 
@@ -326,14 +414,15 @@ public static class GamesApi
             if (rows == 0) throw new ApiBadRequest("状态刚变过，刷新一下");
 
             db.ChangeTracker.Clear();
-            return ApiKit.Ok(Snap(Load(db, id), uid));
+            return ApiKit.Ok(Snap(Load(db, id, key), uid));
         });
 
         // ==================== 退出 ====================
-        g.MapPost("/{id:int}/leave", (int id, AppDbContext db, HttpContext ctx) =>
+        gs.MapPost("/rooms/{id:int}/leave", (string gameKey, int id, AppDbContext db, HttpContext ctx) =>
         {
+            var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
-            var room = Load(db, id);
+            var room = Load(db, id, key);
             var mySide = MySide(room, uid);
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
 
@@ -370,9 +459,16 @@ public static class GamesApi
 
     // ==================== 内部工具 ====================
 
-    private static GameRoom Load(AppDbContext db, int id) =>
-        db.GameRooms.Include(x => x.Host).Include(x => x.Guest).FirstOrDefault(x => x.Id == id)
-        ?? throw new ApiBadRequest("这一局不存在或已被解散");
+    /// <summary>取房间；给了 gameKey 就顺带验一下归属（别让五子棋的房间被别的入口操作）</summary>
+    private static GameRoom Load(AppDbContext db, int id, string? gameKey = null)
+    {
+        var room = db.GameRooms.Include(x => x.Host).Include(x => x.Guest).FirstOrDefault(x => x.Id == id)
+                   ?? throw new ApiBadRequest("这一局不存在或已被解散");
+        if (gameKey is not null
+            && !string.Equals(room.GameKey, gameKey, StringComparison.OrdinalIgnoreCase))
+            throw new ApiBadRequest("房间不属于这个游戏");
+        return room;
+    }
 
     /// <summary>我在这一局执哪一方（1 黑 / 2 白），不在局中返回 0</summary>
     private static int MySide(GameRoom r, int uid) =>

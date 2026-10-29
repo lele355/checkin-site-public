@@ -1,5 +1,3 @@
-// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
-const ADMIN = process.env.QA_USER || 'admin';
 // 2.4.x 全流程回归（网页端）—— 页面可达性 + 学期功能 API + 留言时间 + UI 一致性
 //
 // 说明：页面级只做「能不能打开 / 有没有溢出 / 关键元素在不在」（稳定、可长期跑）；
@@ -10,9 +8,8 @@ const ADMIN = process.env.QA_USER || 'admin';
 const { chromium } = require('playwright');
 const fs = require('fs');
 
-const BASE = process.env.BASE || 'http://127.0.0.1:5199';
-const USER = process.env.QA_USER || ADMIN;
-const PASS = process.env.QA_PASS || process.env.QA_PASS;
+const { USER, PASS } = require('./_env');
+const BASE = process.env.QA_BASE || process.env.BASE || 'http://127.0.0.1:5188';
 const OUT = process.env.OUT || 'D:/checkin-work/tmp/qa240';
 const TAG = 'QA240';
 

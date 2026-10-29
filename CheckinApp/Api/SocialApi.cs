@@ -85,10 +85,11 @@ public static class SocialApi
         // ==================== 留言板 ====================
         var bd = g.MapGroup("/board").RequireAuthorization("perm:board.use");
 
-        bd.MapGet("", (AppDbContext db, HttpContext ctx) =>
+        bd.MapGet("", (AppDbContext db, CurrentUser me, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
             var before = ApiKit.IntQ(ctx, "before", 0);
+            var canModerate = me.Has("board.moderate");
             var rows = db.BoardMessages.Include(b => b.User).AsQueryable();
             if (before > 0) rows = rows.Where(b => b.Id < before);
             var items = rows.OrderByDescending(b => b.Id).Take(50).ToList()
@@ -97,6 +98,7 @@ public static class SocialApi
                     id = b.Id, content = b.Content,
                     author = b.User?.DisplayName ?? "?",
                     authorId = b.UserId, mine = b.UserId == uid,
+                    canDelete = b.UserId == uid || canModerate,
                     createdAt = ApiKit.StampUtc(b.CreatedAt),
                 }).ToList();
             return ApiKit.Ok(new { items, hasMore = items.Count == 50 });
@@ -112,13 +114,13 @@ public static class SocialApi
             return ApiKit.Ok(new { id = m.Id });
         });
 
-        // 删自己的；管理员（admin.users）可删任意
+        // 删自己的；有 board.moderate（管理员）可删任意
         bd.MapDelete("/{id:int}", (int id, AppDbContext db, CurrentUser me, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
             var m = db.BoardMessages.FirstOrDefault(x => x.Id == id);
             if (m is null) return ApiKit.NotFound("留言不存在或已删除");
-            if (m.UserId != uid && !me.Has("admin.users")) return ApiKit.Forbidden("只能删自己的留言");
+            if (m.UserId != uid && !me.Has("board.moderate")) return ApiKit.Forbidden("只能删自己的留言");
             db.BoardMessages.Remove(m);
             db.SaveChanges();
             return ApiKit.Ok();

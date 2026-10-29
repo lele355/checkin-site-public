@@ -526,11 +526,10 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         if (Date(a, "semester_start", out var ss))
         {
             var monday = ss.Date.AddDays(-(((int)ss.DayOfWeek + 6) % 7));   // 归一到周一
-            var iso = monday.ToString("yyyy-MM-dd");
-            var setting = db.AppSettings.FirstOrDefault(s => s.Key == "courses.semester-start");
-            if (setting is null) db.AppSettings.Add(new AppSetting { Key = "courses.semester-start", Value = iso });
-            else setting.Value = iso;
-            semNote = $"，学期开始日设为 {iso}";
+            // 走 SemesterService 改当前学期，而不是只写老 AppSetting ——
+            // 只写老键会让 Semesters.StartDate 与它分叉，工作台/课表/接口各算各的周次。
+            SemesterService.Update(db, uid, curSem.Id, null, monday);
+            semNote = $"，学期开始日设为 {monday:yyyy-MM-dd}";
         }
 
         db.SaveChanges();

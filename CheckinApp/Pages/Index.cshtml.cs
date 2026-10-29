@@ -59,8 +59,8 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     public void OnGet()
     {
         if (_me.UserId is not int uid) return;
-        var horizon = DateTime.Today.AddDays(7);
-        var today = DateTime.Today;
+        var horizon = SiteClock.Today.AddDays(7);
+        var today = SiteClock.Today;
 
         var meRow = _db.Users.Where(u => u.Id == uid)
             .Select(u => new { u.DashboardLayout, u.SamplePromptDismissed }).FirstOrDefault();
@@ -97,20 +97,22 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         // 今日课程（与课程表同一套学期/周次算法；今天是周几就取周几的课）
         if (_me.Has("courses.use"))
         {
-            var setting = _db.AppSettings.FirstOrDefault(s => s.Key == "courses.semester-start");
-            SemesterConfigured = setting is not null && DateTime.TryParse(setting.Value, out _);
-            var raw = SemesterConfigured && DateTime.TryParse(setting!.Value, out var parsed) ? parsed : today;
-            var semStart = MondayOf(raw);
-            CurrentWeek = Math.Max(1, (int)((today - semStart).TotalDays / 7) + 1);
+            // 必须走 SemesterService.Current，不能读老的 AppSetting("courses.semester-start")：
+            // 课程表页与 /api/v1/courses 用的都是前者，工作台以前用后者，两者会走岔 ——
+            // 用户在课表里改了学期起始日后，工作台还按旧值算周次；而且老代码根本不过滤
+            // SemesterId，上学期的课会被一起捞出来，看起来就是「网页显示的课完全不对」。
+            var sem = SemesterService.Current(_db, uid);
+            SemesterConfigured = true;
+            CurrentWeek = Math.Max(1, (int)((today - sem.StartDate).TotalDays / 7) + 1);
             var weekday = ((int)today.DayOfWeek + 6) % 7 + 1;     // 1=周一 … 7=周日
             var periods = CoursesConfig.Load(_db);                // 节次时间（可自定义）
             TodayCourses = _db.Courses
-                .Where(c => c.UserId == uid && c.Weekday == weekday)
+                .Where(c => c.UserId == uid && c.SemesterId == sem.Id && c.Weekday == weekday)
                 .ToList()
                 .Where(c => Weeks.Includes(c.WeeksText, CurrentWeek))
                 .OrderBy(c => c.StartPeriod)
                 .Take(6)
-                .Select(c => (c, HoursOf(c.StartPeriod, periods)))
+                .Select(c => (c, HoursOf(c.StartPeriod, c.EndPeriod, periods)))
                 .ToList();
         }
 
@@ -225,7 +227,7 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         if (_me.UserId is not int uid) return RedirectToPage("/Login");
         var habit = _db.Habits.FirstOrDefault(h => h.Id == id && h.UserId == uid);
         if (habit is null) return NotFound();
-        var today = DateTime.Today;
+        var today = SiteClock.Today;
         if (!_db.HabitCheckins.Any(c => c.HabitId == id && c.CheckinDate == today))
         {
             _db.HabitCheckins.Add(new HabitCheckin
@@ -241,15 +243,16 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         return RedirectToPage();
     }
 
-    /// <summary>开始节次 → 该节起止时间（照可自定义的节次配置）</summary>
-    private static string HoursOf(int startPeriod, List<PeriodSlot> periods)
+    /// <summary>起止节次 → 该课的起止时间（照可自定义的节次配置）</summary>
+    /// <remarks>
+    /// 要吃 endPeriod：1-2 节是 08:00～09:50，以前只按 startPeriod 取一节的时段，
+    /// 显示成 08:00～08:50，把下半截时间弄丢了。
+    /// </remarks>
+    private static string HoursOf(int startPeriod, int endPeriod, List<PeriodSlot> periods)
     {
         if (periods.Count == 0) return "";
-        var p = Math.Clamp(startPeriod, 1, periods.Count) - 1;
-        return $"{periods[p].Start}～{periods[p].End}";
+        var s = Math.Clamp(startPeriod, 1, periods.Count) - 1;
+        var e = Math.Clamp(Math.Max(endPeriod, startPeriod), 1, periods.Count) - 1;
+        return $"{periods[s].Start}～{periods[e].End}";
     }
-
-    /// <summary>取所在周的周一（与课程表同款）</summary>
-    private static DateTime MondayOf(DateTime d) =>
-        d.AddDays(-(((int)d.DayOfWeek + 6) % 7));
 }

@@ -32,7 +32,7 @@ public static class LifeApi
         hb.MapGet("", (AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
-            var today = DateTime.Today;
+            var today = SiteClock.Today;
             var habits = db.Habits.Where(h => h.UserId == uid).OrderBy(h => h.Id).ToList();
 
             var checkins = db.HabitCheckins.Where(c => c.UserId == uid)
@@ -98,7 +98,7 @@ public static class LifeApi
             var uid = ApiKit.MeId(ctx);
             var h = db.Habits.FirstOrDefault(x => x.Id == id && x.UserId == uid);
             if (h is null) return ApiKit.NotFound("习惯不存在或已删除");
-            var today = DateTime.Today;
+            var today = SiteClock.Today;
             if (!db.HabitCheckins.Any(c => c.HabitId == id && c.UserId == uid && c.CheckinDate == today))
             {
                 db.HabitCheckins.Add(new HabitCheckin { HabitId = id, UserId = uid, CheckinDate = today, CreatedAt = DateTime.UtcNow });
@@ -110,7 +110,7 @@ public static class LifeApi
         hb.MapDelete("/{id:int}/checkin", (int id, AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
-            var today = DateTime.Today;
+            var today = SiteClock.Today;
             var row = db.HabitCheckins.FirstOrDefault(c => c.HabitId == id && c.UserId == uid && c.CheckinDate == today);
             if (row is not null) { db.HabitCheckins.Remove(row); db.SaveChanges(); }
             return ApiKit.Ok(Stat(db, id, uid, today, false));
@@ -153,7 +153,7 @@ public static class LifeApi
             var month = DateTime.TryParseExact(monthRaw, "yyyy-MM", CultureInfo.InvariantCulture,
                             DateTimeStyles.None, out var parsed)
                 ? new DateTime(parsed.Year, parsed.Month, 1)
-                : new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+                : new DateTime(SiteClock.Today.Year, SiteClock.Today.Month, 1);
             var next = month.AddMonths(1);
 
             var rows = db.Expenses.Where(x => x.UserId == uid && x.OccurDate >= month && x.OccurDate < next)
@@ -219,7 +219,7 @@ public static class LifeApi
             if (req.Amount <= 0) throw new ApiBadRequest("金额要大于 0");
             if (req.Amount > 9_999_999) throw new ApiBadRequest("金额太大了吧");
             var type = req.Type == "in" ? "in" : "out";
-            var occur = ApiKit.ParseDT(req.OccurDate)?.Date ?? DateTime.Today;
+            var occur = ApiKit.ParseDT(req.OccurDate)?.Date ?? SiteClock.Today;
 
             var item = new ExpenseItem
             {
@@ -265,7 +265,7 @@ public static class LifeApi
         co.MapGet("", (AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
-            var today = DateTime.Today;
+            var today = SiteClock.Today;
             // 学期现在是一张表：起始日和名字都从「当前学期」拿，课也只取这一学期的
             var sem = SemesterService.Current(db, uid);
             var semStart = sem.StartDate;
@@ -337,7 +337,7 @@ public static class LifeApi
         {
             var uid = ApiKit.MeId(ctx);
             var sem = SemesterService.SwitchTo(db, uid, id) ?? throw new ApiBadRequest("学期不存在或已删除");
-            return ApiKit.Ok(new { id = sem.Id, currentWeek = Math.Max(1, (int)((DateTime.Today - sem.StartDate).TotalDays / 7) + 1) });
+            return ApiKit.Ok(new { id = sem.Id, currentWeek = Math.Max(1, (int)((SiteClock.Today - sem.StartDate).TotalDays / 7) + 1) });
         });
 
         co.MapDelete("/semesters/{id:int}", (int id, AppDbContext db, HttpContext ctx) =>
@@ -403,15 +403,18 @@ public static class LifeApi
         });
 
         // 学期起始 + 节次时间配置
-        co.MapPut("/settings", (CourseSettingsReq req, AppDbContext db) =>
+        co.MapPut("/settings", (CourseSettingsReq req, AppDbContext db, HttpContext ctx) =>
         {
             if (req.SemesterStart is not null)
             {
                 var d = ApiKit.ParseDate(req.SemesterStart) ?? throw new ApiBadRequest("学期起始日期格式不对");
-                var key = "courses.semester-start";
-                var row = db.AppSettings.FirstOrDefault(x => x.Key == key);
-                if (row is null) db.AppSettings.Add(new AppSetting { Key = key, Value = ApiKit.D(d) });
-                else row.Value = ApiKit.D(d);
+                // 改当前学期的起始日，而不是只写老的 AppSetting("courses.semester-start")。
+                // 只写老键会让 Semesters.StartDate 与 AppSetting 分叉，工作台/课表/接口
+                // 各按各的算周次，表现就是「网页和 App 显示的课不一样」。
+                // SemesterService.Update 内部会把老键同步回去（导出、旧页面还在读它）。
+                var uid = ApiKit.MeId(ctx);
+                var sem = SemesterService.Current(db, uid);
+                SemesterService.Update(db, uid, sem.Id, null, d);
             }
 
             if (req.Periods is not null)
@@ -436,7 +439,7 @@ public static class LifeApi
         g.MapGet("/stats", (AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
-            var today = DateTime.Today;
+            var today = SiteClock.Today;
             var from90 = today.AddDays(-89);
 
             var daily = db.HabitCheckins.Where(c => c.UserId == uid && c.CheckinDate >= from90)

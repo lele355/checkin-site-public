@@ -13,18 +13,11 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     private readonly AppDbContext _db = db;
     private readonly CurrentUser _me = me;
 
-    /// <summary>大节定义：标题 / 小节 / 时段。由可自定义的节次配置两两配对派生</summary>
-    public record BlockInfo(string Label, string Sub, string Hours);
-
     /// <summary>手机课表网格卡片：Row=起始行(0基)、Span=跨行数、Lane/Lanes=同日撞课分列</summary>
     /// <param name="Color">色板键（已算好：用户设过的优先，否则按课名默认）</param>
     /// <param name="OffWeek">true = 这门课本周不上（设置里打开了「显示非本周课程」才画，画成虚化）</param>
     public record GridCard(int Id, string Name, string Location, string Color, bool OffWeek,
                            int Row, int Span, int Lane, int Lanes);
-
-    /// <summary>表格单元格里的一门课（桌面大节视图用）</summary>
-    public record CellCard(int Id, string Name, string Teacher, string Location, string WeeksText,
-                          string Color, bool OffWeek);
 
     /// <summary>课程类别 → 只作说明字段（配色已改成按课程，见 CoursePalette）</summary>
     public static readonly (string Slug, string Label)[] Categories =
@@ -50,28 +43,21 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
 
     /// <summary>当前学期（页面顶部要显示它的名字，学期切换也靠它）</summary>
     public Semester CurrentSemester { get; private set; } = new();
-    public DateTime Today { get; private set; } = DateTime.Today;
+    public DateTime Today { get; private set; } = SiteClock.Today;
 
     /// <summary>节次配置（节数 = Periods.Count，可自定义）</summary>
     public List<PeriodSlot> Periods { get; private set; } = [.. CoursesConfig.Default];
     public int PeriodCount => Periods.Count;
 
-    /// <summary>大节视图（桌面表格用）：相邻两小节配成一大节</summary>
-    public BlockInfo[] Blocks { get; private set; } = [];
-    public int BlockCount => Blocks.Length;
-
     [BindProperty] public DateTime? SemesterStartInput { get; set; }
 
-    /// <summary>Cells[大节][星期] → 课程列表（含本周与非本周，非本周由 OffWeek 标出）</summary>
-    public List<CellCard>[][] Cells { get; private set; } = [];
-
-    /// <summary>DayGrid[星期] → 手机网格卡片（已按周次过滤 + 撞课分列）</summary>
+    /// <summary>DayGrid[星期] → 网格卡片（已按周次过滤 + 撞课分列）</summary>
     public List<GridCard>[] DayGrid { get; private set; } = CreateDays();
 
     public void OnGet(int? week)
     {
         if (_me.UserId is not int uid) return;
-        Today = DateTime.Today;
+        Today = SiteClock.Today;
 
         // 学期：现在是一张表（可多个、可切换）。没有就自动建一个，起始日沿用老的 AppSetting。
         var sem = SemesterService.Current(_db, uid);
@@ -84,10 +70,10 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         Week = Math.Clamp(week ?? CurrentWeek, 1, 30);
         WeekStart = SemesterStart.AddDays((Week - 1) * 7);
 
-        // 节次配置 → 大节视图（相邻两小节配对；奇数节最后单一大节）
+        // 节次配置：格子左侧的时间字串直接来自它。
+        // 不再做「相邻两节配成一大节」的猜测 —— 作息一旦不是两两成对（比如按 6 大节配），
+        // 那套配对拼出来的时段就是错的，和 App 端逐节显示的时间对不上。
         Periods = CoursesConfig.Load(_db);
-        Blocks = BuildBlocks(Periods);
-        Cells = CreateCells(Blocks.Length);
 
         // 「显示非本周课程」开关：没设置过按开处理（看不到课会以为丢了）
         var offSetting = _db.AppSettings.FirstOrDefault(s => s.Key == ShowOffWeekKey);
@@ -96,31 +82,9 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         // 只取当前学期的课：切到上学期就该看到上学期的课表，而不是所有学期的课叠在一起
         var courses = _db.Courses.Where(c => c.UserId == uid && c.SemesterId == sem.Id).ToList();
         foreach (var c in courses)
-        {
-            // 本周上不上：非本周的照样进网格（虚化显示），但不算进 ThisWeekCount
-            var inWeek = Weeks.Includes(c.WeeksText, Week);
-            if (!inWeek && !ShowOffWeek) continue;
-            if (inWeek) ThisWeekCount++;
+            if (Weeks.Includes(c.WeeksText, Week)) ThisWeekCount++;
 
-            var color = CoursePalette.Of(c);
-            var card = new CellCard(c.Id, c.Name, c.Teacher, c.Location, c.WeeksText, color, !inWeek);
-
-            var d = Math.Clamp(c.Weekday, 1, 7) - 1;
-            for (var b = 0; b < Blocks.Length; b++)
-            {
-                // 大节 b 覆盖小节 (2b+1, 2b+2)；课程与其有交集就在该行出现（跨大节连上会占多行，与教务一致）
-                if (c.StartPeriod <= b * 2 + 2 && c.EndPeriod >= b * 2 + 1)
-                    Cells[b][d].Add(card);
-            }
-        }
-        // 本周的排前面：同一格既有本周又有非本周时，先看到的是真正要上的那门
-        foreach (var row in Cells)
-            foreach (var cell in row)
-                cell.Sort((a, b) => a.OffWeek != b.OffWeek
-                    ? (a.OffWeek ? 1 : 0) - (b.OffWeek ? 1 : 0)
-                    : string.CompareOrdinal(a.Name, b.Name));
-
-        // 手机网格：按星期分列，撞课同日多车道并排（贪心区间着色）
+        // 网格：按星期分列，撞课同日多车道并排（贪心区间着色）
         DayGrid = CreateDays();
         var perDay = new List<(Course C, bool Off)>[DayCount];
         for (var d = 0; d < DayCount; d++) perDay[d] = [];
@@ -128,18 +92,24 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         {
             var inWeek = Weeks.Includes(c.WeeksText, Week);
             if (!inWeek && !ShowOffWeek) continue;
-            var s = Math.Clamp(c.StartPeriod, 1, Periods.Count);
-            var e = Math.Clamp(c.EndPeriod, s, Periods.Count);
             if (c.EndPeriod < 1 || c.StartPeriod > Periods.Count) continue;   // 整节都在配置范围外
             perDay[Math.Clamp(c.Weekday, 1, 7) - 1].Add((c, !inWeek));
         }
         for (var d = 0; d < DayCount; d++)
         {
+            // 非本周的课：与任何本周课时间重叠就不画。否则两块并排分车道，
+            // 本周真正要上的那门被挤成半宽、课程名只能一字一行（App 端就是这么过滤的）。
+            var onWeek = perDay[d].Where(x => !x.Off).ToList();
+            var draw = perDay[d]
+                .Where(x => !x.Off || onWeek.All(a =>
+                    x.C.EndPeriod < a.C.StartPeriod || a.C.EndPeriod < x.C.StartPeriod))
+                .ToList();
+
             // 先按开始节次排出「时间上真的撞在一起」的簇（clusters）。
             // 必须按簇算车道数，不能按整天算：一天 7 门课若全用同一个 lane 数，
             // 每张卡都只有 1/4 宽（手机上一格 78px → 19px），课程名会被挤成一字一行，
             // 而实际上早上那两门并列、下午那门独占整行，根本不冲突。
-            var sorted = perDay[d]
+            var sorted = draw
                 .OrderBy(x => x.C.StartPeriod).ThenBy(x => x.C.EndPeriod).ToList();
 
             var clusters = new List<List<(Course C, bool Off, int S, int E)>>();
@@ -204,43 +174,6 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
             setting.Value = val;
         _db.SaveChanges();
         return RedirectToPage("/Courses/Index", new { week });
-    }
-
-    /// <summary>小节配置 → 大节视图（相邻两两配对；中文序数标题）</summary>
-    public static BlockInfo[] BuildBlocks(List<PeriodSlot> periods)
-    {
-        var blocks = new List<BlockInfo>();
-        for (var i = 0; i < periods.Count; i += 2)
-        {
-            var first = periods[i];
-            var hasSecond = i + 1 < periods.Count;
-            var sub = hasSecond
-                ? $"{(i + 1):D2}{(i + 2):D2}小节"
-                : $"{(i + 1):D2}小节";
-            var hours = hasSecond
-                ? $"{first.Start}～{periods[i + 1].End}"
-                : $"{first.Start}～{first.End}";
-            blocks.Add(new BlockInfo($"第{CnOrdinal(blocks.Count + 1)}大节", sub, hours));
-        }
-        return [.. blocks];
-    }
-
-    private static string CnOrdinal(int n) => n switch
-    {
-        1 => "一", 2 => "二", 3 => "三", 4 => "四", 5 => "五", 6 => "六",
-        7 => "七", 8 => "八", 9 => "九", 10 => "十", 11 => "十一", 12 => "十二",
-        _ => n.ToString(),
-    };
-
-    private static List<CellCard>[][] CreateCells(int blockCount)
-    {
-        var cells = new List<CellCard>[blockCount][];
-        for (var b = 0; b < blockCount; b++)
-        {
-            cells[b] = new List<CellCard>[DayCount];
-            for (var d = 0; d < DayCount; d++) cells[b][d] = [];
-        }
-        return cells;
     }
 
     private static List<GridCard>[] CreateDays()

@@ -21,6 +21,7 @@ public static class PermissionCatalog
         new("anniversary.use", "anniversary", "纪念日（倒计时与每年重复）"),
         new("couples.view",    "couples",     "情侣空间（仅限指定两人，慎授权）"),
         new("board.use",       "board",       "留言板（小圈子公开留言）"),
+        new("board.moderate",  "board",       "留言板管理（删除任意人的留言）"),
         new("expense.use",     "expense",     "记账本（收支流水）"),
         new("period.use",      "period",      "经期助手（仅本人数据，慎授权）"),
         new("export.use",      "export",      "数据导出（个人数据备份）"),

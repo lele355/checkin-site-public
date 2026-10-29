@@ -87,4 +87,67 @@ public static class GameSettingsCatalog
             if (Math.Abs(o - value) < Math.Abs(best - value)) best = o;
         return best;
     }
+
+    // ---------- 分两个入口改：游戏总设置 / 单游戏杂项设置 ----------
+    // 两者共用 User.GameSettings 这一行 JSON，但**必须各自独立的 DTO**：
+    // 若直接拿半截 payload 反序列化成 GameSettings，没传的那半会落回默认值 ——
+    // 改一下显示偏好，规则默认就被重置了。
+
+    /// <summary>游戏总设置（显示偏好）：不进房间、不上服务端判定，纯前端表现</summary>
+    public sealed class DisplaySettings
+    {
+        public bool TapConfirm { get; set; }
+        public bool ShowCoord { get; set; } = true;
+        public bool LastMark { get; set; } = true;
+        public bool Vibrate { get; set; } = true;
+    }
+
+    /// <summary>五子棋杂项设置（规则默认）：建房时快照进房间，之后双方共享</summary>
+    public sealed class RuleDefaults
+    {
+        public int Size { get; set; } = CheckinApp.Services.GomokuRules.DefaultSize;
+        public bool Forbidden { get; set; }
+        public int MoveTimeoutSec { get; set; }
+        public int TotalTimeoutSec { get; set; }
+    }
+
+    public static DisplaySettings ToDisplay(GameSettings s) => new()
+    {
+        TapConfirm = s.TapConfirm,
+        ShowCoord = s.ShowCoord,
+        LastMark = s.LastMark,
+        Vibrate = s.Vibrate,
+    };
+
+    public static GameSettings Apply(GameSettings s, DisplaySettings d) => Normalize(new()
+    {
+        Size = s.Size,
+        Forbidden = s.Forbidden,
+        MoveTimeoutSec = s.MoveTimeoutSec,
+        TotalTimeoutSec = s.TotalTimeoutSec,
+        TapConfirm = d.TapConfirm,
+        ShowCoord = d.ShowCoord,
+        LastMark = d.LastMark,
+        Vibrate = d.Vibrate,
+    });
+
+    public static RuleDefaults ToRules(GameSettings s) => new()
+    {
+        Size = s.Size,
+        Forbidden = s.Forbidden,
+        MoveTimeoutSec = s.MoveTimeoutSec,
+        TotalTimeoutSec = s.TotalTimeoutSec,
+    };
+
+    public static GameSettings Apply(GameSettings s, RuleDefaults r) => Normalize(new()
+    {
+        Size = r.Size,
+        Forbidden = r.Forbidden,
+        MoveTimeoutSec = r.MoveTimeoutSec,
+        TotalTimeoutSec = r.TotalTimeoutSec,
+        TapConfirm = s.TapConfirm,
+        ShowCoord = s.ShowCoord,
+        LastMark = s.LastMark,
+        Vibrate = s.Vibrate,
+    });
 }

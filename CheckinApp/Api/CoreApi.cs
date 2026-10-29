@@ -75,9 +75,10 @@ public static class CoreApi
             var semesterConfigured = false;
             if (has("courses.use"))
             {
-                var setting = db.AppSettings.FirstOrDefault(s => s.Key == "courses.semester-start");
-                semesterConfigured = setting is not null && DateTime.TryParse(setting.Value, out _);
-                // 学期表：起始日和「哪些课算今天的」都跟着当前学期走
+                // 学期表：起始日和「哪些课算今天的」都跟着当前学期走。
+                // SemesterService.Current 找不到会自动建一个，所以这里恒为已配置；
+                // 以前它去读老的 AppSetting("courses.semester-start")，那条现在只作兼容镜像。
+                semesterConfigured = true;
                 var sem = SemesterService.Current(db, uid);
                 var semStart = sem.StartDate;
                 currentWeek = Math.Max(1, (int)((today - semStart).TotalDays / 7) + 1);
@@ -91,7 +92,7 @@ public static class CoreApi
                     {
                         id = c.Id, name = c.Name, teacher = c.Teacher, location = c.Location,
                         startPeriod = c.StartPeriod, endPeriod = c.EndPeriod, category = c.Category,
-                        hours = HoursOf(c.StartPeriod, periods),
+                        hours = HoursOf(c.StartPeriod, c.EndPeriod, periods),
                         weeksLabel = Weeks.Display(c.WeeksText),
                     });
                 }
@@ -408,11 +409,13 @@ public static class CoreApi
         _ => "晚上好",
     };
 
-    private static string HoursOf(int startPeriod, List<PeriodSlot> periods)
+    private static string HoursOf(int startPeriod, int endPeriod, List<PeriodSlot> periods)
     {
         if (periods.Count == 0) return "";
-        var p = Math.Clamp(startPeriod, 1, periods.Count) - 1;
-        return $"{periods[p].Start}～{periods[p].End}";
+        // 吃 endPeriod：1-2 节是 08:00～09:50，只按 startPeriod 取会显示成 08:00～08:50
+        var s = Math.Clamp(startPeriod, 1, periods.Count) - 1;
+        var e = Math.Clamp(Math.Max(endPeriod, startPeriod), 1, periods.Count) - 1;
+        return $"{periods[s].Start}～{periods[e].End}";
     }
 
     private static DateTime MondayOf(DateTime d) => d.AddDays(-(((int)d.DayOfWeek + 6) % 7));

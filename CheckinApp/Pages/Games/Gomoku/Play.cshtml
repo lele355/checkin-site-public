@@ -1,5 +1,5 @@
 @page "{id:int}"
-@model CheckinApp.Pages.Games.PlayModel
+@model CheckinApp.Pages.Games.Gomoku.PlayModel
 @using System.Globalization
 @using CheckinApp.Services
 @{
@@ -180,25 +180,9 @@
                 <button class="btn secondary" type="submit">解散</button>
             </form>
         }
-        <a class="btn secondary" asp-page="/Games">回大厅</a>
-        <a class="btn secondary" asp-page="/Games/Settings">设置</a>
+        <a class="btn secondary" asp-page="/Games/Gomoku">回大厅</a>
+        <a class="btn secondary" asp-page="/Games/Gomoku/Settings">设置</a>
     </div>
-
-    <p class="hint gm-hint">
-        点交叉点落子，先连成五个（含斜线）就赢。
-        @if (room.Forbidden)
-        {
-            <span>标准规则：黑方连成六个以上判负（白方长连仍算赢）。</span>
-        }
-        else
-        {
-            <span>自由规则：超过五连也算赢，没有禁手。</span>
-        }
-        @if (settings.TapConfirm)
-        {
-            <span>已开「落子确认」：第一下预览，再点同一处才落子。</span>
-        }
-    </p>
 </div>
 
 <script type="application/json" id="gmState">@Html.Raw(Model.StateJson)</script>

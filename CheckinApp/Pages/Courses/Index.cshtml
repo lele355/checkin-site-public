@@ -35,64 +35,10 @@
 </div>
 
 <div class="card tt-board">
-    @* 图例已删除：颜色现在区分的是「哪门课」，一门课一个色，
-       列一排「紫=高等数学、蓝=机械CAD」等于把课程名又抄一遍，白白多占一行。 *@
+    @* 一张网格通吃桌面与手机：左侧节次（节号 + 起止时间）+ 七天列。
+       以前桌面走「大节 × 星期」表格、手机走网格，两套渲染两套逻辑 ——
+       表格那套把相邻两小节配成一大节来拼时段，作息一改时间就全错，和 App 对不上。 *@
 
-    @* ---- 桌面：教务式大节×星期 表格 ---- *@
-    <div class="tt-wrap scroll-x">
-        <table class="tt">
-            <thead>
-                <tr>
-                    <th class="tt-time">节次</th>
-                    @for (var d = 0; d < IndexModel.DayCount; d++)
-                    {
-                        var date = Model.WeekStart.AddDays(d);
-                        var isToday = date == Model.Today;
-                        <th class="@(isToday ? "today" : "")">
-                            @dayNames[d]
-                            <div class="mini">@date.ToString("MM-dd")</div>
-                        </th>
-                    }
-                </tr>
-            </thead>
-            <tbody>
-                @for (var b = 0; b < Model.BlockCount; b++)
-                {
-                    <tr>
-                        <th class="tt-time">
-                            <div class="tt-block">@Model.Blocks[b].Label</div>
-                            <div class="mini">(@Model.Blocks[b].Sub)</div>
-                            <div class="mini tt-hours">🕐 @Model.Blocks[b].Hours</div>
-                        </th>
-                        @for (var d = 0; d < IndexModel.DayCount; d++)
-                        {
-                            var date = Model.WeekStart.AddDays(d);
-                            var isToday = date == Model.Today;
-                            <td class="@(isToday ? "today" : "") @(Model.Cells[b][d].Count == 0 ? "tt-empty" : "")">
-                                @foreach (var c in Model.Cells[b][d])
-                                {
-                                    <a class="course-card cs-@c.Color @(c.OffWeek ? "off-week" : "")" href="/Courses/Edit/@c.Id">
-                                        <div class="cc-name">@c.Name</div>
-                                        <div class="cc-meta">周次:@Weeks.Display(c.WeeksText)</div>
-                                        @if (!string.IsNullOrWhiteSpace(c.Location))
-                                        {
-                                            <div class="cc-meta">地点:@c.Location</div>
-                                        }
-                                        @if (!string.IsNullOrWhiteSpace(c.Teacher))
-                                        {
-                                            <div class="cc-meta">老师:@c.Teacher</div>
-                                        }
-                                    </a>
-                                }
-                            </td>
-                        }
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-
-    @* ---- 手机：课程格子式网格（左侧节次+时间、卡片跨节、撞课并排） ---- *@
     <div class="ttm">
       <div class="ttm-scroll">
         <div class="ttm-head">
@@ -139,20 +85,12 @@
             }
         </div>
       </div>
-      <div class="ttm-swipe-hint">← 左右滑动看完整一周 →</div>
     </div>
 
     @if (Model.ThisWeekCount == 0)
     {
         <div class="hint" style="margin-top:10px;">
-            @if (Model.Week == Model.CurrentWeek)
-            {
-                <text>本周没有课。可能是周次范围没覆盖第 @Model.Week 周，或还没添加课程。</text>
-            }
-            else
-            {
-                <text>第 @Model.Week 周没有课。</text>
-            }
+            @(Model.Week == Model.CurrentWeek ? "本周没有课" : $"第 {Model.Week} 周没有课")
         </div>
     }
 </div>
@@ -162,20 +100,19 @@
 
 <script>
     // 打开课表就把「今天」那一列滚进视野。
-    // 手机上 7 列是横滑的，默认停在周一 —— 周三有课也要先往右划两下才看得见，
+    // 窄屏上 7 列是横滑的，默认停在周一 —— 周三有课也要先往右划两下才看得见，
     // 而「今天上什么」才是打开课表最想看的。节次列是吸左的，所以要扣掉它的宽度再留一点余量。
     (function () {
         var scroll = document.querySelector('.ttm-scroll');
-        if (!scroll) return;
+        if (!scroll || scroll.scrollWidth <= scroll.clientWidth) return;
         var head = scroll.querySelector('.ttm-dhead.today');
         if (!head) return;
         var corner = scroll.querySelector('.ttm-corner');
         var gutter = corner ? corner.getBoundingClientRect().width : 0;
+        var colW = head.getBoundingClientRect().width || 78;
 
         // 让今天那列停在「第二节次列」的位置：左边留出一列（通常是昨天），
         // 右边还能看到后面两天。贴死最左边的话周一的课会被推出视野，反而看不到「昨天上了什么」。
-        var colW = head.getBoundingClientRect().width || 78;
-
         function locate() {
             var sr = scroll.getBoundingClientRect();
             var hr = head.getBoundingClientRect();

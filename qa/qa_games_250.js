@@ -1,17 +1,14 @@
-// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
-const ADMIN = process.env.QA_USER || 'admin';
 // qa_games_250.js — 小游戏（五子棋）网页端专项验证
-// 用法：node qa_games_250.js
-// 前提：本地站跑在 http://127.0.0.1:5188；管理员 admin / 口令见 appsettings.Local.json；
+// 用法：export QA_PASS='…' && node qa_games_250.js
+// 前提：本地站跑在 http://127.0.0.1:5188；管理员口令走 _env.js（不写死在文件里）；
 //       另需一个普通账号 qagamer / Qa123456（脚本会自动建）。
 //
 // 这个脚本覆盖：建房 → 页面渲染 → 点击落子（考验 SVG 坐标换算）→
 // 对手（另一个账号，走 API）落子 → 轮询把对手那手拉回来 → 手机视口不横向溢出。
 const { chromium } = require('playwright');
+const { USER, PASS } = require('./_env');
 
 const BASE = process.env.QA_BASE || 'http://127.0.0.1:5188';
-const USER = process.env.QA_USER || ADMIN;
-const PASS = process.env.QA_PASS || process.env.QA_PASS;
 const GUEST = { u: 'qagamer', p: 'Qa123456' };
 
 const out = [];
@@ -75,17 +72,19 @@ const stoneCount = async (page) => page.locator('#gmStones circle.gm-stone').cou
     const meTok = meLogin && meLogin.ok ? meLogin.data.token : null;
     T('拿到自己的令牌（用于重置设置）', !!meTok, meLogin && meLogin.error);
     if (meTok) {
-        const reset = await api('PUT', '/api/v1/games/settings', {
-            size: 15, forbidden: false, tapConfirm: false,
-            showCoord: true, lastMark: true, vibrate: true,
-            moveTimeoutSec: 0, totalTimeoutSec: 0,
+        // 设置分两个入口，各存各的半 —— 得打两枪才能整体恢复出厂值
+        const rd = await api('PUT', '/api/v1/games/settings', {
+            tapConfirm: false, showCoord: true, lastMark: true, vibrate: true,
         }, meTok);
-        T('默认设置已重置为出厂值', reset.ok === true && reset.data.tapConfirm === false,
-            JSON.stringify(reset.data || reset.error));
+        const rr = await api('PUT', '/api/v1/games/gomoku/settings', {
+            size: 15, forbidden: false, moveTimeoutSec: 0, totalTimeoutSec: 0,
+        }, meTok);
+        T('默认设置已重置为出厂值', rd.ok === true && rr.ok === true && rd.data.tapConfirm === false,
+            JSON.stringify(rd.data || rd.error) + ' / ' + JSON.stringify(rr.data || rr.error));
     }
 
     // ---------- 大厅 ----------
-    await page.goto(BASE + '/Games');
+    await page.goto(BASE + '/Games/Gomoku');
     await page.waitForLoadState('networkidle');
     T('大厅可达', page.url().includes('/Games'), page.url());
     T('有「新建对局（我先手）」按钮', (await page.locator('body').innerText()).includes('新建对局（我先手）'));
@@ -95,9 +94,9 @@ const stoneCount = async (page) => page.locator('#gmStones circle.gm-stone').cou
     const createBtn = page.locator('form[action*="handler=Create"] button').first();
     await createBtn.click();
     await page.waitForLoadState('networkidle');
-    T('建房后进入棋盘页', /\/Games\/Play\/\d+/.test(page.url()), page.url());
+    T('建房后进入棋盘页', /\/Games\/Gomoku\/Play\/\d+/.test(page.url()), page.url());
 
-    const roomId = page.url().match(/\/Games\/Play\/(\d+)/)[1];
+    const roomId = page.url().match(/\/Games\/Gomoku\/Play\/(\d+)/)[1];
     const codeText = await page.locator('.gm-code').innerText();
     const code = codeText.replace(/[^A-Z0-9]/g, '');
     T('显示房间码（6 位）', code.length === 6, codeText);
@@ -135,12 +134,12 @@ const stoneCount = async (page) => page.locator('#gmStones circle.gm-stone').cou
     T('点击落子后出现 1 颗棋子', await stoneCount(page) === 1, String(await stoneCount(page)));
     T('出现最后一手标记', await page.locator('#gmStones circle.gm-last').count() === 1);
 
-    const st = await api('GET', '/api/v1/games/' + roomId, undefined, gt);
+    const st = await api('GET', '/api/v1/games/gomoku/rooms/' + roomId, undefined, gt);
     T('服务端记录了这手 (7,7)', st.data.moveCount === 1 && st.data.moves[0].x === 7 && st.data.moves[0].y === 7,
         JSON.stringify(st.data.moves));
 
     // ---------- 对手落子 → 轮询拉回 ----------
-    const mv = await api('POST', '/api/v1/games/' + roomId + '/move', { x: 8, y: 8 }, gt);
+    const mv = await api('POST', '/api/v1/games/gomoku/rooms/' + roomId + '/move', { x: 8, y: 8 }, gt);
     T('对手落子成功', mv.ok, mv.error || '');
     await page.waitForTimeout(2600);
     T('轮询自动拉回对手那一手（2 颗子）', await stoneCount(page) === 2, String(await stoneCount(page)));
@@ -156,7 +155,7 @@ const stoneCount = async (page) => page.locator('#gmStones circle.gm-stone').cou
     const mob = await ctx.newPage();
     await mob.setViewportSize({ width: 390, height: 844 });
     mob.on('pageerror', e => T('手机视口无 JS 异常', false, e.message));
-    await mob.goto(BASE + '/Games/Play/' + roomId);
+    await mob.goto(BASE + '/Games/Gomoku/Play/' + roomId);
     await mob.waitForLoadState('networkidle');
     const overflow = await mob.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     T('手机视口无横向溢出', overflow <= 1, 'overflow=' + overflow);
@@ -165,12 +164,12 @@ const stoneCount = async (page) => page.locator('#gmStones circle.gm-stone').cou
     await mob.screenshot({ path: 'qa_games_play_mobile.png', fullPage: true });
 
     // ---------- 大厅能看到这盘 ----------
-    await mob.goto(BASE + '/Games');
+    await mob.goto(BASE + '/Games/Gomoku');
     await mob.waitForLoadState('networkidle');
     const lobby = await mob.locator('body').innerText();
     // 对局中的房间行显示的是「手数」而不是房间码，所以这里认链接和分组标题
     T('大厅里列出我的对局',
-        lobby.includes('我的对局') && (await mob.locator(`a[href="/Games/Play/${roomId}"]`).count()) > 0);
+        lobby.includes('我的对局') && (await mob.locator(`a[href="/Games/Gomoku/Play/${roomId}"]`).count()) > 0);
 
     await browser.close();
 

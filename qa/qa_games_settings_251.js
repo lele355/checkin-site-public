@@ -1,5 +1,3 @@
-// 管理员用户名（不是秘密；口令从环境变量 QA_PASS 读，见 _env.js）
-const ADMIN = process.env.QA_USER || 'admin';
 // 小游戏「设置」专项（网页端）
 //
 // 覆盖：设置页读写 → 大厅建房选项 → 盘面尺寸/坐标 → 落子二次确认 → 计时条 → 超时判负 → 恢复默认
@@ -8,11 +6,13 @@ const ADMIN = process.env.QA_USER || 'admin';
 // 走 UI 会卡在 /ChangePassword。API 登录没有这个门槛，也更快。
 //
 // 跑法：本地起好服务（5188）后
-//   NODE_PATH=C:/Users/An/AppData/Roaming/npm/node_modules/@playwright/cli/node_modules node qa/qa_games_settings_251.js
+//   export QA_PASS='…' && NODE_PATH=… node qa/qa_games_settings_251.js
+// 管理员口令走 _env.js，不写死在文件里（见 _env.js 顶部的铁律）。
 const { chromium } = require('playwright');
+const { USER: HOST_USER, PASS: HOST_PASS } = require('./_env');
 
-const BASE = 'http://127.0.0.1:5188';
-const HOST = { u: ADMIN, p: process.env.QA_PASS };
+const BASE = process.env.QA_BASE || 'http://127.0.0.1:5188';
+const HOST = { u: HOST_USER, p: HOST_PASS };
 const GUEST = { u: 'qagamer', p: 'Qa123456' };
 
 let ok = 0, fail = 0;
@@ -56,19 +56,17 @@ async function login(ctx, who) {
   const gTok = gLogin.token;
   check('对手账号拿到令牌', !!gTok, gLogin.error || '');
 
-  // ---------- 1. 设置页读写 ----------
-  await host.goto(BASE + '/Games/Settings');
+  // ---------- 1a. 五子棋杂项设置（规则默认） ----------
+  await host.goto(BASE + '/Games/Gomoku/Settings');
   await host.waitForLoadState('networkidle');
-  check('设置页可达', (await host.locator('h2').first().innerText()).includes('小游戏设置'));
-  check('设置页有四个对局规则下拉', (await host.locator('select').count()) === 4,
+  check('杂项设置页可达', (await host.locator('h2').first().innerText()).includes('五子棋设置'));
+  check('杂项设置页有四个对局规则下拉', (await host.locator('select').count()) === 4,
     await host.locator('select').count());
 
   await host.selectOption('#size', '19');
   await host.selectOption('#forbidden', '1');
   await host.selectOption('#moveTimeoutSec', '30');
   await host.selectOption('#totalTimeoutSec', '300');
-  const tap = host.locator('input[name="tapConfirm"]');
-  if (!(await tap.isChecked())) await tap.check();
 
   await host.click('form:has(button:has-text("保存设置")) button:has-text("保存设置")');
   await host.waitForLoadState('networkidle');
@@ -78,12 +76,27 @@ async function login(ctx, who) {
   check('保存后仍是标准规则', (await host.inputValue('#forbidden')) === '1');
   check('保存后单步 30 秒', (await host.inputValue('#moveTimeoutSec')) === '30');
   check('保存后总用时 5 分钟', (await host.inputValue('#totalTimeoutSec')) === '300');
+
+  // ---------- 1b. 游戏总设置（显示偏好，另一个入口） ----------
+  await host.goto(BASE + '/Games/Settings');
+  await host.waitForLoadState('networkidle');
+  check('总设置页可达', (await host.locator('h2').first().innerText()).includes('游戏设置'));
+  const tap = host.locator('input[name="tapConfirm"]');
+  if (!(await tap.isChecked())) await tap.check();
+  await host.click('form:has(button:has-text("保存设置")) button:has-text("保存设置")');
+  await host.waitForLoadState('networkidle');
   check('保存后二次确认仍勾着', await tap.isChecked());
 
-  // ---------- 2. 大厅：设置入口 + 建房选项 ----------
-  await host.goto(BASE + '/Games');
+  // 两半互不覆盖：改了显示偏好，规则默认要还在
+  await host.goto(BASE + '/Games/Gomoku/Settings');
   await host.waitForLoadState('networkidle');
-  check('大厅有「设置」入口', (await host.locator('a[href="/Games/Settings"]').count()) >= 1);
+  check('改显示偏好没有动到规则默认（盘面还是 19）',
+    (await host.inputValue('#size')) === '19', await host.inputValue('#size'));
+
+  // ---------- 2. 大厅：设置入口 + 建房选项 ----------
+  await host.goto(BASE + '/Games/Gomoku');
+  await host.waitForLoadState('networkidle');
+  check('大厅有「设置」入口', (await host.locator('a[href="/Games/Gomoku/Settings"]').count()) >= 1);
   check('建房处有盘面下拉', (await host.locator('form select[name="size"]').count()) === 1);
   check('盘面下拉默认 19×19', (await host.inputValue('form select[name="size"]')) === '19');
   check('规则下拉默认标准', (await host.inputValue('form select[name="forbidden"]')) === '1');
@@ -92,7 +105,7 @@ async function login(ctx, who) {
   await host.click('button[name="side"][value="1"]');
   await host.waitForLoadState('networkidle');
   const playUrl = host.url();
-  check('建房后进棋盘页', /\/Games\/Play\/\d+/.test(playUrl), playUrl);
+  check('建房后进棋盘页', /\/Games\/Gomoku\/Play\/\d+/.test(playUrl), playUrl);
   const roomId = Number(playUrl.split('/').pop());
   const roomCode = (await host.locator('.gm-code').innerText()).replace(/[^A-Z0-9]/g, '');
   check('棋盘页显示房间码', roomCode.length === 6, roomCode);
@@ -105,7 +118,7 @@ async function login(ctx, who) {
   check('规则 chips 含标准规则', chips.includes('标准规则'), chips);
 
   // ---------- 4. 对手先坐下，再测落子确认 ----------
-  const joined = await api('POST', `/api/v1/games/${roomId}/join`, undefined, gTok);
+  const joined = await api('POST', `/api/v1/games/gomoku/rooms/${roomId}/join`, undefined, gTok);
   check('对手坐下成功', joined.status === 200, joined.error || joined.status);
 
   await host.reload();
@@ -134,7 +147,7 @@ async function login(ctx, who) {
   // #gmStones 里除了棋子还有「最后一手」的小标记圈，数棋子要认 .gm-stone
   const stones = () => host.locator('#gmStones circle.gm-stone').count();
   const movesOf = async () => {
-    const r = await api('GET', `/api/v1/games/${roomId}`, undefined, gTok);
+    const r = await api('GET', `/api/v1/games/gomoku/rooms/${roomId}`, undefined, gTok);
     return r.moves || [];
   };
 
@@ -174,21 +187,21 @@ async function login(ctx, who) {
   check('计时条含本步/我的剩余', /本步|我 /.test(c2 || ''), c2);
 
   // ---------- 6. 超时判负：单步 15 秒，轮到黑方不动 ----------
-  await host.goto(BASE + '/Games/Settings');
+  await host.goto(BASE + '/Games/Gomoku/Settings');
   await host.waitForLoadState('networkidle');
   await host.selectOption('#moveTimeoutSec', '15');
   await host.selectOption('#totalTimeoutSec', '0');
   await host.click('form:has(button:has-text("保存设置")) button:has-text("保存设置")');
   await host.waitForLoadState('networkidle');
 
-  await host.goto(BASE + '/Games');
+  await host.goto(BASE + '/Games/Gomoku');
   await host.waitForLoadState('networkidle');
   await host.click('button[name="side"][value="1"]');     // 我执黑先手，且我不动
   await host.waitForLoadState('networkidle');
   const url2 = host.url();
   const id2 = Number(url2.split('/').pop());
   const code2 = (await host.locator('.gm-code').innerText()).replace(/[^A-Z0-9]/g, '').slice(-6);
-  const j2 = await api('POST', `/api/v1/games/${id2}/join`, undefined, gTok);
+  const j2 = await api('POST', `/api/v1/games/gomoku/rooms/${id2}/join`, undefined, gTok);
   check('第二盘对手坐下成功', j2.status === 200, j2.error || j2.status);
 
   console.log('       … 等 17 秒让单步限时走完');
@@ -203,7 +216,7 @@ async function login(ctx, who) {
   check('超时方是黑（不动的那方）', /你输了|白棋胜/.test(overText), overText);
 
   // ---------- 7. 恢复默认 ----------
-  await host.goto(BASE + '/Games/Settings');
+  await host.goto(BASE + '/Games/Gomoku/Settings');
   await host.waitForLoadState('networkidle');
   // 这个表单带 data-confirm，第一下只把按钮改成确认文案（按钮文字会变），
   // 所以按 action 里的 handler 定位，别按文字定位
@@ -215,7 +228,12 @@ async function login(ctx, who) {
   check('恢复默认后 15×15', (await host.inputValue('#size')) === '15', await host.inputValue('#size'));
   check('恢复默认后自由规则', (await host.inputValue('#forbidden')) === '0', await host.inputValue('#forbidden'));
   check('恢复默认后不限时', (await host.inputValue('#moveTimeoutSec')) === '0', await host.inputValue('#moveTimeoutSec'));
-  check('恢复默认后二次确认关闭', !(await host.locator('input[name="tapConfirm"]').isChecked()));
+
+  // 恢复默认只清自己那半：显示偏好要在另一个页面里还是开着的
+  await host.goto(BASE + '/Games/Settings');
+  await host.waitForLoadState('networkidle');
+  check('恢复规则默认没有动到显示偏好（二次确认仍开着）',
+    await host.locator('input[name="tapConfirm"]').isChecked());
 
   // 收摊：清掉这两盘，别在大厅里留垃圾
   await host.goto(url2);

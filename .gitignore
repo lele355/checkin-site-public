@@ -502,3 +502,12 @@ CheckinApp/data/pylab/
 
 # 数据保护密钥（含私钥！放在 data/keys 是为了让发版脚本保留，绝不能入库）
 CheckinApp/data/keys/
+
+# QA 截图（真实界面数据：课程表、姓名、记账分类、邮件…）—— 绝不入库。
+# 2026-10-29 查过一次：25 张被误跟踪，公开镜像里混进了 8 张。
+# 导出脚本 _export_public.js 也有一条对应的排除规则，两处一起堵。
+qa/*.png
+qa/*.jpg
+qa/*.jpeg
+qa/*.webp
+qa/*.gif

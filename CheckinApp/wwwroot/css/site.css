@@ -774,31 +774,6 @@ body {
 .cs-block-head b { font-size: .95rem; }
 .cs-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-.tt-wrap { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
-.tt { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 880px; }
-.tt th, .tt td { border: 1px solid var(--border); padding: 8px; vertical-align: top; }
-.tt thead th { text-align: center; font-weight: 600; background: var(--card-soft, var(--bg-soft)); white-space: nowrap; }
-.tt .tt-time {
-  position: sticky; left: 0; z-index: 2;      /* 手机横滑时节次列吸附，不跟跑 */
-  width: 112px; min-width: 112px; text-align: left;
-  background: var(--card);
-}
-.tt thead .tt-time { z-index: 3; background: var(--card-soft, var(--bg-soft)); }
-.tt .tt-block { font-weight: 600; white-space: nowrap; }
-.tt .tt-hours { white-space: nowrap; }
-.tt td { height: 96px; min-width: 104px; }
-.tt .today { background: var(--accent-soft); }   /* 今天所在列 */
-
-.course-card {
-  display: block; padding: 8px; margin-bottom: 6px; border-radius: var(--radius-in);
-  text-decoration: none;
-  background: var(--cc-bg); color: var(--cc);
-}
-.course-card:last-child { margin-bottom: 0; }
-.course-card:hover { filter: brightness(.96); }
-.course-card .cc-name { font-weight: 600; margin-bottom: 2px; }
-.course-card .cc-meta { font-size: .78rem; opacity: .92; line-height: 1.5; }
-
 /* ---------- 课程配色：按「课程」而不是「类别」 ----------
    同名课程同色（服务端 CoursePalette 归一化课名后算出来），一门课整学期一个色，
    顺着颜色就能把一周里分散的几次课串起来。CSS 变量两个：
@@ -906,14 +881,23 @@ body {
   background: var(--cc-bg); color: var(--cc); font-size: .86rem;
 }
 
-/* ---------- 手机课表网格（课程格子式：左侧节次+时间、卡片跨节、撞课并排） ---------- */
-.ttm { display: none; --ttm-row: 46px; --ttm-gut: 42px; --ttm-col: 1fr; }
+/* ---------- 课表网格（全视口一套）：左侧节次+时间、七天列、卡片跨节、撞课并排 ----------
+   桌面把 --ttm-col 留成 1fr，七列平分宽度；窄屏在媒体查询里改成定宽列 + 横滑。 */
+.ttm {
+  display: block;
+  --ttm-row: 56px; --ttm-gut: 58px; --ttm-col: 1fr;
+  --ttm-day-min: 92px;
+}
 .ttm-scroll { }
-.ttm-head { display: grid; grid-template-columns: var(--ttm-gut) repeat(7, var(--ttm-col)); border-bottom: 1px solid var(--border); }
-.ttm-corner { display: flex; align-items: center; justify-content: center; padding: 4px 0; font-size: .62rem; color: var(--text-weak); }
-.ttm-dhead { text-align: center; padding: 4px 1px; line-height: 1.3; }
-.ttm-dhead b { display: block; font-size: .72rem; }
-.ttm-dhead span { font-size: .6rem; color: var(--text-weak); }
+.ttm-head {
+  display: grid;
+  grid-template-columns: var(--ttm-gut) repeat(7, minmax(var(--ttm-day-min), var(--ttm-col)));
+  border-bottom: 1px solid var(--border);
+}
+.ttm-corner { display: flex; align-items: center; justify-content: center; padding: 4px 0; font-size: .68rem; color: var(--text-weak); }
+.ttm-dhead { text-align: center; padding: 6px 1px; line-height: 1.3; }
+.ttm-dhead b { display: block; font-size: .82rem; }
+.ttm-dhead span { font-size: .7rem; color: var(--text-weak); }
 .ttm-dhead.today { background: var(--accent-soft); border-radius: 6px 6px 0 0; }
 /* 今天：日期做成反白小胶囊。
    只用淡底色 + 加粗隔得太远看不见（editorial 主题的强调色本身就是墨黑，
@@ -924,15 +908,18 @@ body {
   background: var(--accent); color: var(--on-accent, #fff);
   font-weight: 600;
 }
-.ttm-body { display: grid; grid-template-columns: var(--ttm-gut) repeat(7, var(--ttm-col)); }
+.ttm-body {
+  display: grid;
+  grid-template-columns: var(--ttm-gut) repeat(7, minmax(var(--ttm-day-min), var(--ttm-col)));
+}
 .ttm-gutter { border-right: 1px solid var(--border); }
 .ttm-gcell {
   height: var(--ttm-row); display: flex; flex-direction: column;
   align-items: center; justify-content: center; line-height: 1.15;
   border-bottom: 1px dashed var(--border);
 }
-.ttm-gcell b { font-size: .72rem; }
-.ttm-gcell span { font-size: .55rem; color: var(--text-weak); }
+.ttm-gcell b { font-size: .8rem; }
+.ttm-gcell span { font-size: .68rem; color: var(--text-weak); }
 .ttm-day {
   position: relative; border-right: 1px solid var(--border);
   background: repeating-linear-gradient(to bottom,
@@ -943,23 +930,21 @@ body {
 .ttm-day.today { background-color: var(--accent-soft); }
 .ttm-card {
   position: absolute; display: block; overflow: hidden;
-  padding: 3px 4px; border-radius: 7px; text-decoration: none;
+  padding: 4px 6px; border-radius: 7px; text-decoration: none;
   /* 半透明底 + 同色细边：底色压薄一点，课程名读起来更轻，
      也让「今天列」的淡底能透出来（纯实色会把整列的高亮盖掉）。 */
   background: color-mix(in srgb, var(--cc-bg) 74%, transparent);
   border: 1px solid color-mix(in srgb, var(--cc) 22%, transparent);
   color: var(--cc);
-  font-size: .58rem; line-height: 1.25;
+  font-size: .72rem; line-height: 1.3;
 }
-.ttm-card b { display: block; font-size: .62rem; word-break: break-all; }
-.ttm-card span { display: block; opacity: .85; word-break: break-all; }
+.ttm-card b { display: block; font-size: .78rem; overflow-wrap: anywhere; }
+.ttm-card span { display: block; opacity: .85; overflow-wrap: anywhere; }
 .ttm-card:hover { filter: brightness(.96); }
 .ttm-fab { display: none; }
-.ttm-swipe-hint { display: none; }
 
-@media (max-width: 640px) {
-  .tt-wrap { display: none; }             /* 手机看网格，桌面看教务表格 */
-  .ttm { display: block; --ttm-row: 44px; --ttm-gut: 38px; --ttm-col: 78px; }
+@media (max-width: 720px) {
+  .ttm { --ttm-row: 44px; --ttm-gut: 38px; --ttm-col: 96px; --ttm-day-min: 96px; }
   /* 7 列挤在 390px 里课程名会被拆成两行，改成定宽列 + 横滑，节次列吸左不动 */
   .ttm-scroll {
     overflow-x: auto; overflow-y: hidden;
@@ -980,10 +965,6 @@ body {
   .ttm-card { padding: 3px 4px; }
   .ttm-card b { font-size: .68rem; }
   .ttm-card span { font-size: .6rem; }
-  .ttm-swipe-hint {
-    display: block; text-align: center; margin-top: 8px;
-    font-size: .7rem; color: var(--text-weak);
-  }
   .tt-nav .btn { padding: 0 10px; font-size: .8rem; }
   .tt-week { min-width: 92px; }
   .ttm-fab {
@@ -1718,6 +1699,11 @@ input[type="month"]::-webkit-calendar-picker-indicator:hover { opacity:1; }
 .dash-row .dash-name {
   flex:1; min-width:0; font-size:.92rem; font-weight:600;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+/* 问候块行：面板最上方的固定行，只有显隐开关（没有图钉/↑↓） */
+.dash-row-fixed {
+  background:var(--accent-soft); border-color:transparent;
+  margin-bottom:12px;
 }
 .dash-vis {
   display:inline-flex; align-items:center; gap:5px; flex:none;

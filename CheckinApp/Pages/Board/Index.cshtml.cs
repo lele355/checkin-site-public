@@ -45,9 +45,10 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     public IActionResult OnPostDelete(int id)
     {
         if (_me.UserId is not int uid) return RedirectToPage("/Login");
-        // 只能删自己的留言（管理员也不能删别人的 —— 小圈子自觉为主）
-        var m = _db.BoardMessages.FirstOrDefault(x => x.Id == id && x.UserId == uid);
+        // 只能删自己的；有 board.moderate（管理员）可删任意
+        var m = _db.BoardMessages.FirstOrDefault(x => x.Id == id);
         if (m is null) return NotFound();
+        if (m.UserId != uid && !_me.Has("board.moderate")) return Forbid();
         _db.BoardMessages.Remove(m);
         _db.SaveChanges();
         return RedirectToPage();

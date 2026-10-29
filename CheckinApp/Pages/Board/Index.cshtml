@@ -8,7 +8,6 @@
     <div class="page-head">
         <h2>留言板</h2>
     </div>
-    <p class="hint" style="margin-top:6px;">小圈子的公共留言板，大家都看得到。</p>
 
     @if (Model.Error is string err)
     {
@@ -39,9 +38,9 @@ else
                         <div class="mini">@m.User?.DisplayName · @CheckinApp.Services.SiteClock.ToLocal(m.CreatedAt).ToString("M月d日 HH:mm")</div>
                         <div style="white-space:pre-wrap;margin-top:2px;">@m.Content</div>
                     </div>
-                    @if (m.UserId == Me.UserId)
+                    @if (m.UserId == Me.UserId || Me.Has("board.moderate"))
                     {
-                        <form method="post" asp-page-handler="Delete">
+                        <form method="post" asp-page-handler="Delete" data-confirm="确认删除">
                             <input type="hidden" name="id" value="@m.Id" />
                             <button class="mini" type="submit" style="border:none;background:none;cursor:pointer;color:var(--text-muted);">删除</button>
                         </form>

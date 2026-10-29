@@ -182,7 +182,7 @@
 
   function place(x, y) {
     bus = true;
-    fetch('/api/v1/games/' + state.id + '/move', {
+    fetch('/api/v1/games/gomoku/rooms/' + state.id + '/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
       credentials: 'same-origin',
@@ -230,7 +230,7 @@
   }
 
   function poll() {
-    fetch('/api/v1/games/' + state.id, {
+    fetch('/api/v1/games/gomoku/rooms/' + state.id, {
       headers: { 'X-Requested-With': 'fetch' },
       credentials: 'same-origin'
     }).then(function (r) {

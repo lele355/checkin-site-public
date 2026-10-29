@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
-namespace CheckinApp.Pages.Games;
+namespace CheckinApp.Pages.Games.Gomoku;
 
 /// <summary>
 /// 棋盘页。首屏由服务端渲染（关掉 JS 也能看到当前局面和最后一手），
@@ -56,7 +56,7 @@ public class PlayModel(AppDbContext db, CurrentUser me) : PageModel
     {
         if (_me.UserId is not int uid) return RedirectToPage("/Login");
         Join(id, uid);
-        return RedirectToPage("/Games/Play", new { id });
+        return RedirectToPage("/Games/Gomoku/Play", new { id });
     }
 
     /// <summary>退出：等人中的房主 = 解散；对局中 = 认输（与 App 的 leave 语义一致）</summary>
@@ -124,7 +124,7 @@ public class PlayModel(AppDbContext db, CurrentUser me) : PageModel
                 .SetProperty(x => x.Revision, rev + 1)
                 .SetProperty(x => x.UpdatedAt, now)
                 .SetProperty(x => x.FinishedAt, (DateTime?)null));
-        return RedirectToPage("/Games/Play", new { id });
+        return RedirectToPage("/Games/Gomoku/Play", new { id });
     }
 
     /// <summary>坐下（幂等）。成了返回 true</summary>
