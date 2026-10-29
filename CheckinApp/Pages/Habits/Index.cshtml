@@ -14,7 +14,6 @@
             <a class="btn" href="/Habits/New">@Html.Raw(Icons.Svg("plus", 16)) 新建习惯</a>
         </div>
     </div>
-    <p class="hint" style="margin-top:8px;">每天点亮一个好习惯，连续天数就是你的坚持勋章。</p>
 </div>
 
 @if (Model.Rows.Count == 0)
@@ -55,7 +54,7 @@ else if (Model.View == "grid")
                             <button class="btn" type="submit">打卡</button>
                         </form>
                     }
-                    <a class="mini" href="/Habits/Edit/@row.Habit.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                    <a class="pin-btn" href="/Habits/Edit/@row.Habit.Id" title="编辑" aria-label="编辑">@Html.Raw(Icons.Svg("pencil", 14))</a>
                 </div>
             </div>
         }
@@ -68,10 +67,10 @@ else
             @foreach (var row in Model.Rows)
             {
                 <div class="row-item" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                    <div style="width:36px;height:36px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">@row.Habit.Icon</div>
+                    <div style="width:36px;height:36px;border-radius:var(--radius-sm);background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">@row.Habit.Icon</div>
                     <div style="flex:1;min-width:120px;">
-                        <div style="font-weight:600;">@row.Habit.Name</div>
-                        <div class="mini habit-stats">
+                        <div style="font-weight:600;line-height:1.3;">@row.Habit.Name</div>
+                        <div class="mini habit-stats" style="line-height:1.2;">
                             累计 <b class="hs-total">@row.Total</b> 天 ·
                             <span class="hs-flame flame-badge" hidden="@(row.Streak < 2 ? "hidden" : null)" title="连续 @row.Streak 天，继续加油">@Html.Raw(Icons.Svg("flame", 14))连续 <b class="hs-n">@row.Streak</b> 天</span>
                             <span class="hs-plain" hidden="@(row.Streak >= 2 ? "hidden" : null)">连续 <b class="hs-n2" style="color:var(--accent-strong);">@row.Streak</b> 天</span>
@@ -92,7 +91,7 @@ else
                                 <button class="btn" type="submit">打卡</button>
                             </form>
                         }
-                        <a class="mini" href="/Habits/Edit/@row.Habit.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                        <a class="pin-btn" href="/Habits/Edit/@row.Habit.Id" title="编辑" aria-label="编辑">@Html.Raw(Icons.Svg("pencil", 14))</a>
                     </div>
                 </div>
             }

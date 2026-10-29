@@ -59,11 +59,17 @@
 
   --radius: 0px;
   --radius-sm: 0px;
-  --radius-lg: 0px;
-  /* 同心圆角：浮层容器用 --radius-pop，嵌在里面的元素用 --radius-in
-     （= 外圆角 - 内边距），两层弧度同圆心，嵌套处不会出现「圆里套方」。 */
+  /* 同心圆角：浮层容器用 --radius-pop，嵌在里面的元素用 --radius-in*
+     （= max(6px, 外圆角 - 间距)，外圆角为 0 的方形主题保持 0），
+     两层弧度同圆心，嵌套处不会出现「圆里套方」。
+     三对嵌套：pop→格子（间距 8）用 --radius-in-pop（--radius-in 是它的别名，旧引用不断）；
+     app-modal→内嵌框（间距 18 桌 / 12 移）用 --radius-in-modal；
+     .card→内嵌框（间距 12）用 --radius-in-card（natural 四角分别算，多值）。 */
   --radius-pop: 0px;
-  --radius-in: 0px;
+  --radius-in-pop: 0px;
+  --radius-in: var(--radius-in-pop);
+  --radius-in-modal: 0px;
+  --radius-in-card: 0px;
 
   --shadow: none;
   --shadow-hover: none;
@@ -104,9 +110,11 @@
 
   --radius: 20px;
   --radius-sm: 12px;
-  --radius-lg: 24px;
   --radius-pop: 20px;
-  --radius-in: 14px;
+  --radius-in-pop: 12px;
+  --radius-in: var(--radius-in-pop);
+  --radius-in-modal: 6px;
+  --radius-in-card: 8px;
 
   --neu-dark: #b8bcc2;   /* 右下暗影色（底色系可换） */
   --neu-light: #ffffff;  /* 左上亮影色 */
@@ -150,10 +158,13 @@
   /* 有机不规则圆角：四角不同半径，避免工业标准圆 */
   --radius: 26px 38px 24px 34px;
   --radius-sm: 999px;
-  --radius-lg: 36px 48px 32px 44px;
-  /* 浮层不能用多值圆角（calc 算不了），单给一套规整的同心值 */
+  /* 浮层不能用多值圆角（calc 算不了），单给一套规整的同心值；
+     --radius-in-card 跟随四角外圆角分别减 12（max(6, v-12)） */
   --radius-pop: 28px;
-  --radius-in: 18px;
+  --radius-in-pop: 20px;
+  --radius-in: var(--radius-in-pop);
+  --radius-in-modal: 10px;
+  --radius-in-card: 14px 26px 12px 22px;
 
   --shadow: 0 2px 10px rgba(92, 64, 51, .07);
   --shadow-hover: 0 4px 14px rgba(92, 64, 51, .10);
@@ -194,9 +205,11 @@
 
   --radius: 12px;
   --radius-sm: 8px;
-  --radius-lg: 12px;
   --radius-pop: 14px;
-  --radius-in: 9px;
+  --radius-in-pop: 6px;
+  --radius-in: var(--radius-in-pop);
+  --radius-in-modal: 6px;
+  --radius-in-card: 6px;
 
   --shadow: 0 1px 0 rgba(255, 255, 255, .05);
   --shadow-hover: 0 1px 0 rgba(255, 255, 255, .05);
@@ -243,9 +256,11 @@
   --clay-in: linear-gradient(180deg, #fdf0f5 0%, #f8e2ec 100%);  /* 输入面渐变（底色系可换） */
   --radius: 32px;
   --radius-sm: 20px;
-  --radius-lg: 40px;
   --radius-pop: 30px;
-  --radius-in: 22px;
+  --radius-in-pop: 22px;
+  --radius-in: var(--radius-in-pop);
+  --radius-in-modal: 12px;
+  --radius-in-card: 20px;
 
   --shadow: 12px 12px 24px rgba(0, 0, 0, .10), inset 6px 6px 12px rgba(255, 255, 255, .60), inset -4px -4px 8px rgba(0, 0, 0, .05);
   --shadow-hover: 6px 6px 12px rgba(0, 0, 0, .10), inset 4px 4px 8px rgba(255, 255, 255, .60), inset -3px -3px 6px rgba(0, 0, 0, .05);

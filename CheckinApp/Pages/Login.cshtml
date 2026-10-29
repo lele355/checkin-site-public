@@ -9,7 +9,7 @@
             <img src="~/icons/icon-192.png" alt="" width="30" height="30" asp-append-version="true" style="border-radius:9px;display:block;" />
             日常管理
         </h2>
-        <p class="hint" style="margin-bottom:18px;">自用小站，账号由管理员开通，或凭邀请码自助注册。</p>
+        <p class="hint" style="margin-bottom:18px;">账号由管理员开通，或凭邀请码注册</p>
 
         @if (!string.IsNullOrEmpty(Model.Error))
         {
@@ -21,7 +21,7 @@
         <div class="acct-block" id="acctBlock" hidden>
             <div class="acct-title">本机账号</div>
             <div class="acct-list" id="acctList"></div>
-            <p class="acct-note">密码只存在这台设备的浏览器里（Base64 混淆，非加密）。</p>
+            <p class="acct-note">密码仅存于本设备浏览器（未加密）</p>
         </div>
 
         <form method="post" id="loginForm">

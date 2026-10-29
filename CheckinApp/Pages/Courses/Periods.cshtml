@@ -6,7 +6,6 @@
 
 <div class="card" style="max-width:520px;margin:4vh auto 0;">
     <h2>节次时间设置</h2>
-    <p class="hint">自定义课程节数（1～16）和每节的起止时间。课表网格、「开始/结束节次」下拉、大节视图都按这里的配置来。</p>
 
     @if (Model.Error is string err)
     {
@@ -46,9 +45,7 @@
         </div>
     </form>
 
-    <p class="hint" style="margin-top:12px;">
-        注意：节数改小后，排在靠后节次的已有课程不会显示在课表里（数据不丢，把节数改回去就能看到）。
-    </p>
+    <p class="hint" style="margin-top:12px;">节数改小后，排在靠后节次的已有课程不会显示在课表里（数据不丢）。</p>
 </div>
 
 <script>

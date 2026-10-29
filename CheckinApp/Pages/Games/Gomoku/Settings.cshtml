@@ -5,7 +5,7 @@
     ViewData["Title"] = "五子棋设置";
     var s = Model.Rules;
 
-    string SizeText(int n) => $"{n} × {n}";
+    string SizeText(int n) => $"{n} 路";
     string TimeText(int sec) => sec <= 0 ? "不限" : (sec < 60 ? $"{sec} 秒" : $"{sec / 60} 分钟");
 }
 
@@ -51,13 +51,13 @@
                 <select id="forbidden" name="forbidden">
                     @if (s.Forbidden)
                     {
-                        <option value="0">自由规则 —— 长连也算赢</option>
-                        <option value="1" selected>标准规则 —— 黑方长连判负</option>
+                        <option value="0">自由规则</option>
+                        <option value="1" selected>标准规则</option>
                     }
                     else
                     {
-                        <option value="0" selected>自由规则 —— 长连也算赢</option>
-                        <option value="1">标准规则 —— 黑方长连判负</option>
+                        <option value="0" selected>自由规则</option>
+                        <option value="1">标准规则</option>
                     }
                 </select>
             </div>

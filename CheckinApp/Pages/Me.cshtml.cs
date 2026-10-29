@@ -140,7 +140,7 @@ public class MeModel(AppDbContext db, CurrentUser me) : PageModel
 
         user.PasswordHash = PasswordHasher.Hash(NewPassword);
         await _db.SaveChangesAsync();
-        TempData["Ok"] = "密码已更新，下次登录请使用新密码。";
+        TempData["Ok"] = "密码已更新，其它设备需要重新登录";
         return RedirectToPage();
     }
 

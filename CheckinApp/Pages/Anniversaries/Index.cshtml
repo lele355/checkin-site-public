@@ -14,7 +14,6 @@
             <a class="btn" href="/Anniversaries/New">@Html.Raw(Icons.Svg("plus", 16)) 新建纪念日</a>
         </div>
     </div>
-    <p class="hint" style="margin-top:8px;">值得记住的日子，勾选「每年重复」就会循环倒计时。</p>
 </div>
 
 @if (Model.Upcoming.Count == 0 && Model.Past.Count == 0)
@@ -79,7 +78,7 @@ else
                             else
                             {
                                 <div class="mini">还有</div>
-                                <div style="font-weight:700;font-size:20px;color:var(--accent-strong);">@row.DaysLeft <span class="mini">天</span></div>
+                                <div style="font-weight:700;font-size:20px;color:var(--accent-strong);font-variant-numeric:tabular-nums;">@row.DaysLeft <span class="mini">天</span></div>
                             }
                         </div>
                         <a class="mini" href="/Anniversaries/Edit/@row.Item.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>

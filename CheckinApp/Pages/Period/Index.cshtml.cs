@@ -23,12 +23,6 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     public int DaysToNext { get; set; }
     public bool HasEnoughData { get; set; }
 
-    // 内联新增
-    [BindProperty] public DateTime NewStartDate { get; set; } = DateTime.Today;
-    [BindProperty] public DateTime? NewEndDate { get; set; }
-    [BindProperty] public string NewNote { get; set; } = "";
-    public string? Error { get; private set; }
-
     public void OnGet() => Load();
 
     private void Load()
@@ -64,24 +58,5 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         // 预测下次
         NextPredicted = starts.Last().AddDays((int)Math.Round(AvgCycle));
         DaysToNext = (NextPredicted.Value - DateTime.Today).Days;
-    }
-
-    public IActionResult OnPostAdd()
-    {
-        if (_me.UserId is not int uid) return RedirectToPage("/Login");
-        if (NewEndDate is not null && NewEndDate.Value.Date < NewStartDate.Date)
-        { Error = "结束日期不能早于开始日期。"; Load(); return Page(); }
-
-        _db.PeriodRecords.Add(new PeriodRecord
-        {
-            UserId = uid,
-            StartDate = NewStartDate.Date,
-            EndDate = NewEndDate?.Date,
-            Note = NewNote?.Trim() ?? "",
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        });
-        _db.SaveChanges();
-        return RedirectToPage();
     }
 }

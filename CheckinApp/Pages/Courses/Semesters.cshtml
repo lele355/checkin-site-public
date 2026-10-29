@@ -11,10 +11,6 @@
             <a class="btn secondary" href="/Courses">@Html.Raw(Icons.Svg("arrow-left", 16)) 返回课表</a>
         </div>
     </div>
-    <p class="hint" style="margin-top:6px;">
-        每个学期各自有一份课表和起始日。切换学期只改「现在看哪一学期」，不会动数据；
-        删除学期会<b>连带删掉它下面的课程</b>，删之前想清楚。
-    </p>
 
     @if (Model.Error is string err)
     {
@@ -54,7 +50,7 @@
                             <button class="btn" type="submit">保存</button>
                         </form>
                     </details>
-                    <form method="post" asp-page-handler="Delete" data-confirm="确认删除这个学期">
+                    <form method="post" asp-page-handler="Delete" data-confirm="确认删除？它的课程会一起删">
                         <input type="hidden" name="id" value="@s.Id" />
                         <button class="btn danger" type="submit">删除</button>
                     </form>
@@ -66,7 +62,6 @@
     <div class="sem-new">
         <div class="cs-block-head" style="margin-bottom:8px;">
             <b>新建学期</b>
-            <span class="mini">起始日填开学第一周任意一天，会自动对齐到那周的周一</span>
         </div>
         <form method="post" asp-page-handler="Create" class="cs-inline">
             <input name="name" placeholder="2027 春（留空自动命名）" maxlength="20" style="flex:1;min-width:120px;" />

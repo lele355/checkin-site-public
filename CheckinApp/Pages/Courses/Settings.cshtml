@@ -11,10 +11,6 @@
             <a class="btn secondary" href="/Courses">@Html.Raw(Icons.Svg("arrow-left", 16)) 返回课表</a>
         </div>
     </div>
-    <p class="hint" style="margin-top:6px;">
-        学期起始日决定「第几周」怎么算；节次决定左侧那列的节数与上下课时间。
-        这些不常改，所以从课表页收进来了。
-    </p>
 
     @if (Model.Saved)
     {
@@ -24,7 +20,6 @@
     <div class="cs-block">
         <div class="cs-block-head">
             <b>学期起始日</b>
-            <span class="mini">开学第一周任意一天，会自动对齐到那周的周一</span>
         </div>
         <form method="post" asp-page-handler="Semester" class="cs-inline">
             <input type="date" asp-for="SemesterStartInput" />
@@ -37,24 +32,22 @@
             }
             else
             {
-                <text>还没设置过（上面预填的是本周一）；保存后才会按它算周次。</text>
+                <text>还没设置过</text>
             }
         </p>
     </div>
 
     <div class="cs-block">
         <div class="cs-block-head">
-            <b>非本周的课</b>
-            <span class="mini">有些课只是排在这学期、这周不上</span>
+            <b>显示非本周课程</b>
         </div>
         <form method="post" asp-page-handler="ToggleOffWeek" class="cs-inline">
             <input type="hidden" name="show" value="@(Model.ShowOffWeek ? "0" : "1")" />
             <button class="tt-opt-toggle @(Model.ShowOffWeek ? "on" : "")" type="submit"
                     aria-pressed="@(Model.ShowOffWeek ? "true" : "false")">
                 <span class="tt-opt-dot" aria-hidden="true"></span>
-                @(Model.ShowOffWeek ? "显示（淡色虚线）" : "不显示")
+                @(Model.ShowOffWeek ? "显示" : "不显示")
             </button>
-            <span class="mini">@(Model.ShowOffWeek ? "这周不上的课会淡画出来，方便对整学期" : "只看这周真正要上的课")</span>
         </form>
     </div>
 
@@ -63,7 +56,7 @@
             <b>学期</b>
             <span class="mini">当前：@Model.SemesterName</span>
         </div>
-        <a class="btn secondary" href="/Courses/Semesters">@Html.Raw(Icons.Svg("grid", 16)) 管理学期（切换 / 新建 / 删除）</a>
+        <a class="btn secondary" href="/Courses/Semesters">@Html.Raw(Icons.Svg("grid", 16)) 管理学期</a>
     </div>
 
     <div class="cs-block">

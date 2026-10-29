@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CheckinApp.Pages.Reminders;
 
 /// <summary>
-/// 提醒中心 —— 把散在各模块的近期事项聚合成一张清单（站内提醒，不依赖外部推送服务），
+/// 提醒 —— 把散在各模块的近期事项聚合成一张清单（站内提醒，不依赖外部推送服务），
 /// 另可选「每日邮件提醒」：到点把同一份摘要发到邮箱（复用已绑定邮箱的 SMTP）。
 /// </summary>
 [Authorize(Policy = "perm:reminders.use")]

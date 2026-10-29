@@ -26,16 +26,13 @@
         </div>
         <div class="field">
             <label>分类</label>
-            <select asp-for="Category">
+            <select asp-for="Category" onchange="if(this.value==='__manage'){try{sessionStorage.setItem('catManage',String(Date.now()))}catch(e){}location.href='/Expenses/Categories';}">
                 @foreach (var c in Model.Categories)
                 {
                     <option value="@c" selected="@(c == Model.Category ? "selected" : null)">@c</option>
                 }
+                <option value="__manage">管理分类…</option>
             </select>
-            <div class="hint" style="margin-top:6px;">
-                没有想要的分类？
-                <a href="/Expenses/Categories">管理分类</a>
-            </div>
         </div>
         <div class="field">
             <label>日期</label>
@@ -57,3 +54,20 @@
         <button class="btn danger" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 删除账目</button>
     </form>
 </div>
+
+@section Scripts {
+    <script>
+        // 从「管理分类…」返回时（bfcache）重新加载，下拉才能拿到刚保存的分类；
+        // 重新加载后的首次进入顺带把分类页带回来的保存提示（sessionStorage）显示掉，显示后即清防重复
+        window.addEventListener('pageshow', function (e) {
+            if (e.persisted) { location.reload(); return; }
+            try {
+                var t = sessionStorage.getItem('expenseCatToast');
+                if (t) {
+                    sessionStorage.removeItem('expenseCatToast');
+                    if (window.toast) window.toast(t, 'ok');
+                }
+            } catch (err) { }
+        });
+    </script>
+}

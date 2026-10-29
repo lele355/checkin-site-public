@@ -11,10 +11,6 @@
             <button class="btn secondary" type="submit">清空历史</button>
         </form>
     </div>
-    <p class="hint" style="margin-top:8px;">
-        可以问问题，也可以直接说「明天下午三点开会」「记一笔午饭 15 元」——
-        AI 会给出建议单，<strong>你点了确认才会真正写入</strong>。
-    </p>
     <p class="hint" style="margin-top:4px;">
         今日已用 <strong>@Model.TodayTokens.ToString("N0")</strong> / @Model.TokenLimit.ToString("N0") tokens
     </p>
@@ -27,7 +23,7 @@
 
 @if (Model.History.Count == 0)
 {
-    <div class="card"><div class="empty"><span class="big">✨</span>和 AI 助手打个招呼吧，比如「今天有什么安排？」</div></div>
+    <div class="card"><div class="empty"><span class="big">✨</span>还没有对话</div></div>
 }
 
 <div class="ai-chat">
@@ -91,7 +87,7 @@
             <button type="button" class="ai-attach" id="aiAttach" aria-label="添加图片" title="添加图片">@Html.Raw(Icons.Svg("paperclip", 18))</button>
             <input type="file" id="aiFile" accept="image/*" hidden />
             <input type="hidden" name="image" id="aiImageData" />
-            <textarea name="text" rows="2" maxlength="2000" placeholder="问点什么，或让我帮你记日程/备忘/账…">@Model.DraftText</textarea>
+            <textarea name="text" rows="2" maxlength="2000" placeholder="问点什么…">@Model.DraftText</textarea>
             <button class="btn" type="submit" id="aiSend">发送</button>
         </div>
     </form>
@@ -252,7 +248,7 @@
             chat.appendChild(wrap);
             chat.appendChild(wait);
 
-// 空状态卡（「和 AI 助手打个招呼吧」）在回显出现后就该收起来。
+// 空状态卡（「还没有对话」）在回显出现后就该收起来。
             // 站点 CSS 会盖掉 [hidden]（.card 有 display 规则），所以直接写 style。
             var empty = chat.parentNode.querySelector('.empty');
             if (empty) empty.closest('.card').style.display = 'none';

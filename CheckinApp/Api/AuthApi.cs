@@ -147,11 +147,12 @@ public static class AuthApi
             var newPwd = req.NewPassword ?? "";
 
             if (!PasswordHasher.Verify(oldPwd, u.PasswordHash))
-                return ApiKit.Err("当前密码不对");
+                return ApiKit.Err("当前密码不正确。");
 
-            if (newPwd.Length < 8) return ApiKit.Err("新密码至少 8 位");
+            if (newPwd.Length < 8 || !newPwd.Any(char.IsLetter) || !newPwd.Any(char.IsDigit))
+                return ApiKit.Err("新密码至少 8 位，且须同时包含字母和数字。");
             if (newPwd.Length > 64) return ApiKit.Err("新密码最长 64 位");
-            if (newPwd == oldPwd) return ApiKit.Err("新密码不能和旧密码一样");
+            if (newPwd == oldPwd) return ApiKit.Err("新密码不能与当前密码相同。");
 
             u.PasswordHash = PasswordHasher.Hash(newPwd);
             u.MustChangePassword = false;

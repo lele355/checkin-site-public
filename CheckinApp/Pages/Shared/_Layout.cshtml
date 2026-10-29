@@ -289,6 +289,10 @@
         })();
     </script>
 }
+@* 页面级防伪令牌：theme.js 的偏好同步走 fetch，页面上没有表单时（如 /Me、/Period）
+   也要拿得到 token —— 各表单自带的令牌照样保留，两者同值互不干扰。 *@
+@Html.AntiForgeryToken()
+
 @* 轻提示容器（lucianlabs 070 堆叠 Toast 动效） *@
 <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
 

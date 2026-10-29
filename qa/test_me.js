@@ -44,7 +44,8 @@ async function readStats(page) {
     });
 }
 async function sampleCount(page) {
-    const t = await page.locator('.me-sample .chip').first().textContent().catch(() => '');
+    // 条数 chip 在 /Me 的「更多」行与 /Me/Sample 弹窗片段里各有一枚，取文本含「当前」的即可
+    const t = await page.locator('.chip:has-text("当前")').first().textContent().catch(() => '');
     const m = (t || '').match(/(\d+)/);
     return m ? parseInt(m[1], 10) : -1;
 }
@@ -85,7 +86,10 @@ async function sampleCount(page) {
         const stats = await readStats(pL);
         T('我的数据格子渲染 ≥ 8 个', Object.keys(stats).length >= 8, JSON.stringify(stats));
         T('管理员有经期格子（情侣角色才有的权限）', stats['经期'] !== undefined, JSON.stringify(stats));
-        T('登录名只读（不可改）', await pL.locator('.me-grid input[disabled]').count() >= 1);
+        // 登录名只读行搬进了 /Me/Edit 弹窗表单片段
+        await pL.goto(BASE + '/Me/Edit');
+        await pL.waitForTimeout(300);
+        T('登录名只读（不可改）', await pL.locator('input[disabled]').count() >= 1);
 
         // ---------- 2. 资料编辑 ----------
         sec('M2 资料编辑');
@@ -99,7 +103,7 @@ async function sampleCount(page) {
             (await pL.locator('.toast-err, .msg.error').first().textContent().catch(() => '') || '').trim());
 
         // admin 是演示账号：测完把邮箱/签名还原成空，别把演示数据搞脏
-        await pL.goto(BASE + '/Me');
+        await pL.goto(BASE + '/Me/Edit');
         await pL.waitForTimeout(300);
         const oldSign = await pL.locator('textarea[name="Signature"]').inputValue();
         const oldMail = await pL.locator('input[name="Email"]').inputValue();
@@ -164,6 +168,8 @@ async function sampleCount(page) {
         const sc0 = await sampleCount(pU);
         T('测试数据条数 = 30', sc0 === 30, String(sc0));
 
+        await pU.goto(BASE + '/Me/Edit');
+        await pU.waitForTimeout(300);
         await pU.fill('input[name="Email"]', 'qa_me@example.com');
         await pU.fill('textarea[name="Signature"]', '这是主页测试签名 🐾');
         await pU.locator('form[action*="Profile"], form[action*="handler=Profile"]').first()
@@ -178,9 +184,13 @@ async function sampleCount(page) {
         const shownSign = (await pU.locator('.me-sign').first().textContent() || '').trim();
         T('名片立刻反映新签名', shownSign.includes('这是主页测试签名'), shownSign);
 
-        // ---------- 5. 清除 / 再生成 ----------
+        // ---------- 5. 清除 / 再生成（工具收进 /Me/Sample 弹窗片段；清除是 data-confirm 二段确认） ----------
         sec('M5 测试数据清除与再生成');
+        await pU.goto(BASE + '/Me/Sample');
+        await pU.waitForTimeout(300);
         await pU.locator('button:has-text("清除测试数据")').click();
+        await pU.waitForTimeout(250);
+        await pU.locator('button:has-text("确认清掉")').click();
         await pU.waitForTimeout(1200);
         const left = dbq(`select
             (select count(*) from Schedules where UserId=${uid}) s,
@@ -195,15 +205,21 @@ async function sampleCount(page) {
         const keptUser = dbq(`select Email,Signature from Users where Id=${uid}`);
         T('清除测试数据不动用户资料', keptUser[0].Email === 'qa_me@example.com', JSON.stringify(keptUser[0]));
 
+        await pU.goto(BASE + '/Me/Sample');
+        await pU.waitForTimeout(300);
         await pU.locator('button:has-text("生成测试数据")').click();
         await pU.waitForTimeout(1200);
         T('再生成后条数回到 30', (await sampleCount(pU)) === 30, String(await sampleCount(pU)));
+        await pU.goto(BASE + '/Me/Sample');
+        await pU.waitForTimeout(300);
         await pU.locator('button:has-text("生成测试数据")').click();
         await pU.waitForTimeout(1200);
         T('重复生成幂等（仍是 30，不叠加）', (await sampleCount(pU)) === 30, String(await sampleCount(pU)));
 
-        // ---------- 6. 个人主页改密码 ----------
+        // ---------- 6. 个人主页改密码（表单在 /Me/Password 弹窗片段） ----------
         sec('M6 个人主页改密码');
+        await pU.goto(BASE + '/Me/Password');
+        await pU.waitForTimeout(300);
         await pU.fill('input[name="OldPassword"]', 'wrong-old');
         await pU.fill('input[name="NewPassword"]', 'Qa#2026Bb');
         await pU.fill('input[name="ConfirmPassword"]', 'Qa#2026Bb');
@@ -212,6 +228,8 @@ async function sampleCount(page) {
         await pU.waitForTimeout(900);
         T('旧密码错误被拒', await pU.locator('.toast-err, .msg.error').count() > 0);
 
+        await pU.goto(BASE + '/Me/Password');
+        await pU.waitForTimeout(300);
         await pU.fill('input[name="OldPassword"]', 'Qa#2026Aa');
         await pU.fill('input[name="NewPassword"]', 'Qa#2026Bb');
         await pU.fill('input[name="ConfirmPassword"]', 'Qa#2026Bb');

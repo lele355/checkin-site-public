@@ -16,7 +16,6 @@
     {
         <div class="msg error" style="margin-top:12px;">@err</div>
     }
-    <p class="hint" style="margin-top:10px;">角色决定一组权限。改完即时生效，不用让用户重新登录。</p>
 </div>
 
 <div class="card scroll-x" style="padding:0;">
@@ -34,7 +33,7 @@
         @foreach (var r in Model.Roles)
         {
             <tr>
-                <td style="font-weight:600;">@r.Name@(r.IsBuiltin ? " <span class=\"chip\">内置</span>" : "")</td>
+                <td style="font-weight:600;">@r.Name@(r.IsBuiltin ? Html.Raw(" <span class=\"chip\">内置</span>") : Html.Raw(""))</td>
                 <td class="meta">@r.Description</td>
                 <td>@r.PermCount</td>
                 <td>@r.UserCount</td>

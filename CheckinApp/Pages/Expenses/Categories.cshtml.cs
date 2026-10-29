@@ -64,7 +64,7 @@ public class CategoriesModel(AppDbContext db, CurrentUser me) : PageModel
             return RedirectToPage(new { err = $"「{name}」已经在列表里了。" });
 
         Save(uid, list.Append(name));
-        return RedirectToPage(new { ok = $"已添加「{name}」，App 里刷新一下就能选到。" });
+        return RedirectToPage(new { ok = $"已添加「{name}」。" });
     }
 
     /// <summary>删掉一个分类。已有账目不受影响 —— 它们存的是分类名字符串，不是外键。</summary>

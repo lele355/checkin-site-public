@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CheckinApp.Pages.Stats;
 
-/// <summary>统计年报 —— 打卡热力图（近 90 天）+ 习惯排行 + 记账月度柱状图 + 各模块计数。</summary>
+/// <summary>统计 —— 打卡热力图（近 90 天）+ 习惯排行 + 记账月度柱状图 + 各模块计数。</summary>
 [Authorize(Policy = "perm:stats.use")]
 public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
 {

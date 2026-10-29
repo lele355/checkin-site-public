@@ -182,7 +182,7 @@ async function login(page, user, pass) {
         T('刷新后仍不出现（永久消失）', await p2.locator('.sample-banner').count() === 0);
 
         // 再去个人主页重新生成测试数据 —— 提示卡依然不该回来
-        await p2.goto(BASE + '/Me');
+        await p2.goto(BASE + '/Me/Sample');
         await p2.waitForTimeout(300);
         await p2.locator('button:has-text("生成测试数据")').click();
         await p2.waitForTimeout(1300);

@@ -13,16 +13,12 @@
         @if (Model.Done)
         {
             <p class="hint" style="margin-bottom:16px;">
-                「@Model.DoneName」注册成功，现在就可以用刚才的账号和密码登录了。
+                「@Model.DoneName」注册成功。
             </p>
             <a class="btn" href="/Login" style="width:100%;text-align:center;">去登录</a>
         }
         else
         {
-            <p class="hint" style="margin-bottom:16px;">
-                本站只对受邀者开放。请填写管理员发给你的一次性邀请码（12 位，短横可省略），一个码只能用一次。
-            </p>
-
             @if (!string.IsNullOrEmpty(Model.Error))
             {
                 <div class="msg error sticky">@Model.Error</div>
@@ -36,7 +32,7 @@
                 <input type="hidden" asp-for="FormStamp" />
 
                 <div class="field">
-                    <label asp-for="Code">邀请码（必填）</label>
+                    <label asp-for="Code">邀请码（12 位）</label>
                     <input asp-for="Code" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters"
                            spellcheck="false" required style="text-transform:uppercase;letter-spacing:1px;font-family:var(--font-mono,monospace);" />
                 </div>

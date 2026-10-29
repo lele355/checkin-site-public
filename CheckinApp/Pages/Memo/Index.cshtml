@@ -5,26 +5,25 @@
 }
 <div class="card">
     <div class="page-head">
-        <h2>备忘便签</h2>
+        <h2>备忘</h2>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
             <div class="view-switch" data-viewkey="memo">
                 <button type="button" class="vs-btn@(Model.View == "grid" ? " on" : "")" data-view="grid" title="卡片视图">@Html.Raw(Icons.Svg("grid", 15))<span>卡片</span></button>
                 <button type="button" class="vs-btn@(Model.View == "list" ? " on" : "")" data-view="list" title="列表视图">@Html.Raw(Icons.Svg("list", 15))<span>列表</span></button>
             </div>
-            <input id="memoSearch" class="filter-input" type="search" placeholder="搜索标题或正文…" aria-label="搜索便签" />
+            <input id="memoSearch" class="filter-input" type="search" placeholder="搜索标题或正文…" aria-label="搜索备忘" />
             <a class="btn" href="/Memo/New">@Html.Raw(Icons.Svg("plus", 16)) 新建便签</a>
         </div>
     </div>
-    <p class="hint" style="margin-top:8px;">置顶的便签会出现在工作台首页。</p>
 </div>
 
 @if (Model.Memos.Count == 0)
 {
-    <div class="card"><div class="empty"><span class="big">✎</span>还没有备忘录</div></div>
+    <div class="card"><div class="empty"><span class="big">✎</span>还没有备忘</div></div>
 }
 else
 {
-    <div id="memoEmpty" class="card" hidden><div class="empty"><span class="big">🔍</span>没有匹配的便签。</div></div>
+    <div id="memoEmpty" class="card" hidden><div class="empty"><span class="big">🔍</span>没有匹配的备忘。</div></div>
 }
 
 @if (Model.View == "list")
@@ -81,7 +80,7 @@ else
 
 @section Scripts {
 <script>
-    // 便签即时过滤：卡片/列表两视图通用，标题+正文不区分大小写包含匹配
+    // 备忘即时过滤：卡片/列表两视图通用，标题+正文不区分大小写包含匹配
     (function () {
         var input = document.getElementById('memoSearch');
         if (!input) return;

@@ -14,9 +14,8 @@
 
 <div class="card">
     <div class="page-head">
-        <h2>提醒中心</h2>
+        <h2>提醒</h2>
     </div>
-    <p class="hint" style="margin-top:6px;">近 3 天的日程、7 天内的纪念日、今日打卡进度、经期预测，都汇总在这里。</p>
 
     @if (Model.TodayHabitTotal > 0)
     {
@@ -59,10 +58,6 @@ else
             <h2>每日邮件提醒</h2>
             <span class="chip">@(Model.MailSetting?.Enabled == true ? "已开启" : "未开启")</span>
         </div>
-        <p class="hint" style="margin-top:6px;">
-            每天到点把上面这份清单（再加置顶备忘）发到你的邮箱，不用自己想着来看。
-            发信走你已绑定的邮箱账号，只借用它的 SMTP 授权码，不额外存密码。
-        </p>
 
         @if (!string.IsNullOrWhiteSpace(Model.MailLastError))
         {
@@ -77,7 +72,7 @@ else
         {
             <div class="empty">
                 <span class="big">✉️</span>
-                还没有绑定邮箱账号 —— 发信需要它的 SMTP 授权码。<br />
+                还没有绑定邮箱<br />
                 <a class="btn secondary" asp-page="/Email/New" style="margin-top:14px;display:inline-flex;">去绑定邮箱</a>
             </div>
         }

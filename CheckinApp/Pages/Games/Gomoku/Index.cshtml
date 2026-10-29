@@ -33,8 +33,9 @@
     }
 
     @* 两个提交按钮共用一个表单：submit 按钮带 name/value，点哪个就提交哪个 side。
+       建局区三行分组：配置（盘面/规则）→ 主操作（新建对局按钮组）→ 加入（房间码）。
        盘面/规则下拉默认是我的设置，只影响「这一局」，不会写回默认值。 *@
-    <form method="post" asp-page-handler="Create" class="gm-new" style="margin-top:14px;">
+    <form method="post" asp-page-handler="Create" class="gm-new">
         <div class="gm-new-opts">
             <label class="gm-opt">
                 <span>盘面</span>
@@ -43,11 +44,11 @@
                     {
                         if (n == Model.Settings.Size)
                         {
-                            <option value="@n" selected>@n × @n</option>
+                            <option value="@n" selected>@n 路</option>
                         }
                         else
                         {
-                            <option value="@n">@n × @n</option>
+                            <option value="@n">@n 路</option>
                         }
                     }
                 </select>
@@ -57,13 +58,13 @@
                 <select name="forbidden">
                     @if (Model.Settings.Forbidden)
                     {
-                        <option value="0">自由（长连也算赢）</option>
-                        <option value="1" selected>标准（黑方长连判负）</option>
+                        <option value="0">自由规则</option>
+                        <option value="1" selected>标准规则</option>
                     }
                     else
                     {
-                        <option value="0" selected>自由（长连也算赢）</option>
-                        <option value="1">标准（黑方长连判负）</option>
+                        <option value="0" selected>自由规则</option>
+                        <option value="1">标准规则</option>
                     }
                 </select>
             </label>
@@ -76,8 +77,8 @@
         </div>
     </form>
 
-    <form method="post" asp-page-handler="Join" class="inline-form" style="margin-top:12px;">
-        <input name="code" placeholder="或用房间码加入（6 位）" maxlength="6" autocomplete="off"
+    <form method="post" asp-page-handler="Join" class="inline-form gm-new-join">
+        <input name="code" placeholder="房间码（6 位）" maxlength="6" autocomplete="off"
                style="text-transform:uppercase;letter-spacing:2px;" />
         <button class="btn secondary" type="submit">加入</button>
     </form>

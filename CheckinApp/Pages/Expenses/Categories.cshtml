@@ -11,11 +11,6 @@
         <h2>记账分类</h2>
         <a class="btn secondary" href="/Expenses">@Html.Raw(Icons.Svg("chevron-left", 16)) 回到记账</a>
     </div>
-    <p class="hint">
-        记一笔时能选的分类就是下面这些。点一个分类就把它删掉 —— 已有账目不受影响，
-        它们还挂在原来的名字下，只是新账不能再选它了。
-        同一份列表在 App 的「记账 → 管理分类」里也能改，两端同步。
-    </p>
 
     @* 提示条会被 modal.js 转成浮动 Toast（.msg 元素随即从文档里移除），
        所以这里只负责输出内容，视觉上看到的是右上角那条提示。 *@
@@ -66,3 +61,28 @@
         </div>
     </form>
 </div>
+
+@section Scripts {
+    <script>
+        // 从记账表单的「管理分类…」进来、且刚保存成功：自动返回表单（返回页会重新加载拿新分类）。
+        // 下拉跳转与 PRG 的 ?ok= 各占一条历史，back() 只弹掉 ?ok= 会停在分类列表页 ——
+        // 带 catManage 标记且本次保存成功时弹两格正好回表单；历史深度不足退回一格兜底。
+        // go(-2) 会把这页的 ?ok= 提示一起带走，先把提示存进 sessionStorage，
+        // 由表单页（New/Edit）取出显示 —— 手动进入本页保存的路径不写这个键，提示照常在本页显示。
+        (function () {
+            try {
+                var t = sessionStorage.getItem('catManage');
+                if (!t) return;
+                if (Date.now() - Number(t) > 30 * 60 * 1000) { sessionStorage.removeItem('catManage'); return; }
+                if (location.search.indexOf('ok=') >= 0) {
+                    sessionStorage.removeItem('catManage');
+                    try {
+                        var msg = new URLSearchParams(location.search).get('ok');
+                        if (msg) sessionStorage.setItem('expenseCatToast', msg);
+                    } catch (e2) { }
+                    if (history.length >= 3) history.go(-2); else history.back();
+                }
+            } catch (e) { }
+        })();
+    </script>
+}

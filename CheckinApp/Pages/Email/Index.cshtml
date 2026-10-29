@@ -21,13 +21,10 @@
             <a class="btn secondary" href="/Email/Accounts">@Html.Raw(Icons.Svg("mail", 16)) 管理账号</a>
         </div>
     </div>
-    <p class="hint" style="margin-top:8px;">
-        多个邮箱的信汇成一个列表；点开自动标已读。
-        @if (Model.UnreadTotal > 0)
-        {
-            <span>当前 <b style="color:var(--accent-strong);">@Model.UnreadTotal</b> 封未读。</span>
-        }
-    </p>
+    @if (Model.UnreadTotal > 0)
+    {
+        <p class="hint" style="margin-top:8px;">当前 <b style="color:var(--accent-strong);">@Model.UnreadTotal</b> 封未读</p>
+    }
 </div>
 
 @if (!string.IsNullOrEmpty(Model.Note))
@@ -37,11 +34,11 @@
 
 @if (Model.Accounts.Count == 0)
 {
-    <div class="card"><div class="empty"><span class="big">📬</span>还没有绑定邮箱，去<a href="/Email/Accounts">管理账号</a>添加一个吧（QQ / 163 / Gmail 都行）。</div></div>
+    <div class="card"><div class="empty"><span class="big">📬</span>还没有绑定邮箱 · <a href="/Email/Accounts">管理账号</a></div></div>
 }
 else if (Model.Messages.Count == 0)
 {
-    <div class="card"><div class="empty"><span class="big">📭</span>还没有邮件，点右上角「同步」拉取第一封信试试。</div></div>
+    <div class="card"><div class="empty"><span class="big">📭</span>收件箱是空的</div></div>
 }
 else
 {

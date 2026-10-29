@@ -29,7 +29,7 @@
     <section class="card sample-banner">
         <div class="sample-banner-text">
             <h2>这个账号有 @Model.SampleRows 条样例数据</h2>
-            <p class="hint">建号时自动生成的，都以「@SampleData.Mark」开头。清掉只删这些，你自己的数据不动。</p>
+            <p class="hint">都以「@SampleData.Mark」开头，清除只删样例。</p>
         </div>
         <form method="post" asp-page-handler="ClearSample" data-confirm="确认清掉">
             <button class="btn" type="submit">@Html.Raw(Icons.Svg("trash-2", 16)) 清掉样例</button>
@@ -37,16 +37,7 @@
     </section>
 }
 
-@* 自定义面板：显示/隐藏 + 排序（置顶区/普通区两段） *@
-<div class="card" id="dashCustom" hidden>
-    <h2>自定义工作台</h2>
-    <p class="hint">置顶区的卡片永远排在最上面；去掉勾选即隐藏（数据不丢，随时可勾回）。排序用每行的 ↑↓。</p>
-    <div id="dashCustomList"></div>
-    <div class="form-actions">
-        <button class="btn" type="button" id="dashSave">保存</button>
-        <button class="btn secondary" type="button" id="dashReset">恢复默认</button>
-    </div>
-</div>
+@* 自定义面板已收进 dialog.app-modal 弹窗（dashboard.js 装载）：问候卡齿轮是唯一入口 *@
 
 <div class="grid-cards dash-grid" id="dashGrid">
     @* ---------- 问候 ---------- *@
@@ -176,7 +167,7 @@
         </div>
     }
 
-    @* ---------- 置顶便签 ---------- *@
+    @* ---------- 置顶备忘 ---------- *@
     @if (Me.Has("memo.use"))
     {
         <div class="card" data-card="memo">
@@ -200,7 +191,7 @@
                         </div>
                     }
                 </div>
-                <p class="hint hint-foot"><a href="/Memo">查看全部便签 →</a></p>
+                <p class="hint hint-foot"><a href="/Memo">查看全部备忘 →</a></p>
             }
         </div>
     }

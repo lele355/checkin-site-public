@@ -6,8 +6,9 @@
 <div class="card">
     <div class="page-head">
         <h2>经期助手</h2>
+        <span class="chip">仅自己可见</span>
+        <a class="btn" href="/Period/New">记录一次</a>
     </div>
-    <p class="hint" style="margin-top:6px;">只有你自己看得到的数据。记录越全，预测越准。</p>
 
     @if (Model.Records.Count > 0)
     {
@@ -43,29 +44,6 @@
             <p class="mini" style="margin-top:8px;">记录满两次后才会显示周期预测。</p>
         }
     }
-</div>
-
-<div class="card">
-    <h2>记录一次</h2>
-    @if (Model.Error is string err)
-    {
-        <div class="msg error">@err</div>
-    }
-    <form method="post" asp-page-handler="Add" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;">
-        <div class="field" style="margin:0;">
-            <label>开始日期</label>
-            <input asp-for="NewStartDate" type="date" required />
-        </div>
-        <div class="field" style="margin:0;">
-            <label>结束日期（可后补）</label>
-            <input asp-for="NewEndDate" type="date" />
-        </div>
-        <div class="field" style="margin:0;flex:1;min-width:140px;">
-            <label>备注</label>
-            <input asp-for="NewNote" autocomplete="off" placeholder="可留空" />
-        </div>
-        <button class="btn" type="submit">@Html.Raw(Icons.Svg("check", 16)) 保存</button>
-    </form>
 </div>
 
 @if (Model.Records.Count == 0)

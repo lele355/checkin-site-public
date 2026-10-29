@@ -3,7 +3,7 @@
 每轮测试开跑前执行，保证三轮互相独立。"""
 import sqlite3
 
-DB = 'D:/projects/checkin/CheckinApp/data/checkin.db'
+DB = 'D:/checkin/site/CheckinApp/data/checkin.db'
 
 DEL_TABLES_USER = [
     ('AiMessages', 'UserId'), ('Anniversaries', 'UserId'), ('BoardMessages', 'UserId'),
@@ -11,6 +11,7 @@ DEL_TABLES_USER = [
     ('Habits', 'UserId'), ('Memos', 'UserId'), ('PeriodRecords', 'UserId'),
     ('Schedules', 'UserId'), ('LoveNotes', 'FromUserId'),
     ('EmailMessages', 'UserId'), ('EmailAccounts', 'UserId'),
+    ('GameRooms', 'HostUserId'), ('GameRooms', 'GuestUserId'),
 ]
 
 def main():

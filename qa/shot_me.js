@@ -41,11 +41,11 @@ const QA_DIR = 'D:/projects/checkin/qa';
     await m.waitForTimeout(300);
     await m.screenshot({ path: `${QA_DIR}/shot_me_m3.png` });
 
-    // 顺便打出正文长度，确认改密卡与邮箱字段确实渲染了
+    // 顺便打出正文长度，确认二级编辑入口与测试数据入口确实渲染了
     const has = await m.evaluate(() => ({
-        email: !!document.querySelector('input[name="Email"]'),
-        pwd: !![...document.querySelectorAll('h2')].find(h => h.textContent.includes('修改密码')),
-        sample: !!document.querySelector('.me-sample'),
+        edit: !!document.querySelector('a[href="/Me/Edit"]'),
+        pwd: !!document.querySelector('a[href="/Me/Password"]'),
+        sample: !!document.querySelector('a[href="/Me/Sample"]'),
         cards: document.querySelectorAll('.card').length,
         bodyH: document.body.scrollHeight
     }));

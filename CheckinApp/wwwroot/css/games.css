@@ -5,14 +5,16 @@
    跟主题无关（任何皮肤下黑子都该是黑子），所以在这里定成局部变量。
    ========================================================================== */
 
+/* 建局区三行分组：配置（盘面/规则）→ 主操作（新建对局按钮组）→ 加入（房间码） */
 .gm-new {
     display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 12px;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
 }
 
-.gm-new-form { display: inline; }
+.gm-new-form { display: flex; gap: 10px; flex-wrap: wrap; }
+.gm-new-join { margin-top: 0; }
 
 /* ---------- 大厅列表 ---------- */
 
@@ -199,7 +201,6 @@
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    margin-bottom: 10px;
 }
 
 .gm-opt {
@@ -217,6 +218,7 @@
     background: var(--card-soft);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
+    min-height: 44px;
     padding: 6px 10px;
 }
 
@@ -290,13 +292,13 @@
 .gm-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .gm-item {
   display: flex; align-items: center; gap: 12px;
-  padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-in);
+  padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-in-card);
   background: var(--card-soft, var(--bg-soft));
   text-decoration: none; color: inherit;
 }
 a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
 .gm-item-icon {
-  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  flex: none; width: 40px; height: 40px; border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
   background: var(--accent-soft); color: var(--accent-strong);
 }

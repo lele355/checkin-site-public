@@ -105,8 +105,8 @@ async function toastOk(page, text) {
         // ================= S2 自定义面板（显隐 + 排序） =================
         sec('S2 自定义面板：显隐与排序');
         await page.locator('#dashCustomBtn').click();
-        await page.waitForSelector('#dashCustom:not([hidden])');
-        const panelText = await page.locator('#dashCustom').textContent();
+        await page.waitForSelector('#appModal[open] #dashCustomList');
+        const panelText = await page.locator('#appModal .modal-body').textContent();
         T('面板分三区', panelText.includes('置顶区') && panelText.includes('普通区') && panelText.includes('已隐藏'));
         const rows = await page.locator('#dashCustomList .dash-row').count();
         T('每张卡片一行', rows === await page.locator('#dashGrid [data-card]').count(), `rows=${rows}`);
@@ -139,7 +139,7 @@ async function toastOk(page, text) {
 
         // 恢复默认
         await page.locator('#dashCustomBtn').click();
-        await page.waitForSelector('#dashCustom:not([hidden])');
+        await page.waitForSelector('#appModal[open] #dashCustomList');
         await page.locator('#dashReset').click();
         await page.waitForTimeout(300);
         await page.locator('#dashSave').click();
@@ -212,7 +212,7 @@ async function toastOk(page, text) {
         await page.goto(BASE + '/');
         await page.waitForSelector('#dashGrid [data-card]');
         await page.locator('#dashCustomBtn').click();
-        await page.waitForSelector('#dashCustom:not([hidden])');
+        await page.waitForSelector('#appModal[open] #dashCustomList');
         await page.locator('#dashReset').click();
         await page.waitForTimeout(200);
         await page.locator('#dashSave').click();

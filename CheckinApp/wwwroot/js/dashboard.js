@@ -3,7 +3,8 @@
  * - 卡片右上角图钉：一键置顶/取消置顶，即点即存（走 /Preferences?handler=Dashboard）
  * - 「自定义」面板：勾选显隐 + ↑↓ 排序 + 面板内图钉，改动先实时预览，点「保存」才落库；
  *   关面板不保存 = 丢弃草稿回到上次保存的布局。
- * - 问候块恒在第一、不参与置顶与排序（与 App 端一致）；仍可在面板里隐藏。
+ * - 问候块恒在第一、不参与置顶与排序，且不可隐藏（与 App 端一致）：
+ *   打开「自定义」面板的齿轮在它身上，藏了它用户就再也进不了面板。
  * 卡片 id 白名单在服务端 Preferences.cshtml.cs 二次校验，这里只管 UI。 */
 (function () {
   'use strict';
@@ -17,7 +18,7 @@
   // 找不到 DOM 标题时的兜底名（权限未开 / 条件卡片不渲染时，面板里也要认得出）
   var NAME = {
     hello: '问候', reminders: '提醒', habits: '今日打卡', courses: '今日课程',
-    schedule: '未来 7 天日程', memo: '置顶便签', anniversary: '最近的纪念日',
+    schedule: '未来 7 天日程', memo: '置顶备忘', anniversary: '最近的纪念日',
     email: '邮件', board: '留言板', expense: '本月记账', couples: '情侣空间',
     period: '经期助手'
   };
@@ -45,6 +46,13 @@
   // 自定义面板的行按钮闭包抓的是数组引用，换掉引用后 ↑↓ 的交换就写进没人读的旧数组。
   function normalize(st) {
     var seen = {};
+    // 问候块不可隐藏：面板唯一入口（它的齿轮）会随卡消失，藏了就把用户锁在门外。
+    // 老数据里 hidden=hello 的一律忽略，挪回普通区。
+    var hi = st.hidden.indexOf(FIXED_FIRST);
+    if (hi >= 0) {
+      st.hidden.splice(hi, 1);
+      if (st.order.indexOf(FIXED_FIRST) < 0 && st.pinned.indexOf(FIXED_FIRST) < 0) st.order.unshift(FIXED_FIRST);
+    }
     // 问候块不参与置顶：老布局里可能存着 pinned，统一挪到普通区，图钉永远是「未置顶」
     var fi = st.pinned.indexOf(FIXED_FIRST);
     if (fi >= 0) {
@@ -151,11 +159,16 @@
     else save();
   });
 
-  // ---- 自定义面板 ----
+  // ---- 自定义面板（dialog.app-modal 弹窗；问候卡齿轮是唯一入口） ----
+  // 面板从首屏常驻卡收进弹窗：排序/显隐是设置动作，不该占首屏。
+  // 复用站内 dialog.app-modal 外壳（modal.js 在关窗时清空 .modal-body），内容每次打开重建。
   var customBtn = document.getElementById('dashCustomBtn');
-  var panel = document.getElementById('dashCustom');
-  var listEl = document.getElementById('dashCustomList');
-  if (!customBtn || !panel || !listEl) return;
+  var dlg = document.getElementById('appModal');
+  if (!customBtn || !dlg || typeof dlg.showModal !== 'function') return;
+  var modalBody = dlg.querySelector('.modal-body');
+  var modalTitle = dlg.querySelector('.modal-title');
+  if (!modalBody || !modalTitle) return;
+  var listEl = null;   // 弹窗内容里的列表容器，每次打开重建
 
   function pinIcon() {
     var svg = grid.querySelector('.card-pin svg');
@@ -243,26 +256,11 @@
     return wrap;
   }
 
-  // 问候块：固定在面板最上方，只留「显示」开关（与 App 端自定义面板一致）
+  // 问候块：固定在面板最上方，不配任何开关（与 App 端一致）——
+  // 不可隐藏：面板唯一入口（它的齿轮）在它身上，给隐藏勾选就是给用户挖死胡同。
   function fixedRow() {
     var el = document.createElement('div');
     el.className = 'dash-row dash-row-fixed';
-    var label = document.createElement('label');
-    label.className = 'dash-vis';
-    var cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = draft.hidden.indexOf(FIXED_FIRST) < 0;
-    cb.addEventListener('change', function () {
-      removeEverywhere(draft, FIXED_FIRST);
-      if (cb.checked) draft.order.unshift(FIXED_FIRST);
-      else draft.hidden.push(FIXED_FIRST);
-      renderPanel();
-      apply(draft);
-    });
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode('显示'));
-    el.appendChild(label);
-
     var name = document.createElement('div');
     name.className = 'dash-name';
     name.textContent = displayName(FIXED_FIRST);
@@ -271,6 +269,7 @@
   }
 
   function renderPanel() {
+    if (!listEl) return;
     listEl.textContent = '';
     listEl.appendChild(fixedRow());
     listEl.appendChild(section('置顶区', draft.pinned.filter(function (id) { return id !== FIXED_FIRST; }), true, false));
@@ -278,36 +277,58 @@
     listEl.appendChild(section('已隐藏', draft.hidden.filter(function (id) { return id !== FIXED_FIRST; }), false, true));
   }
 
-  customBtn.addEventListener('click', function () {
-    var opening = panel.hidden;
-    if (opening) {
-      draft = clone(state);
+  function openPanel() {
+    draft = clone(state);
+    modalTitle.textContent = '自定义工作台';
+    modalBody.textContent = '';
+    listEl = document.createElement('div');
+    listEl.id = 'dashCustomList';
+    modalBody.appendChild(listEl);
+
+    var acts = document.createElement('div');
+    acts.className = 'form-actions';
+
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn';
+    saveBtn.textContent = '保存';
+    saveBtn.addEventListener('click', function () {
+      if (!draft) return;
+      state = clone(draft);
+      if (window.flipMove) window.flipMove(grid, function () { apply(state); });
+      else apply(state);
+      save();
+      if (dlg.open) dlg.close();
+    });
+
+    var resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'btn secondary';
+    resetBtn.textContent = '恢复默认';
+    resetBtn.addEventListener('click', function () {
+      draft = normalize({ pinned: [], order: [], hidden: [] });
       renderPanel();
-      apply(draft);          // 实时预览
-    } else {
-      draft = null;
-      apply(state);          // 不保存 = 丢弃草稿
-    }
-    panel.hidden = !opening;
-    customBtn.setAttribute('aria-expanded', opening ? 'true' : 'false');
-  });
+      if (window.flipMove) window.flipMove(grid, function () { apply(draft); });
+      else apply(draft);
+      if (window.toast) window.toast('已恢复默认布局，记得点保存', 'info');
+    });
 
-  var saveBtn = document.getElementById('dashSave');
-  if (saveBtn) saveBtn.addEventListener('click', function () {
-    if (!draft) return;
-    state = clone(draft);
-    if (window.flipMove) window.flipMove(grid, function () { apply(state); });
-    else apply(state);
-    save();
-  });
+    acts.appendChild(saveBtn);
+    acts.appendChild(resetBtn);
+    modalBody.appendChild(acts);
 
-  var resetBtn = document.getElementById('dashReset');
-  if (resetBtn) resetBtn.addEventListener('click', function () {
-    draft = normalize({ pinned: [], order: [], hidden: [] });
     renderPanel();
-    if (window.flipMove) window.flipMove(grid, function () { apply(draft); });
-    else apply(draft);
-    if (window.toast) window.toast('已恢复默认布局，记得点保存', 'info');
+    apply(draft);          // 实时预览
+    customBtn.setAttribute('aria-expanded', 'true');
+    if (!dlg.open) dlg.showModal();
+  }
+
+  customBtn.addEventListener('click', openPanel);
+
+  // 关弹窗（× / 遮罩 / Esc）= 不保存：丢弃草稿回到上次保存的布局
+  dlg.addEventListener('close', function () {
+    customBtn.setAttribute('aria-expanded', 'false');
+    if (draft) { draft = null; apply(state); }
   });
 
   // ---- 启动：应用保存的布局 ----

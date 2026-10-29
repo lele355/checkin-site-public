@@ -1,0 +1,23 @@
+@page
+@model CheckinApp.Pages.Me.SampleModel
+@using CheckinApp.Services
+@{
+    ViewData["Title"] = "测试数据";
+}
+<div class="card" style="max-width:520px;margin:4vh auto 0;">
+    <h2>测试数据</h2>
+    <span class="chip">当前 @Model.SampleRows 条</span>
+    <p class="hint" style="margin-top:10px;">每个模块生成 3 条样例，全部以「@SampleData.Mark」开头，清除只删样例。</p>
+
+    <div class="me-actions">
+        <form method="post" asp-page="/Me" asp-page-handler="Sample">
+            <button class="btn" type="submit">生成测试数据</button>
+        </form>
+        @if (Model.SampleRows > 0)
+        {
+            <form method="post" asp-page="/Me" asp-page-handler="ClearSample" data-confirm="确认清掉">
+                <button class="btn secondary" type="submit">清除测试数据</button>
+            </form>
+        }
+    </div>
+</div>

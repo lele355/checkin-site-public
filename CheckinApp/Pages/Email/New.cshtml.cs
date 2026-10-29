@@ -62,6 +62,6 @@ public class NewModel(AppDbContext db, CurrentUser me, EmailCrypto crypto) : Pag
             CreatedAt = DateTime.UtcNow,
         });
         await _db.SaveChangesAsync();
-        return RedirectToPage("/Email/Accounts", new { note = "账号已绑定，点「同步」拉取第一封信试试。" });
+        return RedirectToPage("/Email/Accounts", new { note = "账号已绑定。" });
     }
 }
