@@ -55,12 +55,16 @@ public static class GomokuRules
     /// 只看经过落子点的四条线 —— 别的方向不可能因为这手棋同时凑齐，全盘扫描纯属浪费。
     /// </summary>
     public static int LongestRun(IReadOnlyList<Stone> moves, int x, int y, int side, int size)
+        => LineRuns(moves, x, y, side, size).Max();
+
+    /// <summary>落子后四个方向各自的连子数（横、竖、右下斜、右上斜）</summary>
+    public static int[] LineRuns(IReadOnlyList<Stone> moves, int x, int y, int side, int size)
     {
         // 方向向量：横、竖、右下斜、右上斜
         int[] dx = [1, 0, 1, 1];
         int[] dy = [0, 1, 1, -1];
 
-        var best = 1;
+        var runs = new int[4];
         for (var d = 0; d < 4; d++)
         {
             var count = 1;
@@ -74,9 +78,9 @@ public static class GomokuRules
                 if (!Has(moves, x - dx[d] * i, y - dy[d] * i, side, size)) break;
                 count++;
             }
-            if (count > best) best = count;
+            runs[d] = count;
         }
-        return best;
+        return runs;
     }
 
     /// <summary>成五（含以上）。自由规则下长连也算赢</summary>
@@ -85,7 +89,45 @@ public static class GomokuRules
 
     /// <summary>长连：连成 6 个以上。只在「标准规则」下对黑方判负</summary>
     public static bool IsOverline(IReadOnlyList<Stone> moves, int x, int y, int side, int size)
-        => LongestRun(moves, x, y, side, size) > WinLen;
+        => LineRuns(moves, x, y, side, size).Any(r => r > WinLen);
+
+    /// <summary>
+    /// 黑方禁手（仅标准规则用；自由规则禁手全关）。
+    /// 三三 / 四四：简化判定 —— 每方向最多记一个「四」（连四）/「活三」（两端皆空的三），
+    /// 同一手形成 ≥2 个即禁手。返回 null=无禁手，否则禁手名。
+    /// </summary>
+    public static string? ForbiddenFoul(IReadOnlyList<Stone> moves, int x, int y, int size)
+    {
+        var runs = LineRuns(moves, x, y, 1, size);
+        if (runs.Count(r => r == WinLen) >= 2) return "double-four";
+        if (CountOpenThrees(moves, x, y, size) >= 2) return "double-three";
+        return null;
+    }
+
+    /// <summary>活三数量：某方向恰连三且两端外一格都空</summary>
+    private static int CountOpenThrees(IReadOnlyList<Stone> moves, int x, int y, int size)
+    {
+        int[] dx = [1, 0, 1, 1];
+        int[] dy = [0, 1, 1, -1];
+        var n = 0;
+        for (var d = 0; d < 4; d++)
+        {
+            var lo = 0;
+            var hi = 0;
+            while (Has(moves, x - dx[d] * (lo + 1), y - dy[d] * (lo + 1), 1, size)) lo++;
+            while (Has(moves, x + dx[d] * (hi + 1), y + dy[d] * (hi + 1), 1, size)) hi++;
+            if (lo + hi + 1 != WinLen - 2) continue;   // 本方向恰成三
+
+            var ex = x - dx[d] * (lo + 1);
+            var ey = y - dy[d] * (lo + 1);
+            var aOpen = InBoard(ex, ey, size) && !Occupied(moves, ex, ey);
+            ex = x + dx[d] * (hi + 1);
+            ey = y + dy[d] * (hi + 1);
+            var bOpen = InBoard(ex, ey, size) && !Occupied(moves, ex, ey);
+            if (aOpen && bOpen) n++;
+        }
+        return n;
+    }
 
     private static bool Has(IReadOnlyList<Stone> list, int cx, int cy, int side, int size)
     {

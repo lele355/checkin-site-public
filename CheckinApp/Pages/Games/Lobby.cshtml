@@ -1,0 +1,115 @@
+@page "/Games/{gameKey}"
+@model CheckinApp.Pages.Games.LobbyModel
+@using CheckinApp.Ui
+@{
+    ViewData["Title"] = Model.GameName;
+    var g = Model.Game;
+}
+<div class="card">
+    <div class="page-head">
+        <h2>@Model.GameName</h2>
+        <div style="display:flex;gap:8px;">
+            <a class="btn secondary" href="/Games/@Model.GameKey/Settings">@Html.Raw(Icons.Svg("settings", 16)) 设置</a>
+            <a class="btn secondary" href="/Games">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
+        </div>
+    </div>
+
+    <div class="gm-rules">
+        @if (g?.HasAi == true)
+        {
+            <span class="chip">可单人 · 可双人</span>
+        }
+        else
+        {
+            <span class="chip">双人对战</span>
+        }
+    </div>
+
+    <div class="gm-actions" style="margin-top:12px;">
+        @if (Model.GameKey == "ludo")
+        {
+            <form method="post" asp-page-handler="CreateLudo" class="gm-ludo-form" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+                <input type="hidden" name="gameKey" value="ludo" />
+                <div class="field" style="margin:0;">
+                    <label>人数</label>
+                    <select name="seatCount">
+                        <option value="2">2 人</option>
+                        <option value="3">3 人</option>
+                        <option value="4">4 人</option>
+                    </select>
+                </div>
+                <label class="chip" style="cursor:pointer;"><input type="checkbox" name="ai1" value="true" /> 2 号 AI</label>
+                <label class="chip" style="cursor:pointer;"><input type="checkbox" name="ai2" value="true" /> 3 号 AI</label>
+                <label class="chip" style="cursor:pointer;"><input type="checkbox" name="ai3" value="true" /> 4 号 AI</label>
+                <button class="btn" type="submit">新建对局</button>
+            </form>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="Create">
+                <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                <input type="hidden" name="side" value="1" />
+                <button class="btn" type="submit">新开一盘（我先手）</button>
+            </form>
+            <form method="post" asp-page-handler="Create">
+                <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                <input type="hidden" name="side" value="2" />
+                <button class="btn secondary" type="submit">新开一盘（我后手）</button>
+            </form>
+            @if (g?.HasAi == true)
+            {
+                <form method="post" asp-page-handler="CreateAi">
+                    <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                    <button class="btn secondary" type="submit">人机对战</button>
+                </form>
+            }
+        }
+    </div>
+
+    <form method="post" asp-page-handler="JoinByCode" class="gm-join-form" style="margin-top:12px;display:flex;gap:8px;align-items:end;">
+        <div class="field" style="flex:1;">
+            <label>房间码</label>
+            <input name="code" maxlength="6" placeholder="6 位房间码" autocomplete="off" />
+        </div>
+        <input type="hidden" name="gameKey" value="@Model.GameKey" />
+        <button class="btn" type="submit">加入</button>
+    </form>
+
+    @if (Model.MyRooms.Count > 0)
+    {
+        <h3 style="margin-top:18px;">我的对局</h3>
+        @foreach (var r in Model.MyRooms)
+        {
+            <div class="gm-room-row">
+                <a href="/Games/@Model.GameKey/Play/@r.Id" style="flex:1;">
+                    <b>@r.Code</b> · @r.StatusText
+                </a>
+                @if (r.Status != "playing")
+                {
+                    <form method="post" asp-page-handler="Leave" data-confirm="确认解散">
+                        <input type="hidden" name="id" value="@r.Id" />
+                        <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                        <button class="btn secondary" type="submit">解散</button>
+                    </form>
+                }
+            </div>
+        }
+    }
+
+    <h3 style="margin-top:18px;">大厅里的房间</h3>
+    @if (Model.OpenRooms.Count == 0)
+    {
+        <p class="hint">现在没人开着房间</p>
+    }
+    else
+    {
+        @foreach (var r in Model.OpenRooms)
+        {
+            <div class="gm-room-row">
+                <a href="/Games/@Model.GameKey/Play/@r.Id?join=1" style="flex:1;">
+                    <b>@r.HostName</b> · 房间 @r.Code
+                </a>
+            </div>
+        }
+    }
+</div>

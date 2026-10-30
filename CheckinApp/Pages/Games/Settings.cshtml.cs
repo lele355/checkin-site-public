@@ -19,7 +19,7 @@ public class SettingsModel(AppDbContext db, CurrentUser me) : PageModel
     private readonly AppDbContext _db = db;
     private readonly CurrentUser _me = me;
 
-    public GameSettingsCatalog.DisplaySettings Display { get; private set; } = new();
+    public GameSettingsCatalog.DisplayDto Display { get; private set; } = new();
 
     public string? Ok { get; private set; }
     public string? Err { get; private set; }

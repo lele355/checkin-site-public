@@ -4,6 +4,7 @@ using CheckinApp.Security;
 using CheckinApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 
@@ -11,6 +12,12 @@ namespace CheckinApp.Pages;
 
 /// <summary>个人主页的数据概览格子（每格=一个模块的条数，点进去就是模块首页）。</summary>
 public record MeStat(string Label, string Icon, string Url, int Count);
+
+/// <summary>资料编辑表单的共享 VM —— GET 片段页与 POST 错误响应共用一份 markup</summary>
+public record MeProfileFormVm(string Username, string DisplayName, string Email, string Signature, string? Error = null);
+
+/// <summary>修改密码表单的共享 VM</summary>
+public record MePasswordFormVm(string? Error = null, string OldPassword = "", string NewPassword = "", string ConfirmPassword = "");
 
 /// <summary>
 /// 个人主页 —— 看的（头像/资料/加入时间/数据概览）+ 改的（昵称/邮箱/签名/密码）+ 测试数据开关。
@@ -72,32 +79,24 @@ public class MeModel(AppDbContext db, CurrentUser me) : PageModel
         var mail = (Email ?? "").Trim();
         var sign = (Signature ?? "").Trim();
 
-        if (name.Length == 0)
-        {
-            TempData["Err"] = "昵称不能为空。";
-            return RedirectToPage();
-        }
-        if (name.Length > 20)
-        {
-            TempData["Err"] = "昵称最多 20 个字。";
-            return RedirectToPage();
-        }
-        // 邮箱可以留空（不强留），填了就得像个邮箱：有 @、@ 两侧都不为空、不带空格
-        if (mail.Length > 0)
+        string? err = null;
+        if (name.Length == 0) err = "昵称不能为空。";
+        else if (name.Length > 20) err = "昵称最多 20 个字。";
+        else if (mail.Length > 0)
         {
             var at = mail.IndexOf('@');
             if (mail.Length > 100 || at <= 0 || at == mail.Length - 1
                 || mail.Any(char.IsWhiteSpace) || mail.IndexOf('@', at + 1) >= 0
                 || !mail[(at + 1)..].Contains('.'))
-            {
-                TempData["Err"] = "邮箱格式看起来不对，示例：you@example.com（也可以留空）。";
-                return RedirectToPage();
-            }
+                err = "邮箱格式看起来不对，示例：you@example.com（也可以留空）。";
         }
-        if (sign.Length > 60)
+        else if (sign.Length > 60) err = "个性签名最多 60 个字。";
+
+        if (err is not null)
         {
-            TempData["Err"] = "个性签名最多 60 个字。";
-            return RedirectToPage();
+            // 200 重绘弹窗片段：错误内联 + 已填值保留 + 防伪令牌重新输出
+            var vm = new MeProfileFormVm(row.Username, name, mail, sign, err);
+            return new PartialViewResult { ViewName = "_MeProfileForm", ViewData = new ViewDataDictionary<MeProfileFormVm>(ViewData, vm) };
         }
 
         row.DisplayName = name;
@@ -117,25 +116,20 @@ public class MeModel(AppDbContext db, CurrentUser me) : PageModel
         var user = await _db.Users.FindAsync(uid);
         if (user is null) return RedirectToPage("/Login");
 
+        string? err = null;
         if (!PasswordHasher.Verify(OldPassword, user.PasswordHash))
+            err = "当前密码不正确。";
+        else if (NewPassword.Length < 8 || !NewPassword.Any(char.IsLetter) || !NewPassword.Any(char.IsDigit))
+            err = "新密码至少 8 位，且须同时包含字母和数字。";
+        else if (NewPassword != ConfirmPassword)
+            err = "两次输入的新密码不一致。";
+        else if (PasswordHasher.Verify(NewPassword, user.PasswordHash))
+            err = "新密码不能与当前密码相同。";
+
+        if (err is not null)
         {
-            TempData["Err"] = "当前密码不正确。";
-            return RedirectToPage();
-        }
-        if (NewPassword.Length < 8 || !NewPassword.Any(char.IsLetter) || !NewPassword.Any(char.IsDigit))
-        {
-            TempData["Err"] = "新密码至少 8 位，且须同时包含字母和数字。";
-            return RedirectToPage();
-        }
-        if (NewPassword != ConfirmPassword)
-        {
-            TempData["Err"] = "两次输入的新密码不一致。";
-            return RedirectToPage();
-        }
-        if (PasswordHasher.Verify(NewPassword, user.PasswordHash))
-        {
-            TempData["Err"] = "新密码不能与当前密码相同。";
-            return RedirectToPage();
+            var vm = new MePasswordFormVm(err, OldPassword ?? "", "", "");
+            return new PartialViewResult { ViewName = "_MePasswordForm", ViewData = new ViewDataDictionary<MePasswordFormVm>(ViewData, vm) };
         }
 
         user.PasswordHash = PasswordHasher.Hash(NewPassword);

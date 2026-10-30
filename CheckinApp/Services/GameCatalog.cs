@@ -13,12 +13,21 @@ namespace CheckinApp.Services;
 public static class GameCatalog
 {
     /// <param name="Sub">卡片上的一行副标题（名词性描述，不是使用说明）</param>
-    public sealed record GameInfo(string Key, string Name, string Sub, int MinPlayers, int MaxPlayers, bool Available);
+    /// <param name="HasAi">是否支持 AI 对手</param>
+    /// <param name="Solo">是否单机游戏（点进去直达单机画面，跳过建房/大厅/对局）</param>
+    /// <param name="MaxScore">单机记分上限（弱防作弊；0 = 非单机）</param>
+    public sealed record GameInfo(string Key, string Name, string Sub, int MinPlayers, int MaxPlayers, bool Available, bool HasAi = false, bool Solo = false, int MaxScore = 0);
 
     public static readonly GameInfo[] All =
     [
         new("gomoku", "五子棋", "双人联机 · 先五连者胜", 2, 2, true),
-        // 新游戏登记在这里，前端自动多出一张卡
+        new("reversi", "黑白棋", "双人对战 · 终局子多者胜", 2, 2, true, true),
+        new("jungle", "斗兽棋", "双人对战 · 入对方兽穴胜", 2, 2, true, true),
+        new("xiangqi", "象棋", "双人对战 · 将死对方胜", 2, 2, true, true),
+        new("ludo", "飞行棋", "双人对战 · 骰子起飞", 2, 2, true, true),
+        new("armychess", "军旗", "双人对战 · 暗子对战", 2, 2, true),
+        new("fish", "大鱼吃小鱼", "单机 · 吃小鱼变大", 1, 1, true, Solo: true, MaxScore: 1_000_000),
+        new("melon", "合成大西瓜", "单机 · 合成冲击大西瓜", 1, 1, true, Solo: true, MaxScore: 1_000_000),
     ];
 
     public static GameInfo? Find(string key) =>

@@ -16,6 +16,9 @@ public class SampleModel(AppDbContext db, CurrentUser me) : PageModel
     /// <summary>当前账号带「【测试】」标记的记录条数。</summary>
     public int SampleRows { get; private set; }
 
+    /// <summary>内联错误位（当前无校验失败路径，保留槽位与其它片段一致）。</summary>
+    public string? Error { get; private set; }
+
     public IActionResult OnGet()
     {
         if (_me.UserId is not int uid) return RedirectToPage("/Login");

@@ -1,0 +1,81 @@
+@page "/Games/{gameKey}/Play/{id:int}"
+@model CheckinApp.Pages.Games.PlayModel
+@using CheckinApp.Ui
+@{
+    ViewData["Title"] = Model.GameName;
+    var dto = Model.Snap;
+}
+<div class="card gm-card" data-gamekey="@Model.GameKey">
+    <div class="page-head">
+        <h2>@Model.GameName</h2>
+        <span class="gm-code">房间 @dto.code</span>
+        <a class="btn secondary" href="/Games/@Model.GameKey">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
+    </div>
+
+    <div class="gm-status" id="gmStatus" data-status="@dto.status">
+        <span id="gmStatusText">@Model.StatusText</span>
+        @if (dto.moveTimeoutSec > 0 || dto.totalTimeoutSec > 0)
+        {
+            <span class="gm-clock" id="gmClock" hidden></span>
+        }
+    </div>
+
+    <div class="gm-board-wrap">
+        <div id="gmBoardHost" data-gamekey="@Model.GameKey"></div>
+    </div>
+
+    <div class="gm-actions">
+        @if (dto.canJoin)
+        {
+            <form method="post" asp-page-handler="Join">
+                <input type="hidden" name="id" value="@dto.id" />
+                <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                <button class="btn" type="submit">加入这一局</button>
+            </form>
+        }
+        @if (dto.mySide != 0 && dto.status == "playing")
+        {
+            <form method="post" asp-page-handler="Leave" data-confirm="确认认输">
+                <input type="hidden" name="id" value="@dto.id" />
+                <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                <button class="btn secondary" type="submit">认输</button>
+            </form>
+        }
+        @if (dto.mySide != 0 && dto.status == "finished")
+        {
+            <form method="post" asp-page-handler="Rematch">
+                <input type="hidden" name="id" value="@dto.id" />
+                <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                <button class="btn" type="submit">再来一局</button>
+            </form>
+            <form method="post" asp-page-handler="Leave">
+                <input type="hidden" name="id" value="@dto.id" />
+                <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                <button class="btn secondary" type="submit">收摊</button>
+            </form>
+        }
+        @if (dto.status == "waiting" && dto.hostId == Model.Uid)
+        {
+            <form method="post" asp-page-handler="Leave" data-confirm="确认解散">
+                <input type="hidden" name="id" value="@dto.id" />
+                <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                <button class="btn secondary" type="submit">解散</button>
+            </form>
+        }
+        <a class="btn secondary" href="/Games/@Model.GameKey">回大厅</a>
+        <a class="btn secondary" href="/Games/@Model.GameKey/Rules">规则</a>
+    </div>
+</div>
+
+<script type="application/json" id="gmState">@Html.Raw(Model.StateJson)</script>
+
+@section Scripts {
+    <script src="~/js/boards.js" asp-append-version="true"></script>
+    <script src="~/js/boards/gomoku.js" asp-append-version="true"></script>
+    <script src="~/js/boards/reversi.js" asp-append-version="true"></script>
+    <script src="~/js/boards/jungle.js" asp-append-version="true"></script>
+    <script src="~/js/boards/xiangqi.js" asp-append-version="true"></script>
+    <script src="~/js/boards/ludo.js" asp-append-version="true"></script>
+    <script src="~/js/boards/armychess.js" asp-append-version="true"></script>
+    <script src="~/js/games.js" asp-append-version="true"></script>
+}

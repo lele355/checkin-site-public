@@ -475,6 +475,9 @@ namespace CheckinApp.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("AiLevel")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -527,6 +530,9 @@ namespace CheckinApp.Migrations
                     b.Property<int>("Revision")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("SeatsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Size")
                         .HasColumnType("INTEGER");
 
@@ -561,6 +567,35 @@ namespace CheckinApp.Migrations
                     b.HasIndex("Status", "UpdatedAt");
 
                     b.ToTable("GameRooms");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.GameScore", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BestScore")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("GameKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameKey", "BestScore");
+
+                    b.HasIndex("UserId", "GameKey")
+                        .IsUnique();
+
+                    b.ToTable("GameScores");
                 });
 
             modelBuilder.Entity("CheckinApp.Models.Habit", b =>
@@ -1224,6 +1259,17 @@ namespace CheckinApp.Migrations
                     b.Navigation("Guest");
 
                     b.Navigation("Host");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.GameScore", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CheckinApp.Models.Habit", b =>

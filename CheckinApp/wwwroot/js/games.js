@@ -1,262 +1,199 @@
-// games.js — 五子棋棋盘：短轮询 + 点击落子。
-//
-// 为什么是轮询：回合制棋类对延迟不敏感，1.2 秒一次完全够用；
-// 而 WebSocket 要为 Cookie / Bearer 两套认证各写一条长连接，收益不抵复杂度。
-//
-// 这个脚本会在两种时机执行：正常加载、以及 pjax 换主区后被 site.js 重放。
-// 所以入口先判断「棋盘元素是否已绑定」，避免同一次访问挂两个定时器。
-//
-// 盘面大小、留白、落子确认、计时都是从 `#gmState` 里读的 —— 页面渲染用的是同一份快照，
-// 不做第二次计算，改规则时只改服务端一处。
+// games.js — 通用对局轮询 + 落子。配合 boards.js + boards/{key}.js 使用。
+// 1.2s 短轮询 + revision 乐观锁，渲染交给 boards 模块。
+// pageshow 刷 bfcache（修复 2）。
 (function () {
   'use strict';
 
-  var svg = document.getElementById('gmBoard');
-  if (!svg || svg.dataset.bound === '1') return;
-  svg.dataset.bound = '1';
-
   var stateEl = document.getElementById('gmState');
-  var stonesG = document.getElementById('gmStones');
-  var statusEl = document.getElementById('gmStatus');
-  // 文案与计时条是两个独立节点：写文案只能写到 #gmStatusText，不能碰 #gmStatus，
-  // 否则会把作为兄弟节点的计时条一起清掉（2.5.1 就是这么丢的）。
-  var statusTextEl = document.getElementById('gmStatusText') || statusEl;
-  var clockEl = document.getElementById('gmClock');
-  var ghost = document.getElementById('gmGhost');
-  if (!stateEl || !stonesG || !statusEl) return;
+  var boardHost = document.getElementById('gmBoardHost');
+  if (!stateEl || !boardHost) return;
+  if (boardHost.dataset.bound === '1') return;
+  boardHost.dataset.bound = '1';
 
   var state;
   try { state = JSON.parse(stateEl.textContent); } catch (e) { return; }
 
-  var SIZE = state.size || 15;
-  var PAD = typeof state.pad === 'number' ? state.pad : 20;
-  var STEP = (640 - PAD * 2) / (SIZE - 1);
-  var bus = false;
+  var statusTextEl = document.getElementById('gmStatusText');
+  var clockEl = document.getElementById('gmClock');
   var timer = null;
   var clockTimer = null;
-  var ghostAt = null;          // 二次确认时的预览格
-  var clockAt = 0;             // 本地计时起点（毫秒时间戳）
-  var clockBase = null;        // 拿到快照那一刻的剩余量
-  var forcedPoll = false;      // 计时归零后是否已经催过一次轮询
 
-  function px(i) { return PAD + i * STEP; }
-  function dot(side) { return side === 1 ? 'b' : 'w'; }
-  function rStone() { return (STEP * 0.42).toFixed(2); }
-  function rMark() { return (STEP * 0.16).toFixed(2); }
+  // 选择棋盘渲染器（按 gameKey 精确分发，不回落到 GomokuBoard）
+  var gameKey = state.gameKey || 'gomoku';
+  var RENDERERS = {
+    gomoku: window.GomokuBoard,
+    reversi: window.ReversiBoard,
+    jungle: window.JungleBoard,
+    xiangqi: window.XiangqiBoard,
+    ludo: window.LudoBoard,
+    armychess: window.ArmyChessBoard,
+  };
+  var renderer = RENDERERS[gameKey];
+  if (!renderer) { console.error('未知游戏类型: ' + gameKey); return; }
 
-  function occupied(x, y) {
-    var ms = state.moves || [];
-    for (var i = 0; i < ms.length; i++) if (ms[i].x === x && ms[i].y === y) return true;
+  // 创建 SVG
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 640 640');
+  svg.setAttribute('class', 'gm-board');
+  svg.style.width = '100%';
+  svg.style.height = 'auto';
+  boardHost.appendChild(svg);
+
+  function render() {
+    if (!renderer.render) return;
+    lastGeom = renderer.render(svg, state.state || {}, {
+      showCoord: state.showCoord,
+      lastMark: state.lastMark,
+      mySide: state.mySide,
+      myTurn: state.myTurn,
+      tapConfirm: state.tapConfirm,
+      sel: sel,
+    });
+    if (statusTextEl) {
+      var txt = statusText(state);
+      // 黑白棋：全程比分 + 无子可下提示（状态事实，非解释）
+      if (gameKey === 'reversi' && state.state) {
+        var evs = state.state.events || [];
+        var last = evs.length ? evs[evs.length - 1] : null;
+        if (last && last.t === 'pass') {
+          txt = (last.s === state.mySide ? '你无子可下，跳过' : '对方无子可下，跳过') + ' · ' + txt;
+        }
+        txt += ' · 黑 ' + (state.state.black || 0) + ' 白 ' + (state.state.white || 0);
+      }
+      statusTextEl.textContent = txt;
+    }
+  }
+
+  // 最近一次 render 返回的几何（pad/cw/ch/cols/rows/mode）—— 点击换算与渲染同源
+  var lastGeom = null;
+  // 两段式走子：当前选中的起点 (gx,gy)。象棋/斗兽棋/军旗用。
+  var sel = null;
+
+  function statusText(s) {
+    if (s.status === 'waiting') return '等人进来';
+    if (s.status === 'finished') {
+      var w = s.winner === 3 ? '和棋' : s.winner === 0 ? '已结束' : (s.winner === s.mySide ? '你赢了' : '你输了');
+      return w;
+    }
+    if (s.mySide === 0) return '你在旁观这一局';
+    return s.myTurn ? '轮到你' : '等对手落子';
+  }
+
+  // 点击模式：两段式（象棋/斗兽棋/军旗）/ 单点落子（五子棋/黑白棋）/ 不响应棋盘点击（飞行棋走按钮）
+  function boardClickMode() {
+    if (gameKey === 'xiangqi' || gameKey === 'jungle' || gameKey === 'armychess') return 'two';
+    if (gameKey === 'gomoku' || gameKey === 'reversi') return 'point';
+    return 'none';
+  }
+
+  // (gx,gy) 上是否我的子（两段式选起点用）
+  function ownPieceAt(gx, gy) {
+    var ps = state.state && state.state.pieces;
+    if (!ps) return false;
+    for (var i = 0; i < ps.length; i++) {
+      if (ps[i].x === gx && ps[i].y === gy && ps[i].side === state.mySide) return true;
+    }
     return false;
   }
 
-  function render() {
-    var html = '';
-    var moves = state.moves || [];
-    for (var i = 0; i < moves.length; i++) {
-      var m = moves[i];
-      html += '<circle cx="' + px(m.x) + '" cy="' + px(m.y) + '" r="' + rStone() + '" class="gm-stone ' + dot(m.s) + '"/>';
+  // 点击：算到 SVG viewBox 坐标 → 网格坐标 → 两段式/单点分发
+  svg.addEventListener('click', function (e) {
+    if (!state.myTurn || state.status !== 'playing') return;
+    var rect = svg.getBoundingClientRect();
+    var vb = svg.viewBox && svg.viewBox.baseVal;
+    var vw = vb && vb.width ? vb.width : 640;
+    var vh = vb && vb.height ? vb.height : 640;
+    var x = (e.clientX - rect.left) / rect.width * vw;
+    var y = (e.clientY - rect.top) / rect.height * vh;
+    var g = window.GameBoards.hit(lastGeom, x, y);
+    if (!g) return;
+
+    var mode = boardClickMode();
+    if (mode === 'none') return;
+
+    if (mode === 'two') {
+      // 点己方另一子 = 改选起点（必须在 sendMove 之前判，否则改选分支不可达）
+      if (ownPieceAt(g.x, g.y)) {
+        sel = { x: g.x, y: g.y };
+        render();
+        return;
+      }
+      // 已有起点且点的是别处 → 提交 {fx,fy,tx,ty}
+      if (sel && !(sel.x === g.x && sel.y === g.y)) {
+        sendMove({ fx: sel.x, fy: sel.y, tx: g.x, ty: g.y });
+        sel = null;
+        render();
+        return;
+      }
+      sel = null;
+      render();
+      return;
     }
-    if (state.lastMove && state.lastMark !== false) {
-      html += '<circle cx="' + px(state.lastMove.x) + '" cy="' + px(state.lastMove.y) +
-        '" r="' + rMark() + '" class="gm-last ' + dot(state.lastMove.s) + '"/>';
-    }
-    stonesG.innerHTML = html;
-    hideGhost();
-    statusText();
-    resetClock();
-  }
 
-  function statusText() {
-    var txt;
-    if (state.status === 'waiting') {
-      txt = '等人进来 —— 把房间码 ' + (state.code || '') + ' 发给朋友';
-    } else if (state.status === 'finished') {
-      var who = state.winner === 3 ? '和棋' : (state.winner === state.mySide ? '你赢了' : '你输了');
-      txt = who + ' · 共 ' + (state.moves || []).length + ' 手';
-      var r = state.resultReason;
-      if (r === 'resign') txt += '（认输）';
-      else if (r === 'draw') txt += '（棋盘下满）';
-      else if (r === 'overline') txt += '（黑方长连判负）';
-      else if (r === 'timeout') txt += '（超时）';
-    } else if (!state.mySide) {
-      txt = '你在旁观这一局';
-    } else if (state.myTurn) {
-      txt = '轮到你落子';
-    } else {
-      txt = '等对手落子';
-    }
-    if (state.status === 'playing' && state.opponentOnline === false) txt += ' · 对手好像离开了';
-    statusTextEl.textContent = txt;
-    statusEl.dataset.myturn = state.myTurn ? '1' : '0';
-  }
+    // 单点落子（五子棋/黑白棋）
+    sendMove({ x: g.x, y: g.y });
+  });
 
-  // ---------------- 计时条 ----------------
-  function fmt(ms) {
-    var s = Math.ceil(Math.max(0, ms) / 1000);
-    var m = Math.floor(s / 60);
-    s = s % 60;
-    return m > 0 ? m + ':' + (s < 10 ? '0' + s : s) : s + 's';
-  }
-
-  function resetClock() {
-    clockAt = Date.now();
-    clockBase = {
-      move: typeof state.moveRemainMs === 'number' ? state.moveRemainMs : null,
-      my: typeof state.myRemainMs === 'number' ? state.myRemainMs : null,
-      opp: typeof state.oppRemainMs === 'number' ? state.oppRemainMs : null
-    };
-    forcedPoll = false;
-    drawClock();
-  }
-
-  // 服务端只给「该走棋的一方」计时（没轮到你就不扣），所以这里也不能三方一起倒数，
-  // 否则对手/自己的数字会先掉下去再被下一次轮询拉回来，看着像在乱跳。
-  function left(v, running) {
-    if (v === null) return null;
-    return running ? Math.max(0, v - (Date.now() - clockAt)) : v;
-  }
-
-  function drawClock() {
-    if (!clockEl || !clockBase) return;
-    var playing = state.status === 'playing';
-    var move = left(clockBase.move, playing);
-    var my = left(clockBase.my, playing && state.myTurn);
-    var opp = left(clockBase.opp, playing && !state.myTurn);
-    if (move === null && my === null) { clockEl.hidden = true; return; }
-
-    clockEl.hidden = false;
-    var parts = [];
-    if (move !== null && state.status === 'playing') parts.push('本步 ' + fmt(move));
-    if (my !== null) parts.push('我 ' + fmt(my));
-    if (opp !== null) parts.push('对手 ' + fmt(opp));
-    clockEl.textContent = parts.join(' · ');
-    clockEl.classList.toggle('low', (move !== null && move < 10000) || (my !== null && my < 60000));
-
-    // 归零了立刻催一次轮询，让服务端判超时（不然要等下一拍）
-    var zero = (move === 0) || (my === 0);
-    if (zero && !forcedPoll && state.status === 'playing') {
-      forcedPoll = true;
-      poll();
-    }
-  }
-
-  // ---------------- 二次确认的预览圈 ----------------
-  // 注意：<circle> 是 SVGElement，没有 hidden 这个 IDL 属性（那是 HTMLElement 才有的），
-  // 写 ghost.hidden = false 只会挂一个无效的 JS 属性，attribute 不会被移除，
-  // 结果就是预览圈永远不显示。SVG 元素一律走 setAttribute / removeAttribute。
-  function showGhost(x, y) {
-    if (!ghost) return;
-    ghost.setAttribute('cx', px(x));
-    ghost.setAttribute('cy', px(y));
-    ghost.setAttribute('r', rStone());
-    ghost.setAttribute('class', 'gm-ghost ' + dot(state.mySide));
-    ghost.removeAttribute('hidden');
-    ghostAt = { x: x, y: y };
-  }
-
-  function hideGhost() {
-    if (ghost) ghost.setAttribute('hidden', '');
-    ghostAt = null;
-  }
-
-  /** 拿到一份新快照：重绘；状态换了就整页刷新一次（按钮/名字要跟着变） */
-  function apply(next) {
-    if (!next || next.revision === state.revision) return;
-    var prevStatus = state.status;
-    var prevMoves = (state.moves || []).length;
-    state = next;
-    SIZE = state.size || SIZE;
-    render();
-    // 对手落子后提示一下，别让人以为自己的点击没生效
-    if ((next.moves || []).length > prevMoves && next.myTurn && window.toast) {
-      window.toast('对手走了一步，轮到你了', 'ok');
-    }
-    if (next.status !== prevStatus) {
-      setTimeout(function () {
-        if (!document.body.contains(svg)) return;
-        location.reload();
-      }, 300);
-    }
-  }
-
-  function place(x, y) {
-    bus = true;
-    fetch('/api/v1/games/gomoku/rooms/' + state.id + '/move', {
+  function sendMove(move) {
+    fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id + '/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
       credentials: 'same-origin',
-      body: JSON.stringify({ x: x, y: y })
-    }).then(function (r) {
-      return r.json();
-    }).then(function (j) {
-      bus = false;
-      hideGhost();
-      if (j && j.ok) apply(j.data);
-      else if (window.toast) window.toast((j && j.error) || '落子失败', 'err');
-    }, function () {
-      bus = false;
-      if (window.toast) window.toast('网络不太好，再点一次', 'err');
-    });
+      body: JSON.stringify(move),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.ok && j.data) apply(j.data);
+    }, function () { });
   }
 
-  svg.addEventListener('click', function (e) {
-    if (bus || state.status !== 'playing' || !state.myTurn) return;
-
-    var rect = svg.getBoundingClientRect();
-    if (!rect.width) return;
-    var vx = (e.clientX - rect.left) / rect.width * 640;
-    var vy = (e.clientY - rect.top) / rect.height * 640;
-
-    var col = Math.round((vx - PAD) / STEP);
-    var row = Math.round((vy - PAD) / STEP);
-    if (col < 0 || col >= SIZE || row < 0 || row >= SIZE) return;
-    // 离交叉点太远当没点中（手机上避免误触）
-    if (Math.abs(px(col) - vx) > STEP * 0.6 || Math.abs(px(row) - vy) > STEP * 0.6) return;
-    if (occupied(col, row)) return;
-
-    // 开了「落子确认」：第一下只预览，点同一处第二下才落
-    if (state.tapConfirm) {
-      if (!ghostAt || ghostAt.x !== col || ghostAt.y !== row) {
-        showGhost(col, row);
-        return;
-      }
-    }
-    place(col, row);
-  });
-
-  function schedule(ms) {
-    timer = setTimeout(tick, ms);
+  function apply(data) {
+    if (data.revision === state.revision) return;
+    state.revision = data.revision;
+    if (!data.myTurn) sel = null;   // 轮到对方时清掉两段式选中
+    state.status = data.status;
+    state.turn = data.turn;
+    state.winner = data.winner;
+    state.resultReason = data.resultReason;
+    state.myTurn = data.myTurn;
+    state.mySide = data.mySide;
+    state.state = data.state;
+    state.moveRemainMs = data.moveRemainMs;
+    state.myRemainMs = data.myRemainMs;
+    state.oppRemainMs = data.oppRemainMs;
+    render();
   }
 
   function poll() {
-    fetch('/api/v1/games/gomoku/rooms/' + state.id, {
+    fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id, {
       headers: { 'X-Requested-With': 'fetch' },
-      credentials: 'same-origin'
-    }).then(function (r) {
-      return r.json();
-    }).then(function (j) {
+      credentials: 'same-origin',
+    }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.ok && j.data) apply(j.data);
-    }, function () { /* 断网就下一轮再试 */ });
+    }, function () { });
+  }
+
+  function schedule(ms) {
+    clearTimeout(timer);
+    timer = setTimeout(tick, ms);
   }
 
   function tick() {
-    // pjax 换页后这个 svg 已经不在文档里了 —— 停掉，别再空转
     if (!document.body.contains(svg)) {
       clearTimeout(timer);
       clearInterval(clockTimer);
       return;
     }
     if (document.hidden) { schedule(1500); return; }
-
     poll();
     schedule(state.status === 'finished' ? 3000 : 1200);
   }
 
   render();
   schedule(1200);
-  clockTimer = setInterval(function () {
-    if (!document.body.contains(svg)) { clearInterval(clockTimer); return; }
-    drawClock();
-  }, 250);
+
+  // bfcache 返回时刷一次（修复 2）
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    if (!document.body.contains(svg)) return;
+    poll();
+  });
 })();

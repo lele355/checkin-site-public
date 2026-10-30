@@ -505,6 +505,9 @@ public class GameRoom
     /// <summary>房主执哪一方：1 = 黑（先手），2 = 白。对手方自动取另一方</summary>
     public int HostSide { get; set; } = 1;
 
+    /// <summary>AI 等级：0 = 人类 guest（现状）；&gt;0 = AI 对局，GuestUserId 恒为 null，AI 执 HostSide 的对方</summary>
+    public int AiLevel { get; set; }
+
     /// <summary>waiting（等人）/ playing（进行中）/ finished（终局，棋盘保留可复盘）</summary>
     public string Status { get; set; } = "waiting";
 
@@ -551,4 +554,28 @@ public class GameRoom
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? FinishedAt { get; set; }
+
+    /// <summary>
+    /// 飞行棋专属：座位唯一真相（2/3/4 座 JSON 数组），其余五款恒 null 不读不写。
+    /// 读到 null 时按 Host/Guest 懒回填 2 座（存量 2 人局零漂移）。
+    /// 结构：[{seat,side,color,uid|null=AI,isAi,usedMs,seenAt,active}]，seat0=房主。
+    /// </summary>
+    public string? SeatsJson { get; set; }
+}
+
+/// <summary>
+/// 单机游戏最高分 —— 一人一游戏一行，只存最高分（不需要每局历史）。
+/// 防作弊：服务端 <c>BestScore = max(旧值, 新值)</c> 幂等更新（分数只增不减），
+/// 加上限 + 限速（见 Services/GameScores.cs）。删用户级联清除。
+/// </summary>
+public class GameScore
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    /// <summary>游戏 key："fish" / "melon"</summary>
+    public required string GameKey { get; set; }
+    /// <summary>最高分（只增不减）</summary>
+    public int BestScore { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

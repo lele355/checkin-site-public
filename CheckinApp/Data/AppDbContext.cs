@@ -36,6 +36,8 @@ public partial class AppDbContext : DbContext
     public DbSet<NotifySetting> NotifySettings => Set<NotifySetting>();
     /// <summary>小游戏对局房间（五子棋），一行一盘</summary>
     public DbSet<GameRoom> GameRooms => Set<GameRoom>();
+    /// <summary>单机游戏最高分，一人一游戏一行</summary>
+    public DbSet<GameScore> GameScores => Set<GameScore>();
 
     protected override void OnModelCreating(ModelBuilder m)
     {
@@ -228,6 +230,14 @@ public partial class AppDbContext : DbContext
             e.HasIndex(x => x.GuestUserId);
             e.HasOne(x => x.Host).WithMany().HasForeignKey(x => x.HostUserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Guest).WithMany().HasForeignKey(x => x.GuestUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 单机游戏最高分：一人一游戏一行（唯一索引兜底并发）；删用户级联清除
+        m.Entity<GameScore>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.GameKey }).IsUnique();
+            e.HasIndex(x => new { x.GameKey, x.BestScore });
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -1,0 +1,68 @@
+@page "/Games/{gameKey}/Settings"
+@model CheckinApp.Pages.Games.GameSettingsModel
+@using CheckinApp.Ui
+@{
+    ViewData["Title"] = Model.GameName + " · 默认规则";
+    var r = Model.Rules;
+}
+<div class="card">
+    <div class="page-head">
+        <h2>@Model.GameName · 默认规则</h2>
+        <a class="btn secondary" href="/Games/@Model.GameKey">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Ok))
+    {
+        <div class="msg ok">@Model.Ok</div>
+    }
+
+    <form method="post" asp-page-handler="Save">
+        <input type="hidden" name="gameKey" value="@Model.GameKey" />
+        @if (Model.GameKey == "gomoku")
+        {
+            <div class="field">
+                <label>盘面大小</label>
+                <select name="size">
+                    <option value="13" selected="@(Model.GomokuSize == 13)">13 路</option>
+                    <option value="15" selected="@(Model.GomokuSize == 15)">15 路</option>
+                    <option value="19" selected="@(Model.GomokuSize == 19)">19 路</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>禁手</label>
+                <select name="forbidden">
+                    <option value="true" selected="@(Model.GomokuForbidden)">标准规则</option>
+                    <option value="false" selected="@(!Model.GomokuForbidden)">自由规则</option>
+                </select>
+            </div>
+        }
+        <div class="field">
+            <label>单步限时</label>
+            <select name="moveTimeoutSec">
+                @foreach (var t in Model.MoveTimeoutOptions)
+                {
+                    <option value="@t" selected="@(t == Model.MoveTimeoutSec)">@(t == 0 ? "不限" : t < 60 ? $"{t} 秒" : $"{t / 60} 分钟")</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>每方总用时</label>
+            <select name="totalTimeoutSec">
+                @foreach (var t in Model.TotalTimeoutOptions)
+                {
+                    <option value="@t" selected="@(t == Model.TotalTimeoutSec)">@(t == 0 ? "不限" : $"{t / 60} 分钟")</option>
+                }
+            </select>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">保存设置</button>
+        </div>
+    </form>
+
+    <form method="post" asp-page-handler="Reset" data-confirm="恢复成默认设置？" style="margin-top:8px;">
+        <input type="hidden" name="gameKey" value="@Model.GameKey" />
+        <div class="form-actions">
+            <button class="btn secondary" type="submit">恢复默认</button>
+        </div>
+    </form>
+</div>

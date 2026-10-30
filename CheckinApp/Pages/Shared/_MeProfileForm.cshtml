@@ -1,0 +1,32 @@
+@model CheckinApp.Pages.MeProfileFormVm
+@* 资料编辑表单 —— GET 片段页（/Me/Edit）与 POST 错误响应（/Me?handler=Profile）共用。
+   modal.js 的 fillModal 从返回 HTML 里抓 .card > form，所以结构必须是 card 包 form。 *@
+<div class="card" style="max-width:520px;margin:4vh auto 0;">
+    <h2>编辑资料</h2>
+    @if (Model.Error is string err)
+    {
+        <div class="msg error sticky">@err</div>
+    }
+    <form method="post" asp-page="/Me" asp-page-handler="Profile">
+        <div class="field">
+            <label>登录名（不可改）</label>
+            <input value="@Model.Username" disabled />
+        </div>
+        <div class="field">
+            <label asp-for="DisplayName">昵称</label>
+            <input asp-for="DisplayName" maxlength="20" required placeholder="最多 20 个字" />
+        </div>
+        <div class="field">
+            <label asp-for="Email">联系邮箱（选填）</label>
+            <input asp-for="Email" maxlength="100" placeholder="you@example.com" />
+        </div>
+        <div class="field">
+            <label asp-for="Signature">个性签名（选填）</label>
+            <textarea asp-for="Signature" rows="3" maxlength="60" placeholder="一句话介绍自己，最多 60 字"></textarea>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">保存资料</button>
+            <a class="btn secondary" href="/Me">取消</a>
+        </div>
+    </form>
+</div>

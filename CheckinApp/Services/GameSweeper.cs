@@ -27,15 +27,27 @@ public static class GameSweeper
     {
         var cutoff = DateTime.UtcNow.AddMinutes(-IdleMinutes);
 
-        // 双方的「最近看过」都早于 cutoff 才算闲置。
-        // 没有对手的房只看房主；GuestSeenAt 为 null 也视为没来过。
+        // 非飞行棋：双方的「最近看过」都早于 cutoff 才算闲置。
         var dead = db.GameRooms
-            .Where(x => x.Status != "finished"
+            .Where(x => x.Status != "finished" && x.GameKey != "ludo"
                         && (x.HostSeenAt == null || x.HostSeenAt < cutoff)
                         && (x.GuestUserId == null
                             ? true
                             : x.GuestSeenAt == null || x.GuestSeenAt < cutoff))
             .ToList();
+
+        // 飞行棋多座：座位 seenAt 才是真相（seat2/3 不写 Host/Guest 列），内存判活
+        var ludoRooms = db.GameRooms
+            .Where(x => x.Status != "finished" && x.GameKey == "ludo")
+            .Take(200).ToList();
+        foreach (var lr in ludoRooms)
+        {
+            var seats = LudoSeats.Get(lr);
+            var anyAlive = seats.Any(s => s.SeenAt is not null && s.SeenAt.Value >= cutoff)
+                           || (lr.HostSeenAt is not null && lr.HostSeenAt.Value >= cutoff)
+                           || (lr.GuestSeenAt is not null && lr.GuestSeenAt.Value >= cutoff);
+            if (!anyAlive) dead.Add(lr);
+        }
 
         if (dead.Count == 0) return 0;
         db.GameRooms.RemoveRange(dead);

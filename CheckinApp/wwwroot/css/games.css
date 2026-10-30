@@ -306,3 +306,137 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
 .gm-item-name { font-weight: 600; font-size: .98rem; }
 .gm-item-sub { margin-top: 2px; font-size: .82rem; color: var(--text-sub); }
 .gm-item > svg { flex: none; color: var(--text-weak); }
+
+/* ==================== 单机游戏 ==================== */
+.gm-solo { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.gm-solo canvas {
+  background: #fff; border-radius: 10px; border: 1px solid var(--border);
+  max-width: 100%; height: auto; touch-action: none;
+}
+.gm-solo-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gm-solo-bar > span {
+  font-weight: 700; font-size: 1.2rem; min-width: 60px;
+  color: var(--text);
+}
+.gm-solo-lb {
+  width: 100%; max-width: 360px; margin-top: 6px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px;
+}
+.gm-solo-lb h3 { margin: 0 0 8px; font-size: 1rem; }
+.gm-solo-lb ol { margin: 0 0 8px; padding-left: 20px; }
+.gm-solo-lb li { font-size: .9rem; line-height: 1.7; }
+.gm-solo-lb .hint { color: var(--text-sub); font-size: .82rem; margin: 0; }
+
+/* ==========================================================================
+   移动端适配（<400px）+ 横屏（T05）
+   落子坐标在 games.js 里是 (clientX-rect.left)/rect.width*640 —— 缩放无关，
+   这里只改尺寸/布局，不碰坐标换算，落点始终准。
+   ========================================================================== */
+
+/* 棋盘限高：正方形棋盘同时受宽度与视口高度约束（矮屏/横屏不顶出、不裁切） */
+.gm-board { max-width: min(520px, 88vh); }
+
+@media (max-width: 400px) {
+    .page-head { flex-wrap: wrap; gap: 8px; }
+    .gm-code { letter-spacing: 1px; font-size: 12px; }
+
+    /* 建房/加入按钮：全宽竖排，不挤不溢出 */
+    .gm-actions { gap: 8px; }
+    .gm-actions form { flex: 1 1 100%; display: block; }
+    .gm-actions .btn { width: 100%; }
+
+    /* 飞行棋人数/AI 表单：column 方向，子项按自然高度堆叠、宽度撑满（不能用 flex-basis:100%，那是高度） */
+    .gm-ludo-form { flex-direction: column; align-items: stretch !important; gap: 8px; }
+    .gm-ludo-form .field,
+    .gm-ludo-form .chip,
+    .gm-ludo-form .btn { flex: 0 0 auto !important; width: 100%; box-sizing: border-box; }
+
+    /* 房间码加入：输入独占一行，加入按钮全宽 */
+    .gm-join-form { flex-wrap: wrap; }
+    .gm-join-form .field { flex: 1 1 100%; }
+    .gm-join-form .btn { flex: 1 1 100%; width: 100%; }
+
+    /* 下拉/选项：占满宽度，避免窄屏挤出 */
+    .gm-opt, .gm-new-opts { flex: 1 1 100%; }
+    .gm-opt select { width: 100%; }
+    .gm-new-form { flex-direction: column; }
+
+    /* 房间行：状态换到下一行右对齐，标题不挤 */
+    .gm-row { flex-wrap: wrap; }
+    .gm-row-title { white-space: normal; }
+    .gm-row-meta { margin-left: 0; width: 100%; justify-content: flex-end; }
+
+    /* 弹层兜底（如以后引入 .app-modal）：不超出视口、可滚动、关闭键可及 */
+    .app-modal { max-width: calc(100vw - 20px) !important; max-height: 92dvh; overflow: auto; }
+
+    /* 单机画布不超视口 */
+    .gm-solo canvas { max-height: 70vh; }
+}
+
+/* 横屏：四款棋类（象棋/斗兽棋/军旗/飞行棋）左右分栏 —— 棋盘左、状态+操作右。
+   高棋盘横屏时按视口高度限高，绝不裁切。用 grid 区域布局，竖屏 DOM 顺序不变。 */
+@media (orientation: landscape) and (max-height: 560px) {
+    .gm-board { max-width: min(520px, 88vh); }
+
+    .gm-card[data-gamekey="xiangqi"],
+    .gm-card[data-gamekey="jungle"],
+    .gm-card[data-gamekey="armychess"],
+    .gm-card[data-gamekey="ludo"] {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(200px, 34%);
+        grid-template-rows: auto auto 1fr;
+        grid-template-areas:
+            "head   head"
+            "board  status"
+            "board  actions";
+        gap: 4px 14px;
+        align-items: start;
+    }
+    .gm-card[data-gamekey="xiangqi"]  > .page-head,
+    .gm-card[data-gamekey="jungle"]   > .page-head,
+    .gm-card[data-gamekey="armychess"]> .page-head,
+    .gm-card[data-gamekey="ludo"]     > .page-head { grid-area: head; }
+
+    .gm-card[data-gamekey="xiangqi"]  > .gm-board-wrap,
+    .gm-card[data-gamekey="jungle"]   > .gm-board-wrap,
+    .gm-card[data-gamekey="armychess"]> .gm-board-wrap,
+    .gm-card[data-gamekey="ludo"]     > .gm-board-wrap { grid-area: board; align-self: start; }
+
+    .gm-card[data-gamekey="xiangqi"]  > .gm-status,
+    .gm-card[data-gamekey="jungle"]   > .gm-status,
+    .gm-card[data-gamekey="armychess"]> .gm-status,
+    .gm-card[data-gamekey="ludo"]     > .gm-status { grid-area: status; margin-top: 0; }
+
+    .gm-card[data-gamekey="xiangqi"]  > .gm-actions,
+    .gm-card[data-gamekey="jungle"]   > .gm-actions,
+    .gm-card[data-gamekey="armychess"]> .gm-actions,
+    .gm-card[data-gamekey="ludo"]     > .gm-actions { grid-area: actions; margin-top: 0; flex-direction: column; }
+    .gm-card[data-gamekey="xiangqi"]  > .gm-actions .btn,
+    .gm-card[data-gamekey="jungle"]   > .gm-actions .btn,
+    .gm-card[data-gamekey="armychess"]> .gm-actions .btn,
+    .gm-card[data-gamekey="ludo"]     > .gm-actions .btn { width: 100%; }
+}
+
+/* 横屏（T05-1）：页头压单行 + 四款高棋盘按可用高度反算，首屏完整不裁切 */
+@media (orientation: landscape) and (max-height: 560px) {
+    .gm-card { padding: 6px 12px !important; }
+    .gm-card > .page-head { padding: 4px 8px !important; margin: 0 0 4px !important; }
+    .gm-card > .page-head h2 { font-size: 1rem !important; line-height: 1.2; }
+    .gm-card > .page-head .gm-code { font-size: 11px; letter-spacing: 1px; }
+    .gm-card > .page-head .btn { padding: 4px 10px; min-height: 0; }
+
+    .gm-card[data-gamekey="xiangqi"] .gm-board,
+    .gm-card[data-gamekey="jungle"] .gm-board,
+    .gm-card[data-gamekey="armychess"] .gm-board,
+    .gm-card[data-gamekey="ludo"] .gm-board {
+        width: auto !important;
+        height: calc(100dvh - 142px) !important;
+        max-height: calc(100dvh - 142px) !important;
+        max-width: 100% !important;
+    }
+    .gm-card[data-gamekey="xiangqi"] > .gm-board-wrap,
+    .gm-card[data-gamekey="jungle"] > .gm-board-wrap,
+    .gm-card[data-gamekey="armychess"] > .gm-board-wrap,
+    .gm-card[data-gamekey="ludo"] > .gm-board-wrap { overflow: hidden; align-items: flex-start; padding: 0 !important; }
+}

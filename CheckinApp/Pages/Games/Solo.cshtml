@@ -1,0 +1,26 @@
+@page "/Games/{gameKey}/Solo"
+@model CheckinApp.Pages.Games.SoloModel
+@using CheckinApp.Ui
+@{
+    ViewData["Title"] = Model.GameName;
+}
+<div class="card">
+    <div class="page-head">
+        <h2>@Model.GameName</h2>
+        <a class="btn secondary" href="/Games">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
+    </div>
+
+    <div class="gm-solo" data-game-key="@Model.GameKey" data-max-score="@Model.MaxScore">
+        <canvas id="soloCanvas" width="360" height="480" tabindex="0"></canvas>
+        <div class="gm-solo-bar">
+            <span id="soloScore">0</span>
+            <button class="btn" id="soloRestart" type="button">重开</button>
+            <button class="btn secondary" id="soloLeaderboard" type="button">排行榜</button>
+        </div>
+        <div id="soloLeaderboardPanel" class="gm-solo-lb" hidden></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/solo/@(Model.GameKey).js" asp-append-version="true"></script>
+}

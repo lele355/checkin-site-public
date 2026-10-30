@@ -16,7 +16,7 @@
     <div class="gm-list">
         @foreach (var g in Model.Games)
         {
-            var href = g.Available ? $"/Games/{g.Key}" : null;
+            var href = g.Available ? (g.Solo ? $"/Games/{g.Key}/Solo" : $"/Games/{g.Key}") : null;
             @if (href is null)
             {
                 <div class="gm-item">

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using CheckinApp.Data;
 using CheckinApp.Models;
 using CheckinApp.Services;
@@ -43,20 +44,28 @@ public static class GamesApi
     // ---------- 请求体 ----------
     /// <summary>
     /// 建房：side = 我执哪一方（1 黑先手 / 2 白后手）；
-    /// 后面四个是「这一局」的覆盖值，不传就用房主的默认设置。
+    /// opponent = "friend"（等人）或 "ai"（AI 对局，立即开始）；
+    /// 后面是「这一局」的覆盖值，不传就用房主的默认设置。
     /// </summary>
     public record CreateReq(
         int Side = 1,
+        string? Opponent = null,
+        int? AiLevel = null,
         int? Size = null,
         bool? Forbidden = null,
         int? MoveTimeoutSec = null,
-        int? TotalTimeoutSec = null);
+        int? TotalTimeoutSec = null,
+        List<SeatSpec>? Seats = null);
+
+    /// <summary>飞行棋座位规格：seat0 恒为房主（真人），其余每座 isAi 决定朋友/AI</summary>
+    public record SeatSpec(bool IsAi = false);
 
     /// <summary>凭房间码加入</summary>
     public record JoinReq(string? Code);
-    public record MoveReq(int X, int Y);
-    /// <summary>再来一局：side 空 = 交换先手（默认）</summary>
+    /// <summary>走子请求体：per-game 字段由引擎解析</summary>
     public record RematchReq(int? Side);
+    /// <summary>单机记分请求体</summary>
+    public record ScoreReq(int Score);
 
     public static void Map(WebApplication app)
     {
@@ -69,7 +78,9 @@ public static class GamesApi
             games = GameCatalog.All.Select(x => new
             {
                 key = x.Key, name = x.Name, sub = x.Sub,
-                minPlayers = x.MinPlayers, maxPlayers = x.MaxPlayers, available = x.Available,
+                minPlayers = x.MinPlayers, maxPlayers = x.MaxPlayers,
+                available = x.Available, hasAi = x.HasAi, solo = x.Solo,
+                maxScore = x.MaxScore,
             }).ToList(),
         }));
 
@@ -102,7 +113,6 @@ public static class GamesApi
         gs.MapGet("/settings", (string gameKey, AppDbContext db, HttpContext ctx) =>
         {
             var key = GameCatalog.Require(gameKey);
-            if (key != GameKey) throw new ApiBadRequest("这个游戏还没开放设置");
             var uid = ApiKit.MeId(ctx);
             var user = db.Users.FirstOrDefault(x => x.Id == uid);
             return ApiKit.Ok(new
@@ -117,7 +127,6 @@ public static class GamesApi
         gs.MapPut("/settings", (string gameKey, GameSettingsCatalog.RuleDefaults req, AppDbContext db, HttpContext ctx) =>
         {
             var key = GameCatalog.Require(gameKey);
-            if (key != GameKey) throw new ApiBadRequest("这个游戏还没开放设置");
             var uid = ApiKit.MeId(ctx);
             var user = db.Users.FirstOrDefault(x => x.Id == uid)
                        ?? throw new ApiBadRequest("账号不存在");
@@ -125,6 +134,33 @@ public static class GamesApi
             user.GameSettings = GameSettingsCatalog.Store(merged);
             db.SaveChanges();
             return ApiKit.Ok(GameSettingsCatalog.ToRules(merged));
+        });
+
+        // ==================== 教程 ====================
+        gs.MapGet("/tutorial", (string gameKey) =>
+        {
+            GameCatalog.Require(gameKey);
+            var sections = GameTutorials.Get(gameKey)
+                           ?? throw new ApiBadRequest("还没有这个游戏的教程");
+            return ApiKit.Ok(sections.Select(s => new { title = s.Title, paras = s.Paras }).ToList());
+        });
+
+        // ==================== 单机记分 + 排行榜 ====================
+        // 单机游戏不进 GameRooms：纯前端玩法 + 记分接口。防作弊三件套见 GameScores。
+        gs.MapPost("/score", (string gameKey, ScoreReq req, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            var uid = ApiKit.MeId(ctx);
+            if (GameScores.RateLimited(uid)) throw new ApiBadRequest("提交太频繁，稍后再试");
+            var (best, rank) = GameScores.Submit(db, uid, key, req.Score);
+            return ApiKit.Ok(new { bestScore = best, rank });
+        });
+
+        gs.MapGet("/leaderboard", (string gameKey, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            var uid = ApiKit.MeId(ctx);
+            return ApiKit.Ok(GameScores.Leaderboard(db, key, uid));
         });
 
         // ==================== 大厅（这一局游戏的房间列表） ====================
@@ -150,11 +186,34 @@ public static class GamesApi
                 .Take(LobbyKeep)
                 .ToList();
 
+            // 飞行棋多座：seat2/3 用户靠 SeatsJson 内存过滤补进大厅（SQL 只兜 seat0/1）
+            if (key == "ludo")
+            {
+                var extra = db.GameRooms
+                    .Include(x => x.Host).Include(x => x.Guest)
+                    .Where(x => x.GameKey == "ludo" && x.SeatsJson != null
+                                && (x.Status != "finished" || x.UpdatedAt > keepDone)
+                                && x.UpdatedAt > cutoff)
+                    .OrderByDescending(x => x.UpdatedAt).Take(200).ToList()
+                    .Where(x => LudoSeats.Get(x).Any(s2 => s2.Uid == uid) && rooms.All(r2 => r2.Id != x.Id))
+                    .ToList();
+                if (extra.Count > 0)
+                {
+                    rooms.AddRange(extra);
+                    rooms = rooms.OrderByDescending(x => x.UpdatedAt).Take(LobbyKeep).ToList();
+                }
+            }
+
             var items = rooms.Select(r =>
             {
-                var moves = GomokuRules.Parse(r.MovesJson);
-                var mySide = MySide(r, uid);
+                var evs = GameEvents.Parse(r.MovesJson);
+                var mySide = GameViews.MySide(r, uid);
                 var oppSeen = r.HostUserId == uid ? r.GuestSeenAt : r.HostSeenAt;
+                var isLudo = r.GameKey == "ludo";
+                var seatList = isLudo ? LudoSeats.Get(r) : null;
+                var isAi = isLudo
+                    ? (seatList!.Any(s2 => s2.IsAi) && seatList!.All(s2 => s2.Uid is null || s2.Seat == 0))
+                    : r.AiLevel > 0 && r.GuestUserId is null;
                 return new
                 {
                     id = r.Id,
@@ -163,17 +222,18 @@ public static class GamesApi
                     hostId = r.HostUserId,
                     hostName = r.Host?.DisplayName ?? "",
                     guestId = r.GuestUserId ?? 0,
-                    guestName = r.Guest?.DisplayName ?? "",
+                    guestName = isAi ? "AI" : r.Guest?.DisplayName ?? "",
                     hostSide = r.HostSide,
                     size = r.Size,
                     forbidden = r.Forbidden,
-                    moveCount = moves.Count,
+                    seatCount = seatList?.Count ?? 0,
+                    seatedCount = seatList?.Count(s2 => s2.Uid is not null || s2.IsAi) ?? 0,
+                    moveCount = evs.Count(e => e.t == "move"),
                     winner = r.Winner,
                     mySide,
                     mine = mySide != 0,
                     myTurn = r.Status == "playing" && mySide != 0 && r.Turn == mySide,
-                    opponentOnline = oppSeen is not null
-                                     && (DateTime.UtcNow - oppSeen.Value).TotalSeconds < 20,
+                    opponentOnline = isAi || (oppSeen is not null && (DateTime.UtcNow - oppSeen.Value).TotalSeconds < 20),
                     updatedAt = ApiKit.StampUtc(r.UpdatedAt),
                 };
             }).ToList();
@@ -197,7 +257,6 @@ public static class GamesApi
         gs.MapPost("/rooms", (string gameKey, CreateReq req, AppDbContext db, HttpContext ctx) =>
         {
             var key = GameCatalog.Require(gameKey);
-            if (key != GameKey) throw new ApiBadRequest("这个游戏还没开放建房");
             var uid = ApiKit.MeId(ctx);
             var side = req.Side == 2 ? 2 : 1;
 
@@ -214,6 +273,38 @@ public static class GamesApi
             if (req.TotalTimeoutSec is int rt) s.TotalTimeoutSec = rt;
             s = GameSettingsCatalog.Normalize(s);
 
+            // AI 局：立即 playing；限时照设（对 AI 豁免由 GameClock 的 GameAi.IsAiTurn 短路兜底）
+            var isAi = string.Equals(req.Opponent, "ai", StringComparison.OrdinalIgnoreCase);
+            var aiLevel = isAi ? Math.Clamp(req.AiLevel ?? 2, 1, 5) : 0;
+
+            // 飞行棋多座（3~4 人）：req.Seats 显式给出每座规格；seat0 恒为房主
+            var isLudoMulti = key == "ludo" && req.Seats is { Count: >= 3 and <= 4 };
+            List<LudoSeat>? ludoSeats = null;
+            if (isLudoMulti)
+            {
+                ludoSeats = new List<LudoSeat>();
+                for (var i = 0; i < req.Seats!.Count; i++)
+                {
+                    var sd = i + 1;
+                    if (i == 0)
+                        ludoSeats.Add(new LudoSeat { Seat = 0, Side = 1, Color = LudoSeats.ColorOf(1), Uid = uid, Name = user.DisplayName, IsAi = false, Active = true });
+                    else if (req.Seats[i].IsAi)
+                        ludoSeats.Add(new LudoSeat { Seat = i, Side = sd, Color = LudoSeats.ColorOf(sd), Uid = null, Name = "AI", IsAi = true, Active = true });
+                    else
+                        ludoSeats.Add(new LudoSeat { Seat = i, Side = sd, Color = LudoSeats.ColorOf(sd), Uid = null, Name = "", IsAi = false, Active = true });
+                }
+            }
+            // 是否还有空着的真人座（决定开局还是等）
+            var hasEmptyHumanSeat = isLudoMulti && ludoSeats!.Any(x => x.Uid is null && !x.IsAi);
+            var playNow = isLudoMulti ? !hasEmptyHumanSeat : isAi;
+            // 2 人飞行棋多座投影：GuestUserId = seat1 的 uid（AI 则 null）
+            int? guestIdProjection = null;
+            if (isLudoMulti)
+            {
+                var seat1 = ludoSeats!.FirstOrDefault(x => x.Seat == 1);
+                guestIdProjection = seat1 is { IsAi: false } ? seat1.Uid : null;
+            }
+
             // 一个人同时只留一个「等待中」的房间：否则大厅里会堆一屏自己的空房
             var stale = db.GameRooms
                 .Where(x => x.HostUserId == uid && x.Status == "waiting" && x.GuestUserId == null)
@@ -225,19 +316,33 @@ public static class GamesApi
                 Code = NewCode(db),
                 GameKey = key,
                 HostUserId = uid,
-                HostSide = side,
-                Status = "waiting",
+                HostSide = isLudoMulti ? 1 : side,
+                GuestUserId = isLudoMulti ? guestIdProjection : null,
+                SeatsJson = isLudoMulti ? LudoSeats.Store(ludoSeats!) : null,
+                Status = playNow ? "playing" : "waiting",
                 Turn = 1,
+                AiLevel = (isLudoMulti && ludoSeats!.Any(x => x.IsAi)) ? 2 : aiLevel,
                 Size = s.Size,
                 Forbidden = s.Forbidden,
                 MoveTimeoutSec = s.MoveTimeoutSec,
                 TotalTimeoutSec = s.TotalTimeoutSec,
+                TurnStartedAt = playNow ? DateTime.UtcNow : null,
                 HostSeenAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             };
             db.GameRooms.Add(room);
             db.SaveChanges();
+
+            // 初始化事件（黑白棋 setup / 飞行棋座位 setup）
+            var engine = GameEngines.Get(key);
+            var initEvs = engine.InitialEvents(room);
+            if (initEvs.Count > 0)
+            {
+                room.MovesJson = GameEvents.Store(initEvs);
+                db.SaveChanges();
+            }
+
             return ApiKit.Ok(new
             {
                 id = room.Id,
@@ -247,6 +352,8 @@ public static class GamesApi
                 forbidden = room.Forbidden,
                 moveTimeoutSec = room.MoveTimeoutSec,
                 totalTimeoutSec = room.TotalTimeoutSec,
+                isAi = isLudoMulti ? ludoSeats!.Any(x => x.IsAi) : isAi,
+                aiLevel = room.AiLevel,
             });
         });
 
@@ -269,12 +376,13 @@ public static class GamesApi
             var uid = ApiKit.MeId(ctx);
             var room = Load(db, id, key);
 
-            // 超时不靠后台任务：谁来看这一局，就顺手判一次。两边都在 1.2 秒轮询，
-            // 所以「超时」最多迟一拍被发现，够用且不用维护定时器。
+            // 超时懒结算 + AI 懒生成 + 黑白棋无着自动 pass（谁读谁触发，与 GameClock 同哲学）
             if (GameClock.Enforce(db, room)) room = Load(db, id, key);
+            if (GameAi.EnsureMove(db, room)) room = Load(db, id, key);
+            if (GameAi.EnsureAutoPass(db, room)) room = Load(db, id, key);
 
             Touch(db, room, uid);
-            return ApiKit.Ok(Snap(room, uid));
+            return ApiKit.Ok(GameViews.Snap(room, uid));
         });
 
         // ==================== 加入 ====================
@@ -287,24 +395,127 @@ public static class GamesApi
             return ApiKit.Ok(new { id });
         });
 
-        // ==================== 落子 ====================
-        gs.MapPost("/rooms/{id:int}/move", (string gameKey, int id, MoveReq req, AppDbContext db, HttpContext ctx) =>
+        // ==================== pass（黑白棋等） ====================
+        gs.MapPost("/rooms/{id:int}/pass", (string gameKey, int id, AppDbContext db, HttpContext ctx) =>
         {
             var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
             var room = Load(db, id, key);
-            var mySide = MySide(room, uid);
+            var mySide = GameViews.MySide(room, uid);
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
-            if (room.Status == "waiting") throw new ApiBadRequest("对手还没进来，等一下");
+            if (room.Status != "playing") throw new ApiBadRequest("这一局现在不能 pass");
+            if (room.Turn != mySide) throw new ApiBadRequest("还没轮到你");
+
+            // 有合法着时不许 pass
+            var engine = GameEngines.Get(key);
+            var evs = GameEvents.Parse(room.MovesJson);
+            var state = engine.BuildState(evs, room, mySide, false);
+            // 简单检查：如果引擎说有合法着就拒绝 pass（黑白棋）
+            if (key == "reversi")
+            {
+                var board = ReversiRules.Replay(evs);
+                if (ReversiRules.HasLegalMove(board, mySide))
+                    throw new ApiBadRequest("还有合法着，不能 pass");
+            }
+
+            evs.Add(new GameEvent { t = "pass", s = mySide });
+            var (winner, reason, over) = engine.Judge(evs, room);
+            var rev = room.Revision;
+            var now = DateTime.UtcNow;
+            var rows = db.GameRooms
+                .Where(x => x.Id == id && x.Revision == rev)
+                .ExecuteUpdate(s => s
+                    .SetProperty(x => x.MovesJson, GameEvents.Store(evs))
+                    .SetProperty(x => x.Turn, over ? room.Turn : engine.NextTurn(mySide, room))
+                    .SetProperty(x => x.Status, over ? "finished" : "playing")
+                    .SetProperty(x => x.Winner, winner)
+                    .SetProperty(x => x.ResultReason, reason)
+                    .SetProperty(x => x.TurnStartedAt, over ? room.TurnStartedAt : (DateTime?)now)
+                    .SetProperty(x => x.Revision, rev + 1)
+                    .SetProperty(x => x.UpdatedAt, now)
+                    .SetProperty(x => x.FinishedAt, over ? now : room.FinishedAt));
+            if (rows == 0) throw new ApiBadRequest("状态刚变过");
+            db.ChangeTracker.Clear();
+            return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
+        });
+
+        // ==================== 骰子（飞行棋等） ====================
+        gs.MapPost("/rooms/{id:int}/roll", (string gameKey, int id, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            var uid = ApiKit.MeId(ctx);
+            var room = Load(db, id, key);
+            var mySide = GameViews.MySide(room, uid);
+            if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
+            if (room.Status != "playing") throw new ApiBadRequest("这一局现在不能掷骰子");
+            if (room.Turn != mySide) throw new ApiBadRequest("还没轮到你");
+
+            var engine = GameEngines.Get(key);
+            var evs = GameEvents.Parse(room.MovesJson);
+            var rollEvent = engine.ValidateRoll(evs, room, mySide)
+                           ?? throw new ApiBadRequest("这个游戏不需要骰子");
+
+            var newEvs = GameEvents.Append(evs, rollEvent);
+            var rev = room.Revision;
+            var now = DateTime.UtcNow;
+
+            // 飞行棋：roll 后若无合法着，自动换手（保留骰点，不许重掷）
+            if (key == "ludo" && rollEvent.v is int rv && !LudoRules.HasAnyValidMove(newEvs, mySide, rv))
+            {
+                newEvs.Add(new GameEvent { t = "pass", s = mySide });
+                var (w2, r2, o2) = engine.Judge(newEvs, room);
+                // 掷 6 但无合法着 → 自动 pass 直接换手（不享额外回合：本手没走成，避免同座反复空掷；
+                // 「掷 6 额外回合」只在实际走子后生效，见 move 路径 GrantsExtraTurn）
+                var rows2 = db.GameRooms
+                    .Where(x => x.Id == id && x.Revision == rev)
+                    .ExecuteUpdate(s => s
+                        .SetProperty(x => x.MovesJson, GameEvents.Store(newEvs))
+                        .SetProperty(x => x.Turn, o2 ? room.Turn : engine.NextTurn(mySide, room))
+                        .SetProperty(x => x.Status, o2 ? "finished" : "playing")
+                        .SetProperty(x => x.Winner, w2)
+                        .SetProperty(x => x.ResultReason, r2)
+                        .SetProperty(x => x.TurnStartedAt, o2 ? room.TurnStartedAt : (DateTime?)now)
+                        .SetProperty(x => x.Revision, rev + 1)
+                        .SetProperty(x => x.UpdatedAt, now)
+                        .SetProperty(x => x.FinishedAt, o2 ? now : room.FinishedAt));
+                if (rows2 == 0) throw new ApiBadRequest("状态刚变过");
+                db.ChangeTracker.Clear();
+                return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
+            }
+
+            var rows = db.GameRooms
+                .Where(x => x.Id == id && x.Revision == rev)
+                .ExecuteUpdate(s => s
+                    .SetProperty(x => x.MovesJson, GameEvents.Store(newEvs))
+                    .SetProperty(x => x.Revision, rev + 1)
+                    .SetProperty(x => x.UpdatedAt, now));
+            if (rows == 0) throw new ApiBadRequest("状态刚变过，刷新一下");
+
+            db.ChangeTracker.Clear();
+            return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
+        });
+
+        // ==================== 落子（事件体，per-game 字段由引擎解析） ====================
+        gs.MapPost("/rooms/{id:int}/move", (string gameKey, int id, JsonElement req, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            var uid = ApiKit.MeId(ctx);
+            var room = Load(db, id, key);
+            var mySide = GameViews.MySide(room, uid);
+            if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
+            if (room.Status == "waiting") throw new ApiBadRequest(
+                key == "ludo" && LudoSeats.Count(room) > 2 ? "还有座位没人，等一下" : "对手还没进来，等一下");
             if (room.Status == "finished") throw new ApiBadRequest("这一局已经结束了");
 
             if (GameClock.Enforce(db, room)) throw new ApiBadRequest("这一局已经超时结束了");
 
-            var size = room.Size;
-            var moves = GomokuRules.Parse(room.MovesJson);
-            if (!GomokuRules.InBoard(req.X, req.Y, size)) throw new ApiBadRequest("落子位置不合法");
-            if (GomokuRules.Occupied(moves, req.X, req.Y)) throw new ApiBadRequest("这个位置已经有子了");
             if (room.Turn != mySide) throw new ApiBadRequest("还没轮到你");
+
+            var engine = GameEngines.Get(key);
+            var evs = GameEvents.Parse(room.MovesJson);
+            var newEvent = engine.ValidateMove(evs, room, mySide, req);
+            var newEvs = GameEvents.Append(evs, newEvent);
+            var (winner, reason, over) = engine.Judge(newEvs, room);
 
             var rev = room.Revision;
             var now = DateTime.UtcNow;
@@ -316,30 +527,35 @@ public static class GamesApi
             var hostUsed = room.HostUsedMs + (mySide == 1 ? elapsedMs : 0);
             var guestUsed = room.GuestUsedMs + (mySide == 2 ? elapsedMs : 0);
 
-            moves.Add(new GomokuRules.Stone(req.X, req.Y, mySide));
+            // 掷 6 额外回合（不换座），连续 6 超上限则强制换座（防无限）
+            var keepTurn = key == "ludo" && LudoRules.GrantsExtraTurn(newEvs, mySide);
+            var nextTurn = over ? room.Turn : (keepTurn ? mySide : engine.NextTurn(mySide, room));
 
-            // 标准规则下黑方长连（6 连以上）判负；自由规则下长连算赢
-            var overline = room.Forbidden
-                           && mySide == 1
-                           && GomokuRules.IsOverline(moves, req.X, req.Y, mySide, size);
-            var win = !overline && GomokuRules.IsWin(moves, req.X, req.Y, mySide, size);
-            var draw = !overline && !win && GomokuRules.IsDraw(moves, size);
-            var over = overline || win || draw;
-
-            var winner = overline ? 2 : win ? mySide : draw ? 3 : 0;
-            var reason = overline ? "overline" : win ? "five" : draw ? "draw" : "";
-            var nextTurn = over ? room.Turn : GomokuRules.Other(mySide);
+            // 飞行棋多座：更新该座 usedMs + seenAt，落 SeatsJson（2 人房 SeatsJson==null 不写，保持零漂移）
+            string? newSeatsJson = room.SeatsJson;
+            if (key == "ludo" && room.SeatsJson != null)
+            {
+                var seats = LudoSeats.Get(room);
+                var seat = seats.FirstOrDefault(s => s.Side == mySide);
+                if (seat is not null)
+                {
+                    seat.UsedMs += elapsedMs;
+                    seat.SeenAt = now;
+                    newSeatsJson = LudoSeats.Store(seats);
+                }
+            }
 
             var rows = db.GameRooms
                 .Where(x => x.Id == id && x.Revision == rev)
                 .ExecuteUpdate(s => s
-                    .SetProperty(x => x.MovesJson, GomokuRules.Store(moves))
+                    .SetProperty(x => x.MovesJson, GameEvents.Store(newEvs))
                     .SetProperty(x => x.Turn, nextTurn)
                     .SetProperty(x => x.Status, over ? "finished" : "playing")
                     .SetProperty(x => x.Winner, winner)
                     .SetProperty(x => x.ResultReason, reason)
                     .SetProperty(x => x.HostUsedMs, hostUsed)
                     .SetProperty(x => x.GuestUsedMs, guestUsed)
+                    .SetProperty(x => x.SeatsJson, newSeatsJson)
                     .SetProperty(x => x.TurnStartedAt, over ? room.TurnStartedAt : (DateTime?)now)
                     .SetProperty(x => x.Revision, rev + 1)
                     .SetProperty(x => x.UpdatedAt, now)
@@ -348,7 +564,7 @@ public static class GamesApi
             if (rows == 0) throw new ApiBadRequest("对手刚走过一步，刷新一下再来");
 
             db.ChangeTracker.Clear();
-            return ApiKit.Ok(Snap(Load(db, id, key), uid));
+            return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
         });
 
         // ==================== 认输 ====================
@@ -357,17 +573,45 @@ public static class GamesApi
             var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
             var room = Load(db, id, key);
-            var mySide = MySide(room, uid);
+            var mySide = GameViews.MySide(room, uid);
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
             if (room.Status != "playing") throw new ApiBadRequest("这一局现在没法认输");
 
+            var engine = GameEngines.Get(key);
             var rev = room.Revision;
             var now = DateTime.UtcNow;
+
+            // 飞行棋多人（N>2）：认输 = 该座出局、其余继续；只剩 1 active 该座胜
+            if (key == "ludo" && LudoSeats.Count(room) > 2)
+            {
+                var seats = LudoSeats.MarkInactive(room, mySide);
+                var seatsJson = LudoSeats.Store(seats);
+                var activeSides = seats.Where(s => s.Active).Select(s => s.Side).ToList();
+                var over = activeSides.Count <= 1;
+                var soleActive = over ? (activeSides.Count == 1 ? activeSides[0] : 0) : 0;
+                var nextTurn = over ? room.Turn : LudoSeats.NextActive(room, mySide);
+                var rowsM = db.GameRooms
+                    .Where(x => x.Id == id && x.Revision == rev)
+                    .ExecuteUpdate(s => s
+                        .SetProperty(x => x.SeatsJson, seatsJson)
+                        .SetProperty(x => x.Status, over ? "finished" : "playing")
+                        .SetProperty(x => x.Winner, soleActive)
+                        .SetProperty(x => x.ResultReason, over ? "resign" : "")
+                        .SetProperty(x => x.Turn, nextTurn)
+                        .SetProperty(x => x.TurnStartedAt, over ? room.TurnStartedAt : (DateTime?)now)
+                        .SetProperty(x => x.Revision, rev + 1)
+                        .SetProperty(x => x.UpdatedAt, now)
+                        .SetProperty(x => x.FinishedAt, over ? now : room.FinishedAt));
+                if (rowsM == 0) throw new ApiBadRequest("状态刚变过，刷新一下");
+                db.ChangeTracker.Clear();
+                return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
+            }
+
             var rows = db.GameRooms
                 .Where(x => x.Id == id && x.Revision == rev)
                 .ExecuteUpdate(s => s
                     .SetProperty(x => x.Status, "finished")
-                    .SetProperty(x => x.Winner, GomokuRules.Other(mySide))
+                    .SetProperty(x => x.Winner, engine.NextTurn(mySide, room))
                     .SetProperty(x => x.ResultReason, "resign")
                     .SetProperty(x => x.Revision, rev + 1)
                     .SetProperty(x => x.UpdatedAt, now)
@@ -375,7 +619,7 @@ public static class GamesApi
             if (rows == 0) throw new ApiBadRequest("状态刚变过，刷新一下");
 
             db.ChangeTracker.Clear();
-            return ApiKit.Ok(Snap(Load(db, id, key), uid));
+            return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
         });
 
         // ==================== 再来一局 ====================
@@ -384,27 +628,45 @@ public static class GamesApi
             var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
             var room = Load(db, id, key);
-            var mySide = MySide(room, uid);
+            var mySide = GameViews.MySide(room, uid);
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
 
+            var engine = GameEngines.Get(key);
             // 默认交换先手（输的先走更公平）；也可以指定「我继续执黑/执白」
             var newHostSide = req.Side is 1 or 2
-                ? (room.HostUserId == uid ? req.Side.Value : GomokuRules.Other(req.Side.Value))
-                : GomokuRules.Other(room.HostSide);
+                ? (room.HostUserId == uid ? req.Side.Value : engine.Other(req.Side.Value))
+                : engine.Other(room.HostSide);
 
             var rev = room.Revision;
             var now = DateTime.UtcNow;
-            var playing = room.GuestUserId is not null;
+            var playing = room.GuestUserId is not null || room.AiLevel > 0;
+
+            // 飞行棋多座：重置座位（全员 active、清零 usedMs），保留座位构成
+            var isLudoMulti = key == "ludo" && room.SeatsJson != null;
+            string? newSeatsJson = room.SeatsJson;
+            if (isLudoMulti)
+            {
+                newHostSide = 1;
+                var seats = LudoSeats.Get(room);
+                foreach (var st in seats) { st.Active = true; st.UsedMs = 0; }
+                newSeatsJson = LudoSeats.Store(seats);
+                playing = !seats.Any(x => x.Seat > 0 && x.Uid is null && !x.IsAi);
+            }
+
+            // 重置事件（黑白棋要重新 setup）
+            var initEvs = engine.InitialEvents(room);
+            var initJson = GameEvents.Store(initEvs);
+
             var rows = db.GameRooms
                 .Where(x => x.Id == id && x.Revision == rev)
                 .ExecuteUpdate(s => s
-                    .SetProperty(x => x.MovesJson, "")
+                    .SetProperty(x => x.MovesJson, initJson)
                     .SetProperty(x => x.Turn, 1)
                     .SetProperty(x => x.Status, playing ? "playing" : "waiting")
                     .SetProperty(x => x.Winner, 0)
                     .SetProperty(x => x.ResultReason, "")
                     .SetProperty(x => x.HostSide, newHostSide)
-                    // 计时归零重开；规则（盘面/禁手/限时）沿用这一局建房时定下的
+                    .SetProperty(x => x.SeatsJson, newSeatsJson)
                     .SetProperty(x => x.HostUsedMs, 0L)
                     .SetProperty(x => x.GuestUsedMs, 0L)
                     .SetProperty(x => x.TurnStartedAt, playing ? (DateTime?)now : null)
@@ -414,7 +676,7 @@ public static class GamesApi
             if (rows == 0) throw new ApiBadRequest("状态刚变过，刷新一下");
 
             db.ChangeTracker.Clear();
-            return ApiKit.Ok(Snap(Load(db, id, key), uid));
+            return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
         });
 
         // ==================== 退出 ====================
@@ -423,9 +685,10 @@ public static class GamesApi
             var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
             var room = Load(db, id, key);
-            var mySide = MySide(room, uid);
+            var mySide = GameViews.MySide(room, uid);
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
 
+            var engine = GameEngines.Get(key);
             // 等待中的房主退出 = 房间作废；对局中退出 = 认输；终局后房主退出 = 收拾掉这盘
             if (room.Status == "waiting" && room.HostUserId == uid)
             {
@@ -437,10 +700,34 @@ public static class GamesApi
             {
                 var rev = room.Revision;
                 var now = DateTime.UtcNow;
+
+                // 飞行棋多人（N>2）：退出 = 该座出局、其余继续
+                if (key == "ludo" && LudoSeats.Count(room) > 2)
+                {
+                    var seats = LudoSeats.MarkInactive(room, mySide);
+                    var seatsJson = LudoSeats.Store(seats);
+                    var activeSides = seats.Where(s => s.Active).Select(s => s.Side).ToList();
+                    var over = activeSides.Count <= 1;
+                    var soleActive = over ? (activeSides.Count == 1 ? activeSides[0] : 0) : 0;
+                    var nextTurn = over ? room.Turn : LudoSeats.NextActive(room, mySide);
+                    db.GameRooms.Where(x => x.Id == id && x.Revision == rev)
+                        .ExecuteUpdate(s => s
+                            .SetProperty(x => x.SeatsJson, seatsJson)
+                            .SetProperty(x => x.Status, over ? "finished" : "playing")
+                            .SetProperty(x => x.Winner, soleActive)
+                            .SetProperty(x => x.ResultReason, over ? "resign" : "")
+                            .SetProperty(x => x.Turn, nextTurn)
+                            .SetProperty(x => x.TurnStartedAt, over ? room.TurnStartedAt : (DateTime?)now)
+                            .SetProperty(x => x.Revision, rev + 1)
+                            .SetProperty(x => x.UpdatedAt, now)
+                            .SetProperty(x => x.FinishedAt, over ? now : room.FinishedAt));
+                    return ApiKit.Ok(new { resigned = true });
+                }
+
                 db.GameRooms.Where(x => x.Id == id && x.Revision == rev)
                     .ExecuteUpdate(s => s
                         .SetProperty(x => x.Status, "finished")
-                        .SetProperty(x => x.Winner, GomokuRules.Other(mySide))
+                        .SetProperty(x => x.Winner, engine.NextTurn(mySide, room))
                         .SetProperty(x => x.ResultReason, "resign")
                         .SetProperty(x => x.Revision, rev + 1)
                         .SetProperty(x => x.UpdatedAt, now)
@@ -453,13 +740,38 @@ public static class GamesApi
                 db.SaveChanges();
                 return ApiKit.Ok(new { removed = true });
             }
+
+            // 飞行棋多座：等待中非房主退出 → 释放该座（uid=null），房间继续等待，别人可加入
+            if (key == "ludo" && room.SeatsJson != null && room.Status == "waiting" && mySide != 0 && room.HostUserId != uid)
+            {
+                var seats = LudoSeats.Get(room);
+                var seat = seats.FirstOrDefault(s => s.Side == mySide);
+                if (seat is not null && !seat.IsAi)
+                {
+                    seat.Uid = null;
+                    seat.Name = "";
+                    seat.SeenAt = null;
+                    var rev = room.Revision;
+                    var now = DateTime.UtcNow;
+                    var seat1 = seats.FirstOrDefault(s => s.Seat == 1);
+                    var guestId = seat1 is { IsAi: false } ? seat1.Uid : null;
+                    db.GameRooms.Where(x => x.Id == id && x.Revision == rev)
+                        .ExecuteUpdate(s => s
+                            .SetProperty(x => x.SeatsJson, LudoSeats.Store(seats))
+                            .SetProperty(x => x.GuestUserId, guestId)
+                            .SetProperty(x => x.Revision, rev + 1)
+                            .SetProperty(x => x.UpdatedAt, now));
+                }
+                return ApiKit.Ok(new { removed = false });
+            }
+
             return ApiKit.Ok(new { removed = false });
         });
     }
 
     // ==================== 内部工具 ====================
 
-    /// <summary>取房间；给了 gameKey 就顺带验一下归属（别让五子棋的房间被别的入口操作）</summary>
+    /// <summary>取房间；给了 gameKey 就顺带验一下归属</summary>
     private static GameRoom Load(AppDbContext db, int id, string? gameKey = null)
     {
         var room = db.GameRooms.Include(x => x.Host).Include(x => x.Guest).FirstOrDefault(x => x.Id == id)
@@ -470,12 +782,6 @@ public static class GamesApi
         return room;
     }
 
-    /// <summary>我在这一局执哪一方（1 黑 / 2 白），不在局中返回 0</summary>
-    private static int MySide(GameRoom r, int uid) =>
-        r.HostUserId == uid ? r.HostSide
-        : r.GuestUserId == uid ? GomokuRules.Other(r.HostSide)
-        : 0;
-
     /// <summary>
     /// 刷新「我还在看这盘」的时间戳。故意 5 秒才写一次 ——
     /// 轮询是 1.2 秒一次，每次都写库会让 SQLite 的写锁一直热着，
@@ -485,6 +791,24 @@ public static class GamesApi
     private static void Touch(AppDbContext db, GameRoom room, int uid)
     {
         var now = DateTime.UtcNow;
+
+        // 飞行棋多座：全座位按 uid 刷 seenAt（seat2/3 也能保活，players[].online 才准）
+        if (room.GameKey == "ludo" && room.SeatsJson != null)
+        {
+            var seats = LudoSeats.Get(room);
+            var seat = seats.FirstOrDefault(s => s.Uid == uid);
+            if (seat is null) return;
+            if (seat.SeenAt is not null && (now - seat.SeenAt.Value).TotalSeconds < 5) return;
+            seat.SeenAt = now;
+            var rev = room.Revision;
+            db.GameRooms.Where(x => x.Id == room.Id && x.Revision == rev)
+                .ExecuteUpdate(s => s
+                    .SetProperty(x => x.SeatsJson, LudoSeats.Store(seats))
+                    .SetProperty(x => x.UpdatedAt, now));
+            db.ChangeTracker.Clear();
+            return;
+        }
+
         var isHost = room.HostUserId == uid;
         if (!isHost && room.GuestUserId != uid) return;
 
@@ -497,8 +821,39 @@ public static class GamesApi
 
     private static void Join_Internal(AppDbContext db, GameRoom room, int uid)
     {
-        var mySide = MySide(room, uid);
+        var mySide = GameViews.MySide(room, uid);
         if (mySide != 0) return;                                  // 已经在局中，幂等
+
+        // 飞行棋多座：填下一个空真人座（SeatsJson 非空即多人房）
+        if (room.GameKey == "ludo" && room.SeatsJson != null)
+        {
+            var seats = LudoSeats.Get(room);
+            var empty = seats.FirstOrDefault(s => s.Uid is null && !s.IsAi && s.Active);
+            if (empty is null) throw new ApiBadRequest("这一局没有空位了");
+
+            var now0 = DateTime.UtcNow;
+            empty.Uid = uid;
+            empty.Name = db.Users.FirstOrDefault(x => x.Id == uid)?.DisplayName ?? "";
+            empty.SeenAt = now0;
+            var seatsJson = LudoSeats.Store(seats);
+            var stillEmpty = seats.Any(s => s.Uid is null && !s.IsAi && s.Active);
+            var seat1 = seats.FirstOrDefault(s => s.Seat == 1);
+            var guestId = seat1 is { IsAi: false } ? seat1.Uid : null;
+            var rev0 = room.Revision;
+
+            var rows0 = db.GameRooms
+                .Where(x => x.Id == room.Id && x.Revision == rev0)
+                .ExecuteUpdate(s => s
+                    .SetProperty(x => x.SeatsJson, seatsJson)
+                    .SetProperty(x => x.GuestUserId, guestId)
+                    .SetProperty(x => x.Status, stillEmpty ? "waiting" : "playing")
+                    .SetProperty(x => x.TurnStartedAt, stillEmpty ? room.TurnStartedAt : (DateTime?)now0)
+                    .SetProperty(x => x.Revision, rev0 + 1)
+                    .SetProperty(x => x.UpdatedAt, now0));
+            if (rows0 == 0) throw new ApiBadRequest("慢了一步，这盘刚被别人进去了");
+            return;
+        }
+
         if (room.Status != "waiting" || room.GuestUserId is not null)
             throw new ApiBadRequest("这一局已经有人了，让房主再开一盘");
 
@@ -530,57 +885,5 @@ public static class GamesApi
         }
         // 概率上几乎不可能走到这儿（32^6 ≈ 10 亿）；真撞满就退化成时间戳尾号
         return $"G{DateTime.UtcNow:HHmmss}";
-    }
-
-    /// <summary>一局的全量状态 —— 两端都拿这一份渲染，避免各算各的口径</summary>
-    private static object Snap(GameRoom r, int uid)
-    {
-        var moves = GomokuRules.Parse(r.MovesJson);
-        var mySide = MySide(r, uid);
-        var iAmHost = r.HostUserId == uid;
-        var oppSeen = iAmHost ? r.GuestSeenAt : r.HostSeenAt;
-        var oppName = iAmHost ? r.Guest?.DisplayName ?? "" : r.Host?.DisplayName ?? "";
-        var myName = iAmHost ? r.Host?.DisplayName ?? "" : r.Guest?.DisplayName ?? "";
-
-        var now = DateTime.UtcNow;
-
-        return new
-        {
-            id = r.Id,
-            code = r.Code,
-            gameKey = r.GameKey,
-            status = r.Status,
-            hostSide = r.HostSide,
-            hostId = r.HostUserId,
-            hostName = r.Host?.DisplayName ?? "",
-            guestId = r.GuestUserId ?? 0,
-            guestName = r.Guest?.DisplayName ?? "",
-            turn = r.Turn,
-            winner = r.Winner,
-            resultReason = r.ResultReason,
-            revision = r.Revision,
-            // 规则（建房时定下的，双方一致）
-            size = r.Size,
-            forbidden = r.Forbidden,
-            moveTimeoutSec = r.MoveTimeoutSec,
-            totalTimeoutSec = r.TotalTimeoutSec,
-            // 计时（毫秒；null = 这一项不限）
-            moveRemainMs = GameClock.MoveRemainMs(r, now),
-            myRemainMs = GameClock.RemainMs(r, mySide, now),
-            oppRemainMs = GameClock.RemainMs(r, mySide == 0 ? 0 : GomokuRules.Other(mySide), now),
-            hostUsedMs = r.HostUsedMs,
-            guestUsedMs = r.GuestUsedMs,
-            moves = moves.Select(m => new { x = m.x, y = m.y, s = m.s }).ToList(),
-            moveCount = moves.Count,
-            lastMove = moves.Count == 0 ? null : new { x = moves[^1].x, y = moves[^1].y, s = moves[^1].s },
-            mySide,
-            myName,
-            opponentName = oppName,
-            opponentOnline = oppSeen is not null && (DateTime.UtcNow - oppSeen.Value).TotalSeconds < 20,
-            myTurn = r.Status == "playing" && mySide != 0 && r.Turn == mySide,
-            canJoin = r.Status == "waiting" && mySide == 0 && r.GuestUserId is null,
-            createdAt = ApiKit.StampUtc(r.CreatedAt),
-            updatedAt = ApiKit.StampUtc(r.UpdatedAt),
-        };
     }
 }
