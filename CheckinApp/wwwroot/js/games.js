@@ -41,6 +41,10 @@
 
   function render() {
     if (!renderer.render) return;
+    var deployActive = gameKey === 'armychess' && state.status === 'setup'
+      && state.mySide > 0 && !(state.state && state.state.deployDone && state.state.deployDone[state.mySide - 1]);
+    if (deployActive && !deployPieces) deployPieces = window.ArmyChessBoard.genDeploy(state.mySide);
+    if (!deployActive) { deployPieces = null; deploySel = null; }
     lastGeom = renderer.render(svg, state.state || {}, {
       showCoord: state.showCoord,
       lastMark: state.lastMark,
@@ -48,7 +52,10 @@
       myTurn: state.myTurn,
       tapConfirm: state.tapConfirm,
       sel: sel,
+      deployPieces: deployActive ? deployPieces : null,
+      movable: (state.state && state.state.movable) || [],
     });
+    window.__gmLastGeom = lastGeom;   // UI 冒烟/调试用几何（与点击换算同源）
     if (statusTextEl) {
       var txt = statusText(state);
       // 黑白棋：全程比分 + 无子可下提示（状态事实，非解释）
@@ -60,7 +67,29 @@
         }
         txt += ' · 黑 ' + (state.state.black || 0) + ' 白 ' + (state.state.white || 0);
       }
+      // 飞行棋：骰点 + 掷/选机状态（状态事实）
+      if (gameKey === 'ludo' && state.state) {
+        if (state.state.lastRoll) txt += ' · 骰子 ' + state.state.lastRoll;
+        if (state.myTurn && state.status === 'playing') {
+          txt += state.state.needRoll ? ' · 掷骰子' : ' · 选一架飞机';
+        }
+      }
+      // 翻棋：阵营状态 + 执色 + 二选一（状态事实）
+      if (gameKey === 'armychess' && state.state && state.state.mode === 'fanqi' && state.status === 'playing') {
+        txt += state.state.settled ? ' · 翻子或走子' : ' · 阵营未定';
+        if (state.state.myColor) txt += ' · 你执' + (state.state.myColor === 1 ? '红' : '蓝');
+      }
       statusTextEl.textContent = txt;
+    }
+    // 布阵按钮条：仅布阵期且自己未部署时出现
+    var bar = document.getElementById('gmSetupBar');
+    if (bar) bar.hidden = !deployActive;
+    // 飞行棋掷骰按钮条：轮到我且这一手还没掷
+    var ludoBar = document.getElementById('gmLudoBar');
+    if (ludoBar) {
+      var needRoll = !!(state.myTurn && state.status === 'playing'
+        && state.state && state.state.needRoll);
+      ludoBar.hidden = !needRoll;
     }
   }
 
@@ -68,6 +97,9 @@
   var lastGeom = null;
   // 两段式走子：当前选中的起点 (gx,gy)。象棋/斗兽棋/军旗用。
   var sel = null;
+  // 军旗明棋布阵：本地排布（客户端生成，确认后提交 deploy）
+  var deployPieces = null;
+  var deploySel = null;
 
   function statusText(s) {
     if (s.status === 'waiting') return '等人进来';
@@ -86,27 +118,81 @@
     return 'none';
   }
 
+  // 执方视角：翻棋 = 执色（myColor），其余 = 座位（mySide）
+  function myColorOf() {
+    if (gameKey === 'armychess' && state.state && state.state.mode === 'fanqi') return state.state.myColor || 0;
+    return state.mySide;
+  }
+
   // (gx,gy) 上是否我的子（两段式选起点用）
   function ownPieceAt(gx, gy) {
     var ps = state.state && state.state.pieces;
     if (!ps) return false;
+    var mine = myColorOf();
     for (var i = 0; i < ps.length; i++) {
-      if (ps[i].x === gx && ps[i].y === gy && ps[i].side === state.mySide) return true;
+      if (ps[i].x === gx && ps[i].y === gy && ps[i].side === mine) return true;
     }
     return false;
   }
 
-  // 点击：算到 SVG viewBox 坐标 → 网格坐标 → 两段式/单点分发
+  // 点击：算到 SVG viewBox 坐标 → 飞行棋点机 / 网格坐标 → 布阵/两段式/单点分发
   svg.addEventListener('click', function (e) {
-    if (!state.myTurn || state.status !== 'playing') return;
     var rect = svg.getBoundingClientRect();
     var vb = svg.viewBox && svg.viewBox.baseVal;
     var vw = vb && vb.width ? vb.width : 640;
     var vh = vb && vb.height ? vb.height : 640;
     var x = (e.clientX - rect.left) / rect.width * vw;
     var y = (e.clientY - rect.top) / rect.height * vh;
+
+    // 飞行棋：点 ✈ 走子（movable 内才发 {p}），不走网格换算
+    if (gameKey === 'ludo') {
+      if (!state.myTurn || state.status !== 'playing') return;
+      var lst = (state.state && state.state.movable) || [];
+      if (!lst.length) return;
+      var pi = window.LudoBoard.pieceAt(x, y);
+      if (pi >= 0 && lst.indexOf(pi) >= 0) sendMove({ p: pi });
+      return;
+    }
+
     var g = window.GameBoards.hit(lastGeom, x, y);
     if (!g) return;
+
+    // 军旗明棋布阵：点两格互换（约束不合法的交换不动）
+    if (gameKey === 'armychess' && state.status === 'setup' && deployPieces) {
+      var mine = deployPieces.some(function (q) { return q.x === g.x && q.y === g.y; });
+      if (!mine) return;
+      if (!deploySel) { deploySel = { x: g.x, y: g.y }; sel = deploySel; render(); return; }
+      if (deploySel.x === g.x && deploySel.y === g.y) { deploySel = null; sel = null; render(); return; }
+      var swapped = window.ArmyChessBoard.trySwap(state.mySide, deployPieces, deploySel.x, deploySel.y, g.x, g.y);
+      if (swapped) deployPieces = swapped;
+      deploySel = null; sel = null;
+      render();
+      return;
+    }
+
+    if (!state.myTurn || state.status !== 'playing') return;
+
+    // 翻棋：点暗子 = 翻开 {x,y}；点己方已翻子 = 两段式走子（暗子不可动不可被攻击）
+    if (gameKey === 'armychess' && state.state && state.state.mode === 'fanqi') {
+      var psF = state.state.pieces || [], pq = null;
+      for (var iF = 0; iF < psF.length; iF++) if (psF[iF].x === g.x && psF[iF].y === g.y) { pq = psF[iF]; break; }
+      if (pq && pq.hidden) {
+        sel = null;
+        sendMove({ x: g.x, y: g.y });
+        return;
+      }
+      if (!state.state.settled) return;   // 阵营未定：只能翻子
+      if (ownPieceAt(g.x, g.y)) { sel = { x: g.x, y: g.y }; render(); return; }
+      if (sel && !(sel.x === g.x && sel.y === g.y)) {
+        sendMove({ fx: sel.x, fy: sel.y, tx: g.x, ty: g.y });
+        sel = null;
+        render();
+        return;
+      }
+      sel = null;
+      render();
+      return;
+    }
 
     var mode = boardClickMode();
     if (mode === 'none') return;
@@ -133,6 +219,34 @@
     // 单点落子（五子棋/黑白棋）
     sendMove({ x: g.x, y: g.y });
   });
+
+  // 军旗布阵：随机 / 确认（Play.cshtml 按钮条调）
+  window.__gmDeployRandom = function () {
+    if (deployPieces) { deployPieces = window.ArmyChessBoard.genDeploy(state.mySide); deploySel = null; sel = null; render(); }
+  };
+  window.__gmDeployPieces = function () { return deployPieces; };
+  window.__gmDeployConfirm = function () {
+    if (!deployPieces) return;
+    fetch('/api/v1/games/armychess/rooms/' + state.id + '/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ pieces: deployPieces }),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.ok && j.data) { deployPieces = null; deploySel = null; sel = null; apply(j.data); }
+    }, function () { });
+  };
+
+  // 飞行棋：掷骰（Play.cshtml 按钮条调）
+  window.__gmLudoRoll = function () {
+    fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id + '/roll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      credentials: 'same-origin',
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.ok && j.data) apply(j.data);
+    }, function () { });
+  };
 
   function sendMove(move) {
     fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id + '/move', {

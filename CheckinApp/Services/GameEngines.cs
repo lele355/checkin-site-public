@@ -315,10 +315,17 @@ internal sealed class ArmyChessEngine : IGameEngine
     public static readonly ArmyChessEngine Instance = new();
     public string GameKey => "armychess";
 
-    public List<GameEvent> InitialEvents(GameRoom r) => ArmyChessRules.InitialEvents(r);
+    /// <summary>翻棋 = armychess 的 mode=fanqi（T04b）；走子/判定/快照/AI 全部分流</summary>
+    private static bool IsFanqi(GameRoom r) =>
+        string.Equals(r.Mode, "fanqi", StringComparison.OrdinalIgnoreCase);
+
+    public List<GameEvent> InitialEvents(GameRoom r) =>
+        IsFanqi(r) ? FanqiRules.InitialEvents(r) : ArmyChessRules.InitialEvents(r);
 
     public GameEvent ValidateMove(IReadOnlyList<GameEvent> evs, GameRoom r, int side, JsonElement req)
     {
+        if (IsFanqi(r)) return FanqiRules.ValidateMove(evs, r, side, req);
+
         // 军旗走子含战斗判定：先校验走子，再解析战斗
         var moveEvent = ArmyChessRules.ValidateMove(evs, r, side, req);
 
@@ -336,14 +343,85 @@ internal sealed class ArmyChessEngine : IGameEngine
     }
 
     public (int winner, string reason, bool over) Judge(IReadOnlyList<GameEvent> evs, GameRoom r) =>
-        ArmyChessRules.Judge(evs, r);
+        IsFanqi(r) ? FanqiRules.Judge(evs, r) : ArmyChessRules.Judge(evs, r);
 
     public object BuildState(IReadOnlyList<GameEvent> evs, GameRoom r, int mySide, bool finished) =>
-        ArmyChessRules.BuildState(evs, r, mySide, finished);
+        IsFanqi(r) ? FanqiRules.BuildState(evs, r, mySide, finished) : ArmyChessRules.BuildState(evs, r, mySide, finished);
 
     public int Other(int side) => side == 1 ? 2 : 1;
     public string SideName(int side) => ArmyChessRules.SideName(side);
 
-    // 军旗不做 AI（隐藏信息 AI 要么很弱要么作弊）
-    public JsonElement? Think(IReadOnlyList<GameEvent> evs, int side, int level, GameRoom r) => null;
+    /// <summary>全部合法着（翻棋=翻子+走子；明棋/暗棋=图上全部走子）</summary>
+    public IReadOnlyList<JsonElement>? AllMoves(IReadOnlyList<GameEvent> evs, GameRoom r, int side)
+    {
+        if (IsFanqi(r)) return FanqiRules.AllActions(evs, r, side);
+        var board = ArmyChessRules.Replay(evs);
+        return ArmyChessBoard.AllMoves(board, side)
+            .Select(m =>
+            {
+                var (fx, fy) = ArmyChessBoard.Coord(m.from);
+                var (tx, ty) = ArmyChessBoard.Coord(m.to);
+                return JsonSerializer.SerializeToElement(new { fx, fy, tx, ty });
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// 军旗 AI（明棋/暗棋/翻棋都要能下，T07）。单层启发式：
+    /// 夺旗 &gt; 战果差吃子 &gt; 行营/前进；翻棋另有 翻子 优先级。
+    /// 红线：AllMoves 非空时必返回一条合法着（绝不 null 过棋）。
+    /// 暗棋不读未公开 rank（不作弊，只按公开信息+几何打分）。
+    /// </summary>
+    public JsonElement? Think(IReadOnlyList<GameEvent> evs, int side, int level, GameRoom r)
+    {
+        if (IsFanqi(r)) return FanqiRules.Think(evs, r, side, level);
+
+        var (board, idMap) = ArmyChessRules.ReplayWithIds(evs);
+        var revealed = ArmyChessRules.GetRevealedIds(evs);
+        var openAll = string.Equals(r.Mode, "open", StringComparison.OrdinalIgnoreCase);
+
+        var moves = ArmyChessBoard.AllMoves(board, side);
+        if (moves.Count == 0) return null;
+
+        JsonElement? best = null;
+        double bestScore = double.MinValue;
+        foreach (var (from, to) in moves)
+        {
+            var (fx, fy) = ArmyChessBoard.Coord(from);
+            var (tx, ty) = ArmyChessBoard.Coord(to);
+            var attacker = board[fx, fy];
+            var target = board[tx, ty];
+            double score;
+            if (target == 0)
+            {
+                score = 10;   // 前进
+                if (ArmyChessRules.CellType(tx, ty) == ArmyChessRules.Camp) score += 15;   // 行营安全岛
+            }
+            else
+            {
+                var known = openAll || (idMap.TryGetValue((tx, ty), out var tid) && revealed.Contains(tid));
+                if (known)
+                {
+                    var defRank = ArmyChessRules.PieceRank(target);
+                    if (defRank == ArmyChessRules.RANK_FLAG) score = 100000;
+                    else
+                    {
+                        var attValue = ArmyChessRules.RankValue(ArmyChessRules.PieceRank(attacker));
+                        var defValue = ArmyChessRules.RankValue(defRank);
+                        score = 500 + (defValue - attValue) * 10;
+                    }
+                }
+                else
+                {
+                    score = 520;   // 未公开子：期望值吃子（不读 rank，不作弊）
+                }
+            }
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = JsonSerializer.SerializeToElement(new { fx, fy, tx, ty });
+            }
+        }
+        return best;
+    }
 }

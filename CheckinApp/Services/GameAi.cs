@@ -135,9 +135,29 @@ public static class GameAi
 
         if (!rolledThisTurn)
         {
-            // 阶段 1：掷骰（Turn 不变，同座继续走）
+            // 阶段 1：掷骰（Turn 不变，同座继续走；三连六 → 罚子 + 换人一并 CAS）
             var rollEvent = LudoRules.ValidateRoll(evs, room, aiSide);
             var newEvs = GameEvents.Append(evs, rollEvent);
+            var penalty = LudoRules.PendingPenalty(newEvs, aiSide);
+            if (penalty != null)
+            {
+                newEvs.Add(penalty);
+                var (wP, rP, oP) = engine.Judge(newEvs, room);
+                var rowsP = db.GameRooms
+                    .Where(x => x.Id == room.Id && x.Revision == rev)
+                    .ExecuteUpdate(s => s
+                        .SetProperty(x => x.MovesJson, GameEvents.Store(newEvs))
+                        .SetProperty(x => x.Turn, oP ? room.Turn : LudoSeats.NextActive(room, aiSide))
+                        .SetProperty(x => x.Status, oP ? "finished" : "playing")
+                        .SetProperty(x => x.Winner, wP)
+                        .SetProperty(x => x.ResultReason, rP)
+                        .SetProperty(x => x.TurnStartedAt, oP ? room.TurnStartedAt : (DateTime?)now)
+                        .SetProperty(x => x.Revision, rev + 1)
+                        .SetProperty(x => x.UpdatedAt, now)
+                        .SetProperty(x => x.FinishedAt, oP ? now : room.FinishedAt));
+                db.ChangeTracker.Clear();
+                return rowsP > 0;
+            }
             var rowsR = db.GameRooms
                 .Where(x => x.Id == room.Id && x.Revision == rev)
                 .ExecuteUpdate(s => s
@@ -171,7 +191,7 @@ public static class GameAi
         }
 
         var (winner, reason, over) = engine.Judge(finalEvs, room);
-        // 掷 6 且实际走了子 → 额外回合（连续 6 超上限强制换座，防无限）；pass 不享额外回合
+        // 掷 6 且实际走了子 → 额外回合（三连六已在掷骰阶段罚换人，封顶逻辑已删）；pass 不享额外回合
         var keepTurn = !over && didMove && LudoRules.GrantsExtraTurn(finalEvs, aiSide);
         var nextTurn = over ? room.Turn : (keepTurn ? aiSide : LudoSeats.NextActive(room, aiSide));
 

@@ -118,6 +118,12 @@ async function move(gameKey, id, who, ev) {
 // =========================================================================
 async function testGomoku() {
     section('GOMOKU 五子棋');
+    // G0 快照顶层 size/forbidden 透出（#25 复验回归闸门：GameViews 缺字段 → App 恒渲染 15 路）
+    {
+        const rm = await mkRoom('gomoku', { join: true, size: 13 });
+        const ss = await snap('gomoku', rm.id, 'QA_alpha');
+        T('快照顶层 size=13 且 forbidden 为布尔', ss.size === 13 && typeof ss.forbidden === 'boolean', `size=${ss.size} forbidden=${JSON.stringify(ss.forbidden)}`);
+    }
     // G1 URL 一字不变
     for (const p of ['/Games', '/Games/Gomoku', '/Games/Gomoku/Rules', '/Games/Gomoku/Settings']) {
         const r = await pageGet(p);
@@ -608,25 +614,35 @@ async function testLudo() {
         rr = await move('ludo', rm.id, 'QA_alpha', { p: 0 });
         T('掷 6 起飞成功', rr.json && rr.json.ok === true, JSON.stringify(rr.json && rr.json.error));
     }
-    // L4 终点跑道精确到达（超出被拒）
+    // L4 终点航道反弹（新规则：v=骰点、Replay 确定性重放；t=h+roll，==6 进中心，>6 回弹 h'=12−t）
     {
         const rm = await mkRoom('ludo', { join: true });
-        // piece 0 在终点跑道 55（距终点 57 还差 2），roll=3 → 超出
-        craftMoves(rm.id, [
-            { t: 'move', s: 1, p: 0, v: 6 }, { t: 'move', s: 1, p: 0, v: 55 },
-            { t: 'move', s: 1, p: 1, v: 6 }, { t: 'move', s: 1, p: 1, v: 57 },
-            { t: 'roll', s: 1, v: 3 },
-        ], { Turn: 1, Revision: 10 });
+        // 造 p0 上航道 h3(pos55)：起飞6→0；6→6；6→落12 整链(跳4→飞12→跳4)=32；4→40(跳4)；4→48(跳4)；6→55
+        const toH3 = [
+            { t: 'move', s: 1, p: 0, v: 6 }, { t: 'move', s: 1, p: 0, v: 6 }, { t: 'move', s: 1, p: 0, v: 6 },
+            { t: 'move', s: 1, p: 0, v: 4 }, { t: 'move', s: 1, p: 0, v: 4 }, { t: 'move', s: 1, p: 0, v: 6 },
+        ];
+        // 55(h3)+4 → t=7>6 回弹 h'=5 → 57
+        craftMoves(rm.id, [...toH3, { t: 'roll', s: 1, v: 4 }], { Turn: 1, Revision: 10 });
         let rr = await move('ludo', rm.id, 'QA_alpha', { p: 0 });
-        T('非法：终点跑道超出被拒', rr.status === 400 && /超出终点/.test(rr.json && rr.json.error || ''), JSON.stringify(rr.json && rr.json.error));
-        // 精确到达 57：55+2
-        craftMoves(rm.id, [
-            { t: 'move', s: 1, p: 0, v: 6 }, { t: 'move', s: 1, p: 0, v: 55 },
-            { t: 'move', s: 1, p: 1, v: 6 }, { t: 'move', s: 1, p: 1, v: 57 },
-            { t: 'roll', s: 1, v: 2 },
-        ], { Turn: 1, Revision: 11 });
+        T('航道超出回弹可走（55+4）', rr.json && rr.json.ok === true, JSON.stringify(rr.json && rr.json.error));
+        let ss = await snap('ludo', rm.id, 'QA_alpha');
+        let p0 = (ss.state.pieces || []).find(x => x.side === 1 && x.p === 0);
+        T('回弹落点 57', p0 && p0.pos === 57, `pos=${p0 && p0.pos}`);
+        // 55(h3)+3 → t=6 精确进中心 58
+        craftMoves(rm.id, [...toH3, { t: 'roll', s: 1, v: 3 }], { Turn: 1, Revision: 11 });
         rr = await move('ludo', rm.id, 'QA_alpha', { p: 0 });
-        T('终点跑道精确到达成功', rr.json && rr.json.ok === true, JSON.stringify(rr.json && rr.json.error));
+        T('航道精确进中心可走（55+3）', rr.json && rr.json.ok === true, JSON.stringify(rr.json && rr.json.error));
+        ss = await snap('ludo', rm.id, 'QA_alpha');
+        p0 = (ss.state.pieces || []).find(x => x.side === 1 && x.p === 0);
+        T('进中心落点 58', p0 && p0.pos === 58, `pos=${p0 && p0.pos}`);
+        // 57(h5)+6 → t=11 回弹 h'=1 → 53
+        craftMoves(rm.id, [...toH3, { t: 'move', s: 1, p: 0, v: 2 }, { t: 'roll', s: 1, v: 6 }], { Turn: 1, Revision: 12 });
+        rr = await move('ludo', rm.id, 'QA_alpha', { p: 0 });
+        T('航道二次回弹可走（57+6）', rr.json && rr.json.ok === true, JSON.stringify(rr.json && rr.json.error));
+        ss = await snap('ludo', rm.id, 'QA_alpha');
+        p0 = (ss.state.pieces || []).find(x => x.side === 1 && x.p === 0);
+        T('二次回弹落点 53', p0 && p0.pos === 53, `pos=${p0 && p0.pos}`);
     }
     // L5 无着可走（roll 后无法走）→ 无法跳过回合（预期问题点）
     {
@@ -677,6 +693,21 @@ async function testLudo() {
         const s = await snap('ludo', rm.id, 'QA_alpha');
         T('飞行棋主路径：对局可进行到终局', finished && s.status === 'finished',
             `guard=${guard} status=${s.status} winner=${s.winner} reason=${s.resultReason} ${err}`);
+    }
+    // L7 三连六罚子（F7）：第 3 个 6 → 罚第一手机回机场 + 换手（penalty 是连六链界）
+    {
+        const rm = await mkRoom('ludo', { join: true });
+        craftMoves(rm.id, [
+            { t: 'roll', s: 1, v: 6 }, { t: 'move', s: 1, p: 0, v: 6 },
+            { t: 'roll', s: 1, v: 6 }, { t: 'move', s: 1, p: 0, v: 1 },
+            { t: 'roll', s: 1, v: 6 }, { t: 'penalty', s: 1, p: 0 },
+        ], { Turn: 2, Revision: 10 });
+        const ss = await snap('ludo', rm.id, 'QA_alpha');
+        const p0 = (ss.state.pieces || []).find(x => x.side === 1 && x.p === 0);
+        T('三连六罚子：首手棋回机场', p0 && p0.pos === -1, `pos=${p0 && p0.pos}`);
+        T('三连六罚子：罚后换手', ss.turn === 2, `turn=${ss.turn}`);
+        const rr = await api('POST', `/api/v1/games/ludo/rooms/${rm.id}/roll`, {}, TOKENS.QA_alpha);
+        T('三连六罚子：被罚方不能续掷', rr.status === 400 && /还没轮到你/.test(rr.json && rr.json.error || ''), JSON.stringify(rr.json && rr.json.error));
     }
 }
 
@@ -957,6 +988,30 @@ async function testArmychess() {
             (ss.state.pieces || []).every(p => !('camp' in p)),
             JSON.stringify((ss.state.pieces || [])[0]));
     }
+
+    // D1 明棋布阵链（P2 验收）：open 建房 → setup → 非法拒/随机布阵 → deployDone → 双方齐自动开局
+    {
+        const rm = await mkRoom('armychess', { mode: 'open' });
+        let ss = await snap('armychess', rm.id, 'QA_alpha');
+        T('D1 明棋房进入布阵阶段', ss.status === 'setup' && ss.state && ss.state.mode === 'open',
+            `status=${ss.status} mode=${ss.state && ss.state.mode}`);
+        let rr = await api('POST', `/api/v1/games/armychess/rooms/${rm.id}/deploy`, { pieces: [] }, TOKENS.QA_alpha);
+        T('D1b 非法布阵被拒（缺子）', rr.status === 400 && /25/.test(rr.json && rr.json.error || ''),
+            JSON.stringify(rr.json && rr.json.error));
+        rr = await api('POST', `/api/v1/games/armychess/rooms/${rm.id}/deploy`, { random: true }, TOKENS.QA_alpha);
+        T('D1c alpha 随机布阵受理', rr.json && rr.json.ok === true, JSON.stringify(rr.json && rr.json.error));
+        ss = await snap('armychess', rm.id, 'QA_alpha');
+        T('D1d 布阵进度 deployDone=[true,false]',
+            ss.state && ss.state.deployDone && ss.state.deployDone[0] === true && ss.state.deployDone[1] === false,
+            JSON.stringify(ss.state && ss.state.deployDone));
+        rr = await api('POST', `/api/v1/games/armychess/rooms/${rm.id}/deploy`, { random: true }, TOKENS.QA_alpha);
+        T('D1e 重复布阵被拒', rr.status === 400 && /已经布阵/.test(rr.json && rr.json.error || ''),
+            JSON.stringify(rr.json && rr.json.error));
+        rr = await api('POST', `/api/v1/games/armychess/rooms/${rm.id}/deploy`, { random: true }, TOKENS.QA_beta);
+        T('D1f beta 随机布阵受理', rr.json && rr.json.ok === true, JSON.stringify(rr.json && rr.json.error));
+        ss = await snap('armychess', rm.id, 'QA_alpha');
+        T('D1g 双方布阵完自动开局', ss.status === 'playing', `status=${ss.status}`);
+    }
 }
 
 // =========================================================================
@@ -1030,6 +1085,152 @@ async function testTutorials() {
 }
 
 // =========================================================================
+// FANQI 翻棋（B4/T04b）+ 建房模式开关 + AI 兜底红线
+// =========================================================================
+async function testFanqi() {
+    section('FANQI 翻棋（T04b）');
+    // F1 建房（mode=fanqi）：50 子全暗 + 阵营未定 + events 无 setup（暗子身份不下发）
+    const room = await mkRoom('armychess', { mode: 'fanqi' });
+    let ss = await snap('armychess', room.id, 'QA_alpha');
+    T('F1 翻棋开局：50 子全暗', ss.status === 'playing' && ss.state.pieces.length === 50 && ss.state.pieces.every(p => p.hidden === true),
+        `status=${ss.status} pieces=${ss.state.pieces.length}`);
+    const darkText = JSON.stringify(ss.state.pieces.filter(p => p.hidden));
+    T('F1b 暗子无 side/rank 键（值级反泄露）', !/"side"/.test(darkText) && !/"rank"/.test(darkText), darkText.substring(0, 120));
+    T('F1c mode=fanqi + 阵营未定', ss.state.mode === 'fanqi' && ss.state.myColor === 0 && ss.state.settled === false,
+        `mode=${ss.state.mode} myColor=${ss.state.myColor}`);
+    T('F1d events 无 setup', !(ss.state.events || []).some(e => e.t === 'setup'), `events=${(ss.state.events || []).length}`);
+
+    // F2 翻子 {x,y}（翻棋开棋方系统随机：谁的回合谁翻）
+    const dark = ss.state.pieces.find(p => p.hidden);
+    const who1 = ss.turn === 1 ? 'QA_alpha' : 'QA_beta';
+    let r = await move('armychess', room.id, who1, { x: dark.x, y: dark.y });
+    T('F2 翻子受理', r.json && r.json.ok === true, `turn=${ss.turn} ` + JSON.stringify(r.json && r.json.error));
+    ss = await snap('armychess', room.id, 'QA_alpha');
+    T('F2b 翻开后可见 rank', (ss.state.pieces.find(p => p.x === dark.x && p.y === dark.y) || {}).hidden === false);
+
+    // F3 阵营未定时走子被拒
+    const who3 = ss.turn === 1 ? 'QA_alpha' : 'QA_beta';
+    r = await move('armychess', room.id, who3, { fx: dark.x, fy: dark.y, tx: dark.x, ty: dark.y === 0 ? 1 : dark.y - 1 });
+    T('F3 阵营未定走子被拒', r.status === 400 && /阵营还没确定/.test((r.json && r.json.error) || ''), JSON.stringify(r.json && r.json.error));
+
+    // F4 翻到阵营确定（同一玩家连续两翻同色即定；颜色随机，限 60 翻必达）
+    let flips = 0;
+    while (flips < 60 && !(ss.state && ss.state.settled)) {
+        const who = ss.turn === 1 ? 'QA_alpha' : 'QA_beta';
+        const d = (ss.state.pieces || []).find(p => p.hidden);
+        if (!d) break;
+        r = await move('armychess', room.id, who, { x: d.x, y: d.y });
+        if (!(r.json && r.json.ok)) break;
+        ss = await snap('armychess', room.id, 'QA_alpha');
+        flips++;
+    }
+    T('F4 连翻同色定阵营', ss.state.settled === true && ss.state.myColor !== 0, `flips=${flips} myColor=${ss.state.myColor}`);
+
+    // F5 已定后暗子仍不可动（文案不泄露归属）
+    const dark2 = (ss.state.pieces || []).find(p => p.hidden);
+    if (dark2) {
+        r = await move('armychess', room.id, ss.turn === 1 ? 'QA_alpha' : 'QA_beta', { fx: dark2.x, fy: dark2.y, tx: dark2.x, ty: (dark2.y + 1) % 12 });
+        T('F5 已定后暗子不能移动', r.status === 400 && /暗子不能移动/.test((r.json && r.json.error) || ''), JSON.stringify(r.json && r.json.error));
+    } else {
+        T('F5 已定后暗子不能移动（无暗子可试，跳过）', true, 'all revealed');
+    }
+
+    // F6 翻棋没有 pass
+    const whoNow = ss.turn === 1 ? 'QA_alpha' : 'QA_beta';
+    r = await api('POST', `/api/v1/games/armychess/rooms/${room.id}/pass`, {}, TOKENS[whoNow]);
+    T('F6 翻棋不能 pass', r.status === 400 && /不能 pass/.test((r.json && r.json.error) || ''), JSON.stringify(r.json && r.json.error));
+}
+
+async function testModes() {
+    section('建房模式开关（B4）');
+    // M1 mode=open → open + 布阵期
+    const rm1 = await mkRoom('armychess', { mode: 'open' });
+    let ss = await snap('armychess', rm1.id, 'QA_alpha');
+    T('M1 mode=open 建房生效', ss.state && ss.state.mode === 'open' && ss.status === 'setup', `mode=${ss.state && ss.state.mode} status=${ss.status}`);
+    // M2 mode=dark → dark
+    const rm2 = await mkRoom('armychess', { mode: 'dark' });
+    ss = await snap('armychess', rm2.id, 'QA_alpha');
+    T('M2 mode=dark 建房生效', ss.state && ss.state.mode === 'dark', `mode=${ss.state && ss.state.mode}`);
+    // M3 缺省 mode = dark（现状兼容，旧调用方零影响）
+    const rm3 = await mkRoom('armychess', {});
+    ss = await snap('armychess', rm3.id, 'QA_alpha');
+    T('M3 缺省 mode=dark 现状兼容', ss.state && ss.state.mode === 'dark', `mode=${ss.state && ss.state.mode}`);
+    // M4 非法 mode → 400
+    const bad = await api('POST', '/api/v1/games/armychess/rooms', { side: 1, mode: 'wtf' }, TOKENS.QA_alpha);
+    T('M4 非法 mode 被拒', bad.status === 400 && /模式/.test((bad.json && bad.json.error) || ''), JSON.stringify(bad.json && bad.json.error));
+    // M5 网页建房表单带玩法选择（双端一致：明棋/暗棋/翻棋）
+    const html = await (await pageGet('/Games/armychess')).text();
+    T('M5 网页建房表单有玩法选择', /name="mode"/.test(html) && /明棋/.test(html) && /暗棋/.test(html) && /翻棋/.test(html), `len=${html.length}`);
+}
+
+// 军旗通用：找一步合法走子（自己的可动子 → 正交空格；山界缺口除外）
+function findArmyMove(ss) {
+    const occ = new Set((ss.state.pieces || []).map(p => p.x + ',' + p.y));
+    const gaps = new Set(['1,5|1,6', '3,5|3,6', '1,6|1,5', '3,6|3,5']);
+    for (const p of (ss.state.pieces || [])) {
+        if (p.side !== ss.mySide) continue;
+        if (p.rank === 'rank_flag' || p.rank === 'rank_mine') continue;
+        for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+            const nx = p.x + dx, ny = p.y + dy;
+            if (nx < 0 || nx > 4 || ny < 0 || ny > 11) continue;
+            if (gaps.has(p.x + ',' + p.y + '|' + nx + ',' + ny)) continue;
+            if (occ.has(nx + ',' + ny)) continue;
+            return { fx: p.x, fy: p.y, tx: nx, ty: ny };
+        }
+    }
+    return null;
+}
+
+async function testAi() {
+    section('AI 兜底（红线：有着必出着）');
+    // AI1 翻棋人机：AI 必出动作
+    {
+        const rm = await mkRoom('armychess', { mode: 'fanqi', opponent: 'ai', aiLevel: 2 });
+        const ss0 = await snap('armychess', rm.id, 'QA_alpha');
+        if (ss0.turn === 1) {   // 我先翻一子，把回合交给 AI
+            const d = (ss0.state.pieces || []).find(p => p.hidden);
+            if (d) await move('armychess', rm.id, 'QA_alpha', { x: d.x, y: d.y });
+        }
+        let acted = false;
+        for (let i = 0; i < 20 && !acted; i++) {
+            await new Promise(res => setTimeout(res, 600));
+            const ss = await snap('armychess', rm.id, 'QA_alpha');
+            acted = ((ss.state && ss.state.events) || []).some(e => e.s === 2 && (e.t === 'flip' || e.t === 'move' || e.t === 'battle'));
+        }
+        T('AI1 翻棋 AI 必出着', acted);
+    }
+    // AI2 暗棋军旗人机：AI 必出着（先走一步把回合交给 AI；battle 只进 battleLog 不进 events）
+    {
+        const rm = await mkRoom('armychess', { mode: 'dark', opponent: 'ai', aiLevel: 2 });
+        let ss = await snap('armychess', rm.id, 'QA_alpha');
+        const mv = findArmyMove(ss);
+        if (mv) await move('armychess', rm.id, 'QA_alpha', mv);
+        ss = await snap('armychess', rm.id, 'QA_alpha');
+        const battles0 = ((ss.state && ss.state.battleLog) || []).length;
+        let acted = false;
+        for (let i = 0; i < 20 && !acted; i++) {
+            await new Promise(res => setTimeout(res, 600));
+            ss = await snap('armychess', rm.id, 'QA_alpha');
+            acted = ((ss.state && ss.state.events) || []).some(e => e.s === 2 && (e.t === 'move' || e.t === 'battle'))
+                || ((ss.state && ss.state.battleLog) || []).length > battles0;
+        }
+        T('AI2 暗棋 AI 必出着', acted, mv ? 'human moved first' : 'no human move found');
+    }
+    // AI3 飞行棋 AI 座：craft 直接轮到 AI → 必推进（roll→move/pass 两阶段）
+    {
+        const rm = await mkRoom('ludo', { opponent: 'ai', aiLevel: 2 });
+        craftMoves(rm.id, [], { Turn: 2, Status: 'playing', Revision: 10 });
+        let done = false;
+        for (let i = 0; i < 25 && !done; i++) {
+            await new Promise(res => setTimeout(res, 500));
+            const ss = await snap('ludo', rm.id, 'QA_alpha');
+            done = ss.turn === 1 && ss.revision >= 12;   // AI 完成 roll+走子/pass，回合回到我
+        }
+        T('AI3 飞行棋 AI 必推进（roll→走子/换手）', done);
+    }
+}
+
+// =========================================================================
 (async () => {
     const only = process.argv[2] || 'all';
     await loginAll();
@@ -1041,6 +1242,9 @@ async function testTutorials() {
     if (only === 'all' || only === 'xiangqi') await testXiangqi();
     if (only === 'all' || only === 'ludo') await testLudo();
     if (only === 'all' || only === 'armychess') await testArmychess();
+    if (only === 'all' || only === 'fanqi') await testFanqi();
+    if (only === 'all' || only === 'modes') await testModes();
+    if (only === 'all' || only === 'ai') await testAi();
     if (only === 'all' || only === 'tutorials') await testTutorials();
     if (only === 'all' || only === 'timeout') await testTimeout();
 

@@ -71,14 +71,14 @@ public class LobbyModel(AppDbContext db, CurrentUser me) : PageModel
         return Page();
     }
 
-    public IActionResult OnPostCreate(string gameKey, int side = 1)
+    public IActionResult OnPostCreate(string gameKey, int side = 1, string? mode = null)
     {
-        return CreateRoom(gameKey, side, 0);
+        return CreateRoom(gameKey, side, 0, mode);
     }
 
-    public IActionResult OnPostCreateAi(string gameKey)
+    public IActionResult OnPostCreateAi(string gameKey, string? mode = null)
     {
-        return CreateRoom(gameKey, 1, 2);
+        return CreateRoom(gameKey, 1, 2, mode);
     }
 
     /// <summary>飞行棋多座建房（2~4 人，每座朋友/AI）</summary>
@@ -156,7 +156,7 @@ public class LobbyModel(AppDbContext db, CurrentUser me) : PageModel
         return RedirectToPage("/Games/Play", new { gameKey = key, id = room.Id });
     }
 
-    private IActionResult CreateRoom(string gameKey, int side, int aiLevel)
+    private IActionResult CreateRoom(string gameKey, int side, int aiLevel, string? mode = null)
     {
         if (_me.UserId is not int uid) return RedirectToPage("/Login");
         var key = GameCatalog.Require(gameKey);
@@ -172,6 +172,16 @@ public class LobbyModel(AppDbContext db, CurrentUser me) : PageModel
             .ToList();
         if (stale.Count > 0) _db.GameRooms.RemoveRange(stale);
 
+        // 军旗三模式：建房表单显式带 mode（UI 默认明棋）；缺省/未知 = dark（现状兼容，与 API 同一判）
+        var armyMode = key == "armychess"
+            ? (mode?.Trim().ToLowerInvariant() switch
+            {
+                "open" => "open",
+                "fanqi" => "fanqi",
+                _ => "dark",
+            })
+            : null;
+
         var isAi = aiLevel > 0;
         var room = new GameRoom
         {
@@ -179,14 +189,16 @@ public class LobbyModel(AppDbContext db, CurrentUser me) : PageModel
             GameKey = key,
             HostUserId = uid,
             HostSide = side == 2 ? 2 : 1,
-            Status = isAi ? "playing" : "waiting",
-            Turn = 1,
+            Status = armyMode == "open" ? "waiting" : (isAi ? "playing" : "waiting"),   // 明棋统一翻 setup
+            // 翻棋开棋方系统随机（规则文档一、3）
+            Turn = armyMode == "fanqi" ? Random.Shared.Next(1, 3) : 1,
             AiLevel = aiLevel,
             Size = s.Size,
             Forbidden = s.Forbidden,
             MoveTimeoutSec = s.MoveTimeoutSec,
             TotalTimeoutSec = s.TotalTimeoutSec,
-            TurnStartedAt = isAi ? DateTime.UtcNow : null,
+            TurnStartedAt = isAi && armyMode != "open" ? DateTime.UtcNow : null,
+            Mode = armyMode,
             HostSeenAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -201,6 +213,10 @@ public class LobbyModel(AppDbContext db, CurrentUser me) : PageModel
             room.MovesJson = GameEvents.Store(initEvs);
             _db.SaveChanges();
         }
+
+        // 军旗明棋 + AI 对手：进布阵阶段并即时随机布 AI 那一侧（同 API 建房）
+        if (armyMode == "open" && isAi)
+            ArmyChessSetup.EnterSetup(_db, _db.GameRooms.AsNoTracking().First(x => x.Id == room.Id));
 
         return RedirectToPage("/Games/Play", new { gameKey = key, id = room.Id });
     }
@@ -220,11 +236,13 @@ public class LobbyModel(AppDbContext db, CurrentUser me) : PageModel
         {
             var rev = room.Revision;
             var now = DateTime.UtcNow;
+            // 军旗明棋：加入 → 布阵阶段（同 API Join_Internal）
+            var armyOpenSetup = room.GameKey == "armychess" && room.Mode == "open";
             _db.GameRooms
                 .Where(x => x.Id == room.Id && x.Revision == rev && x.GuestUserId == null)
                 .ExecuteUpdate(s => s
                     .SetProperty(x => x.GuestUserId, uid)
-                    .SetProperty(x => x.Status, "playing")
+                    .SetProperty(x => x.Status, armyOpenSetup ? "setup" : "playing")
                     .SetProperty(x => x.TurnStartedAt, (DateTime?)now)
                     .SetProperty(x => x.GuestSeenAt, now)
                     .SetProperty(x => x.Revision, rev + 1)

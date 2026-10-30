@@ -68,6 +68,8 @@ public static class GameViews
             winner = r.Winner,
             resultReason = r.ResultReason,
             revision = r.Revision,
+            size = r.Size,                 // 快照顶层透出（App GameRoomDto.size 消费；缺字段会恒渲染 15 路）
+            forbidden = r.Forbidden,
             moveTimeoutSec = r.MoveTimeoutSec,
             totalTimeoutSec = r.TotalTimeoutSec,
             moveRemainMs = GameClock.MoveRemainMs(r, now),

@@ -24,6 +24,21 @@
         <div id="gmBoardHost" data-gamekey="@Model.GameKey"></div>
     </div>
 
+    @if (Model.GameKey == "armychess")
+    {
+        <div class="gm-actions" id="gmSetupBar" hidden>
+            <button class="btn secondary" type="button" onclick="if(window.__gmDeployRandom)window.__gmDeployRandom()">随机布阵</button>
+            <button class="btn" type="button" onclick="if(window.__gmDeployConfirm)window.__gmDeployConfirm()">确认布阵</button>
+        </div>
+    }
+
+    @if (Model.GameKey == "ludo")
+    {
+        <div class="gm-actions" id="gmLudoBar" hidden>
+            <button class="btn" type="button" onclick="if(window.__gmLudoRoll)window.__gmLudoRoll()">掷骰子</button>
+        </div>
+    }
+
     <div class="gm-actions">
         @if (dto.canJoin)
         {

@@ -25,21 +25,19 @@ public sealed class LudoSeat
 /// <summary>
 /// 飞行棋座位解析 / 存储 / 轮转 / 出局 —— 座位唯一真相（SeatsJson）。
 ///
-/// 座位 → 颜色 → 起点固定映射（与设计 §2.1 表一致）：
-///   seat0 红 side1 起点0 / seat1 黄 side2 起点26 / seat2 蓝 side3 起点13 / seat3 绿 side4 起点39。
-/// 2 人 = seat0,1（红黄 0/26，与现状完全一致，存量回放零漂移）。
+/// 座位 → 颜色 → 起点固定映射（设计 §3.1：start = 13×(k−1)，起点格恰为本色格）：
+///   seat0 红 side1 起点0 / seat1 黄 side2 起点13 / seat2 蓝 side3 起点26 / seat3 绿 side4 起点39。
+/// 2 人 = seat0,1（红黄 0/13）；存量房随 §3.4 清空废弃，无迁移包袱。
 /// 读到 SeatsJson==null 时按 Host/Guest 懒回填 2 座（复用「读垫片 + 写新」范式）。
 /// </summary>
 public static class LudoSeats
 {
     public static readonly string[] Colors = ["red", "yellow", "blue", "green"];
-    // 侧号(1..4) → 起点 / 进终点前步数（2 人红黄 0/26 与现状一致）
-    private static readonly int[] Starts = [0, 26, 13, 39];
-    private static readonly int[] HomeEntries = [50, 24, 11, 37];
 
     public static string ColorOf(int side) => Colors[((side - 1) % 4 + 4) % 4];
-    public static int StartOf(int side) => Starts[((side - 1) % 4 + 4) % 4];
-    public static int HomeEntryOf(int side) => HomeEntries[((side - 1) % 4 + 4) % 4];
+    // 起点/进终点前格：单一真相在 LudoRules（§9.2 常量表，引擎与绘制共用）
+    public static int StartOf(int side) => LudoRules.StartOf(side);
+    public static int HomeEntryOf(int side) => LudoRules.HomeEntryOf(side);
 
     private static readonly JsonSerializerOptions Opts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 

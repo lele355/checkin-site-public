@@ -516,6 +516,9 @@ namespace CheckinApp.Migrations
                     b.Property<int>("HostUserId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Mode")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("MoveTimeoutSec")
                         .HasColumnType("INTEGER");
 

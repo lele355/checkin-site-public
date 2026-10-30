@@ -46,20 +46,54 @@
         }
         else
         {
+            var isArmy = Model.GameKey == "armychess";
             <form method="post" asp-page-handler="Create">
                 <input type="hidden" name="gameKey" value="@Model.GameKey" />
                 <input type="hidden" name="side" value="1" />
+                @if (isArmy)
+                {
+                    <div class="field" style="margin:0;">
+                        <label>玩法</label>
+                        <select name="mode">
+                            <option value="open" selected>明棋</option>
+                            <option value="dark">暗棋</option>
+                            <option value="fanqi">翻棋</option>
+                        </select>
+                    </div>
+                }
                 <button class="btn" type="submit">新开一盘（我先手）</button>
             </form>
             <form method="post" asp-page-handler="Create">
                 <input type="hidden" name="gameKey" value="@Model.GameKey" />
                 <input type="hidden" name="side" value="2" />
+                @if (isArmy)
+                {
+                    <div class="field" style="margin:0;">
+                        <label>玩法</label>
+                        <select name="mode">
+                            <option value="open" selected>明棋</option>
+                            <option value="dark">暗棋</option>
+                            <option value="fanqi">翻棋</option>
+                        </select>
+                    </div>
+                }
                 <button class="btn secondary" type="submit">新开一盘（我后手）</button>
             </form>
             @if (g?.HasAi == true)
             {
                 <form method="post" asp-page-handler="CreateAi">
                     <input type="hidden" name="gameKey" value="@Model.GameKey" />
+                    @if (isArmy)
+                    {
+                        <div class="field" style="margin:0;">
+                            <label>玩法</label>
+                            <select name="mode">
+                                <option value="open" selected>明棋</option>
+                                <option value="dark">暗棋</option>
+                                <option value="fanqi">翻棋</option>
+                            </select>
+                        </div>
+                    }
                     <button class="btn secondary" type="submit">人机对战</button>
                 </form>
             }

@@ -55,7 +55,8 @@ public static class GamesApi
         bool? Forbidden = null,
         int? MoveTimeoutSec = null,
         int? TotalTimeoutSec = null,
-        List<SeatSpec>? Seats = null);
+        List<SeatSpec>? Seats = null,
+        string? Mode = null);   // 军旗：open=明棋（自摆阵）/ dark=暗棋（缺省，现状兼容）/ fanqi=翻棋（T04b）
 
     /// <summary>飞行棋座位规格：seat0 恒为房主（真人），其余每座 isAi 决定朋友/AI</summary>
     public record SeatSpec(bool IsAi = false);
@@ -297,6 +298,19 @@ public static class GamesApi
             // 是否还有空着的真人座（决定开局还是等）
             var hasEmptyHumanSeat = isLudoMulti && ludoSeats!.Any(x => x.Uid is null && !x.IsAi);
             var playNow = isLudoMulti ? !hasEmptyHumanSeat : isAi;
+            // 军旗三模式：open=明棋（布阵状态机）/ dark=暗棋（随机秘密布阵，现状兼容）/ fanqi=翻棋（T04b）
+            // mode 缺省 = dark（现状兼容）；建房 UI 默认明棋并显式带上 mode
+            var armyMode = key == "armychess"
+                ? (req.Mode?.Trim().ToLowerInvariant() switch
+                {
+                    "" or null => "dark",
+                    "open" => "open",
+                    "dark" => "dark",
+                    "fanqi" => "fanqi",
+                    _ => throw new ApiBadRequest("没有这种军旗模式"),
+                })
+                : null;
+            var armyOpen = armyMode == "open";
             // 2 人飞行棋多座投影：GuestUserId = seat1 的 uid（AI 则 null）
             int? guestIdProjection = null;
             if (isLudoMulti)
@@ -319,14 +333,16 @@ public static class GamesApi
                 HostSide = isLudoMulti ? 1 : side,
                 GuestUserId = isLudoMulti ? guestIdProjection : null,
                 SeatsJson = isLudoMulti ? LudoSeats.Store(ludoSeats!) : null,
-                Status = playNow ? "playing" : "waiting",
-                Turn = 1,
+                Status = armyOpen ? "waiting" : (playNow ? "playing" : "waiting"),   // 军旗明棋统一由 EnterSetup 翻 setup（含 AI 即时布阵）
+                // 翻棋开棋方系统随机（规则文档一、3：开棋方由系统随机选取）；其余 Turn=1
+                Turn = armyMode == "fanqi" ? Random.Shared.Next(1, 3) : 1,
                 AiLevel = (isLudoMulti && ludoSeats!.Any(x => x.IsAi)) ? 2 : aiLevel,
                 Size = s.Size,
                 Forbidden = s.Forbidden,
                 MoveTimeoutSec = s.MoveTimeoutSec,
                 TotalTimeoutSec = s.TotalTimeoutSec,
                 TurnStartedAt = playNow ? DateTime.UtcNow : null,
+                Mode = armyMode,
                 HostSeenAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
@@ -342,6 +358,10 @@ public static class GamesApi
                 room.MovesJson = GameEvents.Store(initEvs);
                 db.SaveChanges();
             }
+
+            // 军旗明棋 + AI 对手：进入布阵阶段并即时随机布 AI 那一侧
+            if (armyOpen && playNow)
+                ArmyChessSetup.EnterSetup(db, db.GameRooms.AsNoTracking().First(x => x.Id == room.Id));
 
             return ApiKit.Ok(new
             {
@@ -376,10 +396,11 @@ public static class GamesApi
             var uid = ApiKit.MeId(ctx);
             var room = Load(db, id, key);
 
-            // 超时懒结算 + AI 懒生成 + 黑白棋无着自动 pass（谁读谁触发，与 GameClock 同哲学）
+            // 超时懒结算 + AI 懒生成 + 黑白棋无着自动 pass + 军旗布阵超时（谁读谁触发）
             if (GameClock.Enforce(db, room)) room = Load(db, id, key);
             if (GameAi.EnsureMove(db, room)) room = Load(db, id, key);
             if (GameAi.EnsureAutoPass(db, room)) room = Load(db, id, key);
+            if (ArmyChessSetup.Enforce(db, room)) room = Load(db, id, key);
 
             Touch(db, room, uid);
             return ApiKit.Ok(GameViews.Snap(room, uid));
@@ -395,6 +416,18 @@ public static class GamesApi
             return ApiKit.Ok(new { id });
         });
 
+        // ==================== deploy（军旗明棋布阵） ====================
+        gs.MapPost("/rooms/{id:int}/deploy", (string gameKey, int id, JsonElement req, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            var uid = ApiKit.MeId(ctx);
+            var room = Load(db, id, key);
+            var mySide = GameViews.MySide(room, uid);
+            if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
+            ArmyChessSetup.Deploy(db, id, mySide, req);
+            return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
+        });
+
         // ==================== pass（黑白棋等） ====================
         gs.MapPost("/rooms/{id:int}/pass", (string gameKey, int id, AppDbContext db, HttpContext ctx) =>
         {
@@ -405,6 +438,9 @@ public static class GamesApi
             if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
             if (room.Status != "playing") throw new ApiBadRequest("这一局现在不能 pass");
             if (room.Turn != mySide) throw new ApiBadRequest("还没轮到你");
+            // 翻棋没有 pass（规则：无合法着法即判负，不许跳过）
+            if (room.GameKey == "armychess" && string.Equals(room.Mode, "fanqi", StringComparison.OrdinalIgnoreCase))
+                throw new ApiBadRequest("翻棋不能 pass");
 
             // 有合法着时不许 pass
             var engine = GameEngines.Get(key);
@@ -458,6 +494,32 @@ public static class GamesApi
             var newEvs = GameEvents.Append(evs, rollEvent);
             var rev = room.Revision;
             var now = DateTime.UtcNow;
+
+            // 飞行棋三连六（F7）：连续第 3 个 6 → 罚第一手机回机场 + 换人（不享额外回合）
+            if (key == "ludo")
+            {
+                var penalty = LudoRules.PendingPenalty(newEvs, mySide);
+                if (penalty != null)
+                {
+                    newEvs.Add(penalty);
+                    var (wP, rP, oP) = engine.Judge(newEvs, room);
+                    var rowsP = db.GameRooms
+                        .Where(x => x.Id == id && x.Revision == rev)
+                        .ExecuteUpdate(s => s
+                            .SetProperty(x => x.MovesJson, GameEvents.Store(newEvs))
+                            .SetProperty(x => x.Turn, oP ? room.Turn : engine.NextTurn(mySide, room))
+                            .SetProperty(x => x.Status, oP ? "finished" : "playing")
+                            .SetProperty(x => x.Winner, wP)
+                            .SetProperty(x => x.ResultReason, rP)
+                            .SetProperty(x => x.TurnStartedAt, oP ? room.TurnStartedAt : (DateTime?)now)
+                            .SetProperty(x => x.Revision, rev + 1)
+                            .SetProperty(x => x.UpdatedAt, now)
+                            .SetProperty(x => x.FinishedAt, oP ? now : room.FinishedAt));
+                    if (rowsP == 0) throw new ApiBadRequest("状态刚变过");
+                    db.ChangeTracker.Clear();
+                    return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
+                }
+            }
 
             // 飞行棋：roll 后若无合法着，自动换手（保留骰点，不许重掷）
             if (key == "ludo" && rollEvent.v is int rv && !LudoRules.HasAnyValidMove(newEvs, mySide, rv))
@@ -527,7 +589,7 @@ public static class GamesApi
             var hostUsed = room.HostUsedMs + (mySide == 1 ? elapsedMs : 0);
             var guestUsed = room.GuestUsedMs + (mySide == 2 ? elapsedMs : 0);
 
-            // 掷 6 额外回合（不换座），连续 6 超上限则强制换座（防无限）
+            // 掷 6 额外回合（不换座；三连六已在 roll 路由罚换人，封顶逻辑已删——设计 §3.2 F7）
             var keepTurn = key == "ludo" && LudoRules.GrantsExtraTurn(newEvs, mySide);
             var nextTurn = over ? room.Turn : (keepTurn ? mySide : engine.NextTurn(mySide, room));
 
@@ -859,12 +921,13 @@ public static class GamesApi
 
         var rev = room.Revision;
         var now = DateTime.UtcNow;
+        var armyOpenSetup = room.GameKey == "armychess" && room.Mode == "open";   // 明棋：加入 → 布阵阶段
         var rows = db.GameRooms
             .Where(x => x.Id == room.Id && x.Revision == rev && x.GuestUserId == null)
             .ExecuteUpdate(s => s
                 .SetProperty(x => x.GuestUserId, uid)
-                .SetProperty(x => x.Status, "playing")
-                .SetProperty(x => x.TurnStartedAt, (DateTime?)now)   // 从坐下的这一刻开始计时
+                .SetProperty(x => x.Status, armyOpenSetup ? "setup" : "playing")
+                .SetProperty(x => x.TurnStartedAt, (DateTime?)now)   // 开局/布阵都从这一刻起表
                 .SetProperty(x => x.GuestSeenAt, now)
                 .SetProperty(x => x.Revision, rev + 1)
                 .SetProperty(x => x.UpdatedAt, now));

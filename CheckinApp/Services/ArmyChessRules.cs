@@ -43,6 +43,10 @@ public static class ArmyChessRules
         (RANK_MINE, 11, 3), (RANK_BOMB, 13, 2), (RANK_FLAG, 12, 1),
     ];
 
+    /// <summary>配比表（deploy 校验 / 随机生成共用）：rank → 数量</summary>
+    public static List<(string rank, int count)> SpecCounts() =>
+        PieceSpec.Select(p => (p.rank, p.count)).ToList();
+
     /// <summary>棋盘格类型（硬要求 2：camp 是格子属性）</summary>
     public const int Normal = 0, Camp = 1, Den = 2;
 
@@ -68,63 +72,56 @@ public static class ArmyChessRules
         return Normal;
     }
 
-    /// <summary>随机布阵（硬要求：军旗在大本营、地雷在最后两排、其余随机）</summary>
-    public static List<GameEvent> InitialEvents(GameRoom r)
+    /// <summary>随机秘密布阵（暗棋用）。明棋（Mode=open）返回空 —— 棋子由 deploy 动作落库。
+    /// dealMode 枚举位预留："flip"（翻棋）由 FanqiRules.InitialEvents 实现（armychess mode=fanqi 分流）。</summary>
+    public static List<GameEvent> InitialEvents(GameRoom r, string? dealMode = null)
+    {
+        if (dealMode == "flip") throw new NotImplementedException("翻棋请走 FanqiRules.InitialEvents（armychess mode=fanqi）");
+        if (r.Mode == "open") return [];   // 明棋：布阵阶段另行落库
+        // 双方棋子 ID 错开（0..24 / 25..49）：GetRevealedIds 按 ID 追踪，重号会跨方误亮（反泄露）
+        return RandomSideSetup(1, 0).Concat(RandomSideSetup(2, 25)).ToList();
+    }
+
+    /// <summary>单方随机秘密布阵（满足全部布阵约束；deploy 随机兑底共用）</summary>
+    public static List<GameEvent> RandomSideSetup(int side, int baseId = 0)
     {
         var evs = new List<GameEvent>();
-        var pieceId = 0;
+        var pieceId = baseId;
+        var rng = Random.Shared;
 
-        foreach (var side in new[] { 1, 2 })
+        var pieces = new List<string>();
+        foreach (var (rank, _, count) in PieceSpec)
+            for (var i = 0; i < count; i++) pieces.Add(rank);
+
+        var used = new HashSet<(int x, int y)>();
+        void Place(string rank)
         {
-            // 生成该方 25 枚棋子
-            var pieces = new List<(string rank, int value)>();
-            foreach (var (rank, value, count) in PieceSpec)
-                for (int i = 0; i < count; i++)
-                    pieces.Add((rank, value));
-
-            // 随机打乱
-            var rng = Random.Shared;
-            for (int i = pieces.Count - 1; i > 0; i--)
+            var candidates = new List<(int x, int y)>();
+            for (var y = 0; y < BoardH; y++)
+            for (var x = 0; x < BoardW; x++)
             {
-                int j = rng.Next(i + 1);
-                (pieces[i], pieces[j]) = (pieces[j], pieces[i]);
+                if (used.Contains((x, y))) continue;
+                if (!ArmyChessBoard.InOwnHalf(side, y)) continue;
+                if (CellType(x, y) == Camp) continue;
+                if (rank == RANK_FLAG && !ArmyChessBoard.IsOwnDen(side, x, y)) continue;
+                if (rank == RANK_BOMB && ArmyChessBoard.IsFrontRow(side, y)) continue;
+                if (rank == RANK_MINE && !ArmyChessBoard.IsBackTwoRows(side, y)) continue;
+                candidates.Add((x, y));
             }
+            var spot = candidates[rng.Next(candidates.Count)];
+            used.Add(spot);
+            evs.Add(new GameEvent { t = "setup", s = side, x = spot.x, y = spot.y, v = RankValue(rank), p = pieceId++ });
+        }
 
-            // 该方可放置的位置
-            var rows = side == 1 ? Enumerable.Range(6, 6).ToList() : Enumerable.Range(0, 6).ToList();
-            var positions = new List<(int x, int y)>();
-            foreach (var y in rows)
-                for (int x = 0; x < BoardW; x++)
-                    positions.Add((x, y));
-
-            // 约束放置：军旗必须在大本营
-            var flagIdx = pieces.FindIndex(p => p.rank == RANK_FLAG);
-            var flagPos = DenPositions.First(d => (side == 1 && d.y >= 6) || (side == 2 && d.y <= 5));
-            positions.Remove(flagPos);
-            evs.Add(new GameEvent { t = "setup", s = side, x = flagPos.x, y = flagPos.y, v = 12, p = pieceId++ });
-            pieces.RemoveAt(flagIdx);
-
-            // 地雷只在最后两排
-            var lastTwoRows = side == 1 ? new[] { 10, 11 } : new[] { 0, 1 };
-            var mineSpots = positions.Where(p => lastTwoRows.Contains(p.y)).ToList();
-            var mineCount = pieces.Count(p => p.rank == RANK_MINE);
-            for (int i = 0; i < mineCount && mineSpots.Count > 0; i++)
-            {
-                var spot = mineSpots[rng.Next(mineSpots.Count)];
-                mineSpots.Remove(spot);
-                positions.Remove(spot);
-                evs.Add(new GameEvent { t = "setup", s = side, x = spot.x, y = spot.y, v = 11, p = pieceId++ });
-                pieces.RemoveAll(p => p.rank == RANK_MINE);
-            }
-
-            // 其余棋子随机放
-            foreach (var (rank, value) in pieces)
-            {
-                if (positions.Count == 0) break;
-                var spot = positions[rng.Next(positions.Count)];
-                positions.Remove(spot);
-                evs.Add(new GameEvent { t = "setup", s = side, x = spot.x, y = spot.y, v = value, p = pieceId++ });
-            }
+        Place(RANK_FLAG);
+        var mines = pieces.Count(p => p == RANK_MINE);
+        var bombs = pieces.Count(p => p == RANK_BOMB);
+        for (var i = 0; i < mines; i++) Place(RANK_MINE);
+        for (var i = 0; i < bombs; i++) Place(RANK_BOMB);
+        foreach (var rank in pieces)
+        {
+            if (rank is RANK_MINE or RANK_BOMB or RANK_FLAG) continue;
+            Place(rank);
         }
         return evs;
     }
@@ -150,23 +147,17 @@ public static class ArmyChessRules
         if (PieceRank(piece) == RANK_FLAG) throw new ApiBadRequest("军旗不能动");
         if (PieceRank(piece) == RANK_MINE) throw new ApiBadRequest("地雷不能动");
 
-        // 步长：只能走一格（横/竖）
-        var dx = Math.Abs(toX - fromX);
-        var dy = Math.Abs(toY - fromY);
-        if (dx + dy != 1) throw new ApiBadRequest("只能走一格");
-        if (dx > 1 || dy > 1) throw new ApiBadRequest("只能走一格");
-
-        // 不能走进自己大本营
-        if (CellType(toX, toY) == Den && ((side == 1 && toY >= 6) || (side == 2 && toY <= 5)))
-            throw new ApiBadRequest("不能进自己的大本营");
-
-        // 目标格检查
         var target = board[toX, toY];
         if (target != 0 && PieceSide(target) == side) throw new ApiBadRequest("不能吃自己的棋子");
 
         // 行营安全区：子在行营内不可被吃
         if (target != 0 && CellType(toX, toY) == Camp)
             throw new ApiBadRequest("行营里的棋子不能被吃");
+
+        // 大本营冻结（§2.1 A5）：进入后该子不可再动 —— 冻结子无落点，CanReach 自然拒绝。
+        // 行棋 = 图上三种查询（公路一步 / 铁路直线滑行 / 工兵 BFS），与 HasAnyMove/AI 同源。
+        if (!ArmyChessBoard.CanReach(board, ArmyChessBoard.Node(fromX, fromY), ArmyChessBoard.Node(toX, toY), side))
+            throw new ApiBadRequest("走法不合法");
 
         return new GameEvent { t = "move", s = side, fx = fromX, fy = fromY, tx = toX, ty = toY };
     }
@@ -260,6 +251,9 @@ public static class ArmyChessRules
 
         // 棋子（硬要求 6：按棋子身份追踪 revealed；健壮性：缺 ID 一律 hidden）
         var revealedIds = GetRevealedIds(evs);
+        var flagRevealed = GetFlagRevealedSides(evs);   // 新：司令阵亡亮旗（CAAI）
+        var openAllVisible = r.Mode == "open" && r.Status == "playing";   // 明棋 playing 全亮
+        var setupHide = r.Status == "setup";                             // 布阵期对方 rank 不下发
         var pieces = new List<object>();
         for (var x = 0; x < BoardW; x++)
         {
@@ -271,8 +265,15 @@ public static class ArmyChessRules
                 var rank = PieceRank(piece);
                 // 健壮性：idMap 缺失时 pid 不存在 → 不加入 revealed（安全侧）
                 var hasId = idMap.TryGetValue((x, y), out var pid);
-                // 己方棋子始终可见；对方棋子只有参战后才可见
-                var isRevealed = side == mySide || (hasId && revealedIds.Contains(pid)) || finished;
+                // 己方始终可见；对方参战后可见；明棋 playing 全亮；司令阵亡后该方军旗亮；终局全亮
+                var isRevealed = side == mySide
+                    || (hasId && revealedIds.Contains(pid))
+                    || openAllVisible
+                    || (side != mySide && rank == RANK_FLAG && flagRevealed.Contains(side))
+                    || finished;
+                // 布阵期对方子不下发 rank（否则摆阵无策略意义）
+                if (setupHide && side != mySide)
+                    isRevealed = false;
 
                 if (isRevealed)
                     pieces.Add(new { x, y, side, rank, hidden = false });
@@ -298,6 +299,12 @@ public static class ArmyChessRules
         {
             boardW = BoardW,
             boardH = BoardH,
+            mode = r.Mode ?? "dark",
+            deployDone = new[]
+            {
+                evs.Any(e => e.t == "setup" && e.s == 1),
+                evs.Any(e => e.t == "setup" && e.s == 2),
+            },
             squares,
             pieces,
             battleLog,
@@ -307,11 +314,30 @@ public static class ArmyChessRules
     }
 
     /// <summary>
+    /// 司令阵亡亮旗（CAAI）：从 battle 事件流推导 —— 某方 RANK_COMMANDER 阵亡，
+    /// 该方 RANK_FLAG 对对手永久可见。纯函数、可单测。
+    /// </summary>
+    public static HashSet<int> GetFlagRevealedSides(IReadOnlyList<GameEvent> evs)
+    {
+        var dead = new HashSet<int>();
+        foreach (var e in evs)
+        {
+            if (e.t != "battle") continue;
+            if (e.att == RANK_COMMANDER && (e.result == "defender_wins" || e.result == "both_die"))
+                dead.Add(e.s);                          // 攻方司令阵亡
+            if (e.def == RANK_COMMANDER && (e.result == "attacker_wins" || e.result == "both_die"))
+                dead.Add(e.s == 1 ? 2 : 1);             // 守方司令阵亡
+        }
+        return dead;
+    }
+
+    /// <summary>
     /// 【硬要求 1】参战即公开：battle 事件里的棋子永久 hidden:false。
     /// 【硬要求 6】按棋子身份（ID）追踪，不是坐标。
     /// 【健壮性】setup 缺 p 时 idMap 为空 → 所有棋子无 ID → GetRevealedIds 匹配不到 → 全部 hidden（安全侧）。
+    /// （public：明棋/暗棋 AI 判断「这枚子是不是已公开」用，AI 不得读未公开 rank）
     /// </summary>
-    private static HashSet<int> GetRevealedIds(IReadOnlyList<GameEvent> evs)
+    public static HashSet<int> GetRevealedIds(IReadOnlyList<GameEvent> evs)
     {
         var revealed = new HashSet<int>();
         foreach (var e in evs)
@@ -386,36 +412,11 @@ public static class ArmyChessRules
         return (board, idMap);
     }
 
-    /// <summary>该方是否有任何合法走法</summary>
-    private static bool HasAnyMove(int[,] board, int side)
-    {
-        for (var x = 0; x < BoardW; x++)
-        {
-            for (var y = 0; y < BoardH; y++)
-            {
-                var piece = board[x, y];
-                if (piece == 0 || PieceSide(piece) != side) continue;
-                var rank = PieceRank(piece);
-                if (rank == RANK_FLAG || rank == RANK_MINE) continue;
+    /// <summary>该方是否有任何合法走法（与 Reachable 同源，三处共用）</summary>
+    private static bool HasAnyMove(int[,] board, int side) => ArmyChessBoard.HasAnyMove(board, side);
 
-                foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
-                {
-                    var tx = x + dx;
-                    var ty = y + dy;
-                    if (tx < 0 || tx >= BoardW || ty < 0 || ty >= BoardH) continue;
-                    if (CellType(tx, ty) == Den && ((side == 1 && ty >= 6) || (side == 2 && ty <= 5))) continue;
-                    var target = board[tx, ty];
-                    if (target != 0 && PieceSide(target) == side) continue;
-                    if (target != 0 && CellType(tx, ty) == Camp) continue;
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /// <summary>rank value 换算</summary>
-    private static int RankValue(string rank) => rank switch
+    /// <summary>rank value 换算（翻棋/明棋 AI 共用）</summary>
+    public static int RankValue(string rank) => rank switch
     {
         RANK_COMMANDER => 10, RANK_ARMY => 9, RANK_DIVISION => 8, RANK_BRIGADE => 7,
         RANK_REGIMENT => 6, RANK_BATTALION => 5, RANK_COMPANY => 4, RANK_PLATOON => 3,

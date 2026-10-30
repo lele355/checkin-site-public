@@ -508,6 +508,9 @@ public class GameRoom
     /// <summary>AI 等级：0 = 人类 guest（现状）；&gt;0 = AI 对局，GuestUserId 恒为 null，AI 执 HostSide 的对方</summary>
     public int AiLevel { get; set; }
 
+    /// <summary>军旗双模式：open=明棋（自摆阵）/ dark=暗棋（随机秘密布阵）；其它游戏 null</summary>
+    public string? Mode { get; set; }
+
     /// <summary>waiting（等人）/ playing（进行中）/ finished（终局，棋盘保留可复盘）</summary>
     public string Status { get; set; } = "waiting";
 
