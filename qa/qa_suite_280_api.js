@@ -1075,7 +1075,7 @@ async function testSettings() {
 // =========================================================================
 async function testTutorials() {
     section('TUTORIALS 教程接口');
-    for (const gk of ['gomoku', 'reversi', 'jungle', 'xiangqi', 'ludo', 'armychess']) {
+    for (const gk of ['gomoku', 'reversi', 'jungle', 'xiangqi', 'ludo', 'armychess', 'melon', 'fish']) {
         const r = await api('GET', `/api/v1/games/${gk}/tutorial`, undefined, TOKENS.QA_alpha);
         const ok = r.json && r.json.ok && Array.isArray(r.json.data) && r.json.data.length === 5;
         const titles = ok ? r.json.data.map(x => x.title).join('/') : JSON.stringify(r.json).substring(0, 80);

@@ -7,20 +7,34 @@
 <div class="card">
     <div class="page-head">
         <h2>@Model.GameName</h2>
-        <a class="btn secondary" href="/Games">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
+        <span>
+            <a class="btn secondary" href="/Games/@Model.GameKey/Rules">规则</a>
+            <a class="btn secondary" href="/Games">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
+        </span>
     </div>
 
     <div class="gm-solo" data-game-key="@Model.GameKey" data-max-score="@Model.MaxScore">
         <canvas id="soloCanvas" width="360" height="480" tabindex="0"></canvas>
         <div class="gm-solo-bar">
             <span id="soloScore">0</span>
+            <span id="soloBest" class="gm-solo-best">最高 0</span>
             <button class="btn" id="soloRestart" type="button">重开</button>
             <button class="btn secondary" id="soloLeaderboard" type="button">排行榜</button>
+        </div>
+        <div id="soloEndModal" class="gm-solo-end" hidden>
+            <div class="gm-solo-end-card">
+                <h3>本局结束</h3>
+                <p>本局 <b id="soloEndScore">0</b> 分 · 最高 <b id="soloEndBest">0</b></p>
+                <button class="btn" id="soloEndRestart" type="button">再来一局</button>
+            </div>
         </div>
         <div id="soloLeaderboardPanel" class="gm-solo-lb" hidden></div>
     </div>
 </div>
 
 @section Scripts {
+    @if (Model.GameKey == "melon") {
+        <script src="~/js/solo/melon-core.js" asp-append-version="true"></script>
+    }
     <script src="~/js/solo/@(Model.GameKey).js" asp-append-version="true"></script>
 }

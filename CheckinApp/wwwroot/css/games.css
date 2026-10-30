@@ -327,6 +327,23 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
 .gm-solo-lb ol { margin: 0 0 8px; padding-left: 20px; }
 .gm-solo-lb li { font-size: .9rem; line-height: 1.7; }
 .gm-solo-lb .hint { color: var(--text-sub); font-size: .82rem; margin: 0; }
+.gm-solo-best {
+  font-weight: 500 !important; font-size: .85rem !important; min-width: 0 !important;
+  color: var(--text-sub) !important;
+}
+.gm-solo-end {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+.gm-solo-end[hidden] { display: none; }
+.gm-solo-end-card {
+  background: var(--card); border-radius: 14px; padding: 22px 28px;
+  text-align: center; min-width: 220px;
+  border: 1px solid var(--border);
+}
+.gm-solo-end-card h3 { margin: 0 0 10px; font-size: 1.15rem; }
+.gm-solo-end-card p { margin: 0 0 16px; color: var(--text-sub); }
 
 /* ==========================================================================
    移动端适配（<400px）+ 横屏（T05）

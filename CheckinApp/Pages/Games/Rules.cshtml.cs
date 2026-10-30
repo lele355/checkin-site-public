@@ -11,6 +11,7 @@ public class RulesModel : PageModel
 {
     public string GameKey { get; private set; } = "";
     public string GameName { get; private set; } = "";
+    public bool IsSolo { get; private set; }
     public List<GameTutorials.Section> Sections { get; private set; } = [];
 
     public IActionResult OnGet(string gameKey)
@@ -18,6 +19,7 @@ public class RulesModel : PageModel
         var key = GameCatalog.Require(gameKey);
         GameKey = key;
         GameName = GameCatalog.Find(key)?.Name ?? key;
+        IsSolo = GameCatalog.Find(key)?.Solo == true;
         Sections = GameTutorials.Get(key) ?? [];
         return Page();
     }

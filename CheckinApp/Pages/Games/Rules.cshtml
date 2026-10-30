@@ -7,7 +7,7 @@
 <div class="card" style="max-width:640px;">
     <div class="page-head">
         <h2>@Model.GameName · 规则</h2>
-        <a class="btn secondary" href="/Games/@Model.GameKey">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
+        <a class="btn secondary" href="@(Model.IsSolo ? "/Games/" + Model.GameKey + "/Solo" : "/Games/" + Model.GameKey)">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
     </div>
 
     @foreach (var s in Model.Sections)
