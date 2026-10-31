@@ -39,4 +39,15 @@
     <script src="~/js/solo/melon-core.js" asp-append-version="true"></script>
     }
     <script src="~/js/solo/@(Model.GameKey).js" asp-append-version="true"></script>
+    <script>
+        // 排行榜弹窗：点遮罩/按 Esc 关闭（按钮自身仍由各游戏 JS 切换 hidden）
+        (function () {
+            var p = document.getElementById('soloLeaderboardPanel');
+            if (!p) return;
+            document.addEventListener('click', function (e) {
+                if (!p.hidden && !p.contains(e.target) && e.target.id !== 'soloLeaderboard') p.hidden = true;
+            });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') p.hidden = true; });
+        })();
+    </script>
 }

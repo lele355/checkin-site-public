@@ -1,4 +1,5 @@
-// boards/reversi.js — 黑白棋棋盘：8×8 格、黑白圆子、翻子动画。
+// boards/reversi.js — 黑白棋棋盘：可变盘面（6/8/10/12，默认 8）+ 黑白圆子 + 翻子动画。
+// 盘面大小来自 state.size（建房快照，与服务端 ReversiRules 同口径）。
 (function () {
   'use strict';
 
@@ -7,7 +8,8 @@
 
   /** 渲染黑白棋棋盘到 svg 容器 */
   function render(svg, state, opts) {
-    var geom = GB.gridGeom(8, 20, opts.showCoord);
+    var n = boardSize(state);
+    var geom = GB.gridGeom(n, 20, opts.showCoord);
     svg.innerHTML = '';
 
     // 背景
@@ -16,16 +18,17 @@
 
     // 格线
     var grid = GB.el('g', { stroke: '#1b5e20', 'stroke-width': '1.5' });
-    for (var i = 0; i <= 8; i++) {
+    for (var i = 0; i <= n; i++) {
       var pos = geom.cellPx(i);
-      grid.appendChild(GB.el('line', { x1: geom.cellPx(0), y1: pos, x2: geom.cellPx(8), y2: pos }));
-      grid.appendChild(GB.el('line', { x1: pos, y1: geom.cellPx(0), x2: pos, y2: geom.cellPx(8) }));
+      grid.appendChild(GB.el('line', { x1: geom.cellPx(0), y1: pos, x2: geom.cellPx(n), y2: pos }));
+      grid.appendChild(GB.el('line', { x1: pos, y1: geom.cellPx(0), x2: pos, y2: geom.cellPx(n) }));
     }
     svg.appendChild(grid);
 
-    // 星位（4 个角的交叉点）
+    // 星位（中心区四角，任意偶数 n 通用）
+    var m = n / 2;
     var stars = GB.el('g', { fill: '#1b5e20' });
-    [[2, 2], [2, 6], [6, 2], [6, 6]].forEach(function (s) {
+    [[m - 2, m - 2], [m - 2, m + 1], [m + 1, m - 2], [m + 1, m + 1]].forEach(function (s) {
       stars.appendChild(GB.el('circle', {
         cx: geom.cellPx(s[0]), cy: geom.cellPx(s[1]), r: 4,
       }));
@@ -35,12 +38,13 @@
     // 坐标
     if (opts.showCoord) {
       var cg = GB.el('g', {});
-      GB.drawCoords(cg, geom, 8, 8);
+      GB.drawCoords(cg, geom, n, n);
       svg.appendChild(cg);
     }
 
     // 棋子
     // 落子确认预览（任务二尾巴）：半透明石子标记将落点
+    var board = buildBoard(state);
     if (opts.pointPreview) {
       var pp = opts.pointPreview.split(',');
       var pv = { x: +pp[0], y: +pp[1] };
@@ -57,10 +61,9 @@
     svg.appendChild(stonesG);
 
     // 从 state.events 重建盘面（或 state 直接给 board）
-    var board = buildBoard(state);
     animP = (opts.placeAt && opts.placeProgress != null) ? Math.min(1, opts.placeProgress) : 1;
-    for (var x = 0; x < 8; x++) {
-      for (var y = 0; y < 8; y++) {
+    for (var x = 0; x < n; x++) {
+      for (var y = 0; y < n; y++) {
         if (board[x][y] !== 0) {
           var k2 = x + ',' + y;
           var fx = animP >= 1 ? null
@@ -81,16 +84,16 @@
     if (opts.myTurn && opts.mySide) {
       var hints = legalMoves(board, opts.mySide);
       var hintG = GB.el('g', { id: 'rvHints' });
-      hints.forEach(function (m) {
+      hints.forEach(function (m2) {
         hintG.appendChild(GB.el('circle', {
-          cx: geom.px(m[0]), cy: geom.px(m[1]), r: geom.cell * 0.15,
+          cx: geom.px(m2[0]), cy: geom.px(m2[1]), r: geom.cell * 0.15,
           fill: opts.mySide === 1 ? '#333' : '#fff', opacity: '0.25',
         }));
       });
       svg.appendChild(hintG);
     }
 
-    return { pad: geom.pad, cw: geom.step, ch: geom.step, cols: 8, rows: 8, mode: 'cell' };
+    return { pad: geom.pad, cw: geom.step, ch: geom.step, cols: n, rows: n, mode: 'cell' };
   }
 
   function drawStone(g, geom, x, y, side, fx) {
@@ -115,12 +118,24 @@
   var lastFlips = [];     // 最后一手翻转的格（翻子动画用）
   var lastPlaced = null;  // 最后一手落点
 
+  /** 盘面大小（state.size 快照；缺省 8） */
+  function boardSize(state) {
+    var n = state && state.size ? +state.size : 8;
+    return (n === 6 || n === 8 || n === 10 || n === 12) ? n : 8;
+  }
+
   function buildBoard(state) {
+    var n = boardSize(state);
     var board = [];
-    for (var i = 0; i < 8; i++) { board.push([0, 0, 0, 0, 0, 0, 0, 0]); }
-    // 标准初始布局
-    board[3][3] = 2; board[4][4] = 2;
-    board[3][4] = 1; board[4][3] = 1;
+    for (var i = 0; i < n; i++) {
+      var row = [];
+      for (var j = 0; j < n; j++) row.push(0);
+      board.push(row);
+    }
+    // 标准初始布局（中心 2×2，任意偶数 n 通用）
+    var c = n / 2;
+    board[c - 1][c - 1] = 2; board[c][c] = 2;
+    board[c - 1][c] = 1; board[c][c - 1] = 1;
 
     if (state && state.events) {
       state.events.forEach(function (e) {
@@ -139,16 +154,17 @@
   }
 
   function getFlips(board, x, y, side, before) {
+    var n = board.length;
     var flips = [];
     var dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
     dirs.forEach(function (d) {
       var line = [];
       var cx = x + d[0], cy = y + d[1];
-      while (cx >= 0 && cx < 8 && cy >= 0 && cy < 8 && board[cx][cy] !== 0 && board[cx][cy] !== side) {
+      while (cx >= 0 && cx < n && cy >= 0 && cy < n && board[cx][cy] !== 0 && board[cx][cy] !== side) {
         line.push([cx, cy]);
         cx += d[0]; cy += d[1];
       }
-      if (line.length > 0 && cx >= 0 && cx < 8 && cy >= 0 && cy < 8 && board[cx][cy] === side) {
+      if (line.length > 0 && cx >= 0 && cx < n && cy >= 0 && cy < n && board[cx][cy] === side) {
         flips = flips.concat(line);
       }
     });
@@ -156,9 +172,10 @@
   }
 
   function legalMoves(board, side) {
+    var n = board.length;
     var moves = [];
-    for (var x = 0; x < 8; x++) {
-      for (var y = 0; y < 8; y++) {
+    for (var x = 0; x < n; x++) {
+      for (var y = 0; y < n; y++) {
         if (board[x][y] === 0 && getFlips(board, x, y, side).length > 0) {
           moves.push([x, y]);
         }

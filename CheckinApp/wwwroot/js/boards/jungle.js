@@ -33,9 +33,12 @@
     var pad = geom.pad;
     var cw = (640 - pad * 2) / W;
     var ch = (totalH - pad * 2) / H;
+    // 视角对调：上方座（side 2）看到的棋盘上下翻转（己方恒在下半区）
+    var flip = !!(opts && opts.flip);
+    function vy(y) { return flip ? (H - 1 - y) : y; }
 
     function px(x) { return pad + x * cw + cw / 2; }
-    function py(y) { return pad + y * ch + ch / 2; }
+    function py(y) { return pad + vy(y) * ch + ch / 2; }
 
     // 背景
     svg.appendChild(GB.el('rect', { x: 0, y: 0, width: 640, height: totalH, fill: '#f5e6c8', rx: 8 }));
@@ -43,7 +46,7 @@
     // 特殊格
     for (var y = 0; y < H; y++) {
       for (var x = 0; x < W; x++) {
-        var cx = pad + x * cw, cy = pad + y * ch;
+        var cx = pad + x * cw, cy = pad + vy(y) * ch;
         if (isWater(x, y)) {
           svg.appendChild(GB.el('rect', { x: cx, y: cy, width: cw, height: ch, fill: '#7ec8e3', opacity: '0.7' }));
         } else if (isTrap(x, y)) {
@@ -72,31 +75,15 @@
     }
     svg.appendChild(grid);
 
-    // 棋子：侧色圆子 + 白色兽剪影（icons-ready 同源）+ 等级角标
+    // 棋子：整枚字面图标直贴（icons-ready 同源，2.8.8 字面制式对齐象棋/军棋 —— 木饼刻字）
     if (state.pieces) {
       state.pieces.forEach(function (p) {
-        var isSide1 = p.side === 1;
-        var r = Math.min(cw, ch) * 0.42;
-        var g = GB.el('g', {});
-        g.appendChild(GB.el('circle', {
-          cx: px(p.x), cy: py(p.y), r: r,
-          fill: isSide1 ? '#d32f2f' : '#1565c0',
-          stroke: isSide1 ? '#b71c1c' : '#0d47a1', 'stroke-width': '2',
+        var side = Math.min(cw, ch) * 0.94;
+        svg.appendChild(GB.el('image', {
+          href: '/pieces/jungle/' + (p.side === 1 ? 'red-' : 'blue-') + (JUNGLE_ICON[p.rank] || 'rat') + '.svg',
+          x: px(p.x) - side / 2, y: py(p.y) - side / 2,
+          width: side, height: side, 'pointer-events': 'none',
         }));
-        var bs = r * 1.5;
-        g.appendChild(GB.el('image', {
-          href: '/pieces/jungle/' + (JUNGLE_ICON[p.rank] || 'rat') + '.svg',
-          x: px(p.x) - bs / 2, y: py(p.y) - bs / 2, width: bs, height: bs,
-          style: 'filter: brightness(0) invert(1)', 'pointer-events': 'none',
-        }));
-        var t = GB.el('text', {
-          x: px(p.x) + r * 0.72, y: py(p.y) - r * 0.5, 'text-anchor': 'middle',
-          'font-size': '11', fill: '#fff', 'font-weight': 'bold',
-          stroke: 'rgba(0,0,0,0.35)', 'stroke-width': '2', 'paint-order': 'stroke',
-        });
-        t.textContent = RANKS[p.rank] || '?';
-        g.appendChild(t);
-        svg.appendChild(g);
       });
     }
 
@@ -104,7 +91,7 @@
     if (opts.lastMark && state.lastMove) {
       var lm = state.lastMove;
       svg.appendChild(GB.el('rect', {
-        x: pad + lm.tx * cw + 2, y: pad + lm.ty * ch + 2, width: cw - 4, height: ch - 4,
+        x: pad + lm.tx * cw + 2, y: pad + vy(lm.ty) * ch + 2, width: cw - 4, height: ch - 4,
         fill: 'none', stroke: '#FF5722', 'stroke-width': '3', rx: 4,
       }));
     }
@@ -112,7 +99,7 @@
     // 两段式：选中起点高亮
     if (opts.sel) {
       svg.appendChild(GB.el('rect', {
-        x: pad + opts.sel.x * cw + 2, y: pad + opts.sel.y * ch + 2,
+        x: pad + opts.sel.x * cw + 2, y: pad + vy(opts.sel.y) * ch + 2,
         width: cw - 4, height: ch - 4,
         fill: 'none', stroke: '#1a73e8', 'stroke-width': 4, rx: 6,
       }));
@@ -125,7 +112,7 @@
         var occ = state.pieces && state.pieces.some(function (q) { return q.x === tp[0] && q.y === tp[1]; });
         if (occ) {
           svg.appendChild(GB.el('rect', {
-            x: pad + tp[0] * cw + 5, y: pad + tp[1] * ch + 5, width: cw - 10, height: ch - 10,
+            x: pad + tp[0] * cw + 5, y: pad + vy(tp[1]) * ch + 5, width: cw - 10, height: ch - 10,
             fill: 'none', stroke: '#e53935', 'stroke-width': 3, rx: 6, opacity: .85,
           }));
         } else {
@@ -137,22 +124,15 @@
       });
     }
 
-    // 吃子鬼影（Batch D）：被吃子淡出（图标同源）
+    // 吃子鬼影（Batch D）：被吃子淡出（整枚图标直贴）
     if (opts.ghost && opts.ghost.piece) {
       var gp = opts.ghost.piece;
-      var isS1G = gp.side === 1;
-      var rG = Math.min(cw, ch) * 0.42;
+      var sideG = Math.min(cw, ch) * 0.94;
       var gg = GB.el('g', { opacity: String(Math.max(0, opts.ghost.alpha)) });
-      gg.appendChild(GB.el('circle', {
-        cx: px(gp.x), cy: py(gp.y), r: rG,
-        fill: isS1G ? '#d32f2f' : '#1565c0',
-        stroke: isS1G ? '#b71c1c' : '#0d47a1', 'stroke-width': '2',
-      }));
-      var bsG = rG * 1.5;
       gg.appendChild(GB.el('image', {
-        href: '/pieces/jungle/' + (JUNGLE_ICON[gp.rank] || 'rat') + '.svg',
-        x: px(gp.x) - bsG / 2, y: py(gp.y) - bsG / 2, width: bsG, height: bsG,
-        style: 'filter: brightness(0) invert(1)', 'pointer-events': 'none',
+        href: '/pieces/jungle/' + (gp.side === 1 ? 'red-' : 'blue-') + (JUNGLE_ICON[gp.rank] || 'rat') + '.svg',
+        x: px(gp.x) - sideG / 2, y: py(gp.y) - sideG / 2,
+        width: sideG, height: sideG, 'pointer-events': 'none',
       }));
       svg.appendChild(gg);
     }

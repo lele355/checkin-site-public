@@ -164,7 +164,7 @@
       var b = game.bodies[i];
       var age = game.time - b.born;
       var sc = age < 0.2 && age >= 0 ? 0.6 + 0.4 * (age / 0.2) : 1;
-      drawFruit(b.x, b.y, b.level, b.angle, 1, sc);
+      drawFruit(b.x, b.y, b.level, 0, 1, sc);
     }
 
     // 合成闪光环（Batch D：扩散圆环）

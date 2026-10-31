@@ -80,9 +80,12 @@
     var pad = 24;
     var cw = (640 - pad * 2) / W;
     var ch = (totalH - pad * 2) / H;
+    // 视角对调：上方座（side 2）看到的棋盘上下翻转（己方恒在下半区）；翻棋混布盘不翻（调用方控制）
+    var flip = !!(opts && opts.flip);
+    function vy(y) { return flip ? (H - 1 - y) : y; }
 
     function nx(x) { return pad + x * cw; }        // 节点左上
-    function ny(y) { return pad + y * ch; }
+    function ny(y) { return pad + vy(y) * ch; }
     function px(x) { return nx(x) + cw / 2; }      // 节点中心
     function py(y) { return ny(y) + ch / 2; }
 

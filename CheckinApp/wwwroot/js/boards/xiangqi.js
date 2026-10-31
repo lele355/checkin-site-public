@@ -22,9 +22,12 @@
     var pad = 50;
     var cw = (640 - pad * 2) / (W - 1);
     var ch = (720 - pad * 2) / (H - 1);
+    // 视角对调：上方座（side 2）看到的棋盘上下翻转（己方恒在下半区）；
+    // 只翻格位不翻字形 —— 文字/图标画在翻转后的格位上，内容保持正立
+    var flip = !!(opts && opts.flip);
 
     function px(x) { return pad + x * cw; }
-    function py(y) { return pad + y * ch; }
+    function py(y) { return pad + (flip ? (H - 1 - y) : y) * ch; }
 
     // 背景
     svg.appendChild(GB.el('rect', { x: 0, y: 0, width: 640, height: 720, fill: '#f0d9a8', rx: 8 }));

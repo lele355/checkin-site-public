@@ -72,9 +72,10 @@
                 <div class="field">
                     <label>盘面大小</label>
                     <select name="size">
-                        <option value="13" selected="@(Model.GomokuSize == 13)">13 路</option>
-                        <option value="15" selected="@(Model.GomokuSize == 15)">15 路</option>
-                        <option value="19" selected="@(Model.GomokuSize == 19)">19 路</option>
+                        @foreach (var sz in Model.SizeOptionsArr)
+                        {
+                            <option value="@sz" selected="@(Model.GomokuSize == sz)">@sz@(Model.GameKey == "reversi" ? "×" + sz : " 路")</option>
+                        }
                     </select>
                 </div>
             }

@@ -318,11 +318,16 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
   font-weight: 700; font-size: 1.2rem; min-width: 60px;
   color: var(--text);
 }
+/* 排行榜弹层（2026-10-31 站主定：内联面板 → 弹窗；用超大 box-shadow 生成遮罩，不改 HTML 结构） */
 .gm-solo-lb {
-  width: 100%; max-width: 360px; margin-top: 6px;
-  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-  padding: 12px 14px;
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 95; width: min(340px, calc(100vw - 36px));
+  max-height: 70vh; overflow: auto;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .45), var(--shadow);
 }
+.gm-solo-lb[hidden] { display: none; }
 .gm-solo-lb h3 { margin: 0 0 8px; font-size: 1rem; }
 .gm-solo-lb ol { margin: 0 0 8px; padding-left: 20px; }
 .gm-solo-lb li { font-size: .9rem; line-height: 1.7; }

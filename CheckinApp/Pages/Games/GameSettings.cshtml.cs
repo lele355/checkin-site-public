@@ -33,6 +33,9 @@ public class GameSettingsModel(AppDbContext db, CurrentUser me) : PageModel
     public bool ShowTimers { get; private set; }       // 联机对战类 6 款
     public bool HasItems { get; private set; }
 
+    /// <summary>盘面档位（五子棋 13/15/19、黑白棋 6/8/10/12）</summary>
+    public int[] SizeOptionsArr => GameKey == "reversi" ? ReversiRules.SizeOptions : [13, 15, 19];
+
     // ---- 当前值 ----
     public bool TapConfirm { get; private set; }
     public bool ShowCoordVal { get; private set; }
@@ -103,7 +106,7 @@ public class GameSettingsModel(AppDbContext db, CurrentUser me) : PageModel
             RebuildAiLevel = active.AiLevel;
             // 回显将改未改的值（取消即整页重载回滚）
             TapConfirm = tapConfirm; ShowCoordVal = showCoord; LastMark = lastMark; SoundVal = sound;
-            if (ShowSize && size > 0) GomokuSize = GomokuRules.ClampSize(size);
+            if (ShowSize && size > 0) GomokuSize = GameKey == "reversi" ? ReversiRules.ClampSize(size) : GomokuRules.ClampSize(size);
             GomokuForbidden = forbidden;
             if (ShowMode && GameSettingsCatalog.ModeOptions.Contains(mode.ToLowerInvariant())) ArmyMode = mode.ToLowerInvariant();
             MoveTimeoutSec = GameSettingsCatalog.Nearest(MoveTimeoutOptions, moveTimeoutSec);
@@ -127,6 +130,15 @@ public class GameSettingsModel(AppDbContext db, CurrentUser me) : PageModel
             {
                 Size = size > 0 ? GomokuRules.ClampSize(size) : curRules.Size,
                 Forbidden = forbidden,
+                MoveTimeoutSec = GameSettingsCatalog.Nearest(MoveTimeoutOptions, moveTimeoutSec),
+                TotalTimeoutSec = GameSettingsCatalog.Nearest(TotalTimeoutOptions, totalTimeoutSec),
+            });
+        }
+        else if (key == "reversi")
+        {
+            merged = GameSettingsCatalog.Apply(merged, new GameSettingsCatalog.ReversiRulesDto
+            {
+                Size = size > 0 ? ReversiRules.ClampSize(size) : curRules.Size,
                 MoveTimeoutSec = GameSettingsCatalog.Nearest(MoveTimeoutOptions, moveTimeoutSec),
                 TotalTimeoutSec = GameSettingsCatalog.Nearest(TotalTimeoutOptions, totalTimeoutSec),
             });
@@ -176,6 +188,8 @@ public class GameSettingsModel(AppDbContext db, CurrentUser me) : PageModel
         var merged = GameSettingsCatalog.Load(user.GameSettings);
         if (key == "gomoku")
             merged = GameSettingsCatalog.Apply(merged, new GameSettingsCatalog.GomokuRulesDto());
+        else if (key == "reversi")
+            merged = GameSettingsCatalog.Apply(merged, new GameSettingsCatalog.ReversiRulesDto());
         else if (key == "armychess")
             merged = GameSettingsCatalog.Apply(merged, new GameSettingsCatalog.ArmyChessModeDto());
         else
@@ -199,7 +213,7 @@ public class GameSettingsModel(AppDbContext db, CurrentUser me) : PageModel
         ShowCoord = key is "gomoku" or "jungle" or "xiangqi" or "reversi";
         ShowLastMark = key is "gomoku" or "jungle" or "xiangqi" or "armychess" or "reversi" or "ludo";
         ShowSound = key is "fish" or "melon";             // 有音效的游戏才显示（melon M13 落地即通）
-        ShowSize = key == "gomoku";
+        ShowSize = key is "gomoku" or "reversi";          // 可变盘面两款（档位不同，SizeOptionsArr 分流）
         ShowForbidden = key == "gomoku";
         ShowMode = key == "armychess";
         ShowTimers = key is "gomoku" or "jungle" or "xiangqi" or "armychess" or "reversi" or "ludo";

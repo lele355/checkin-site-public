@@ -232,7 +232,7 @@ internal sealed class ReversiEngine : IGameEngine
     public string SideName(int side) => ReversiRules.SideName(side);
 
     public IReadOnlyList<JsonElement>? AllMoves(IReadOnlyList<GameEvent> evs, GameRoom r, int side) =>
-        ReversiRules.AllMoves(evs, side)
+        ReversiRules.AllMoves(evs, r, side)
             .Select(m => JsonSerializer.SerializeToElement(new { x = m.fx, y = m.fy }))
             .ToList();
 

@@ -121,12 +121,13 @@ public static class GamesApi
             var s = GameSettingsCatalog.Load(user?.GameSettings);
             // 各配独立 DTO（红线 19）：按 gameKey 返回各自形状
             object rules = key == "gomoku" ? GameSettingsCatalog.ToGomokuRules(s)
+                : key == "reversi" ? GameSettingsCatalog.ToReversiRules(s)
                 : key == "armychess" ? GameSettingsCatalog.ToArmyChessMode(s)
                 : GameSettingsCatalog.ToTimeoutRules(s, key);
             return ApiKit.Ok(new
             {
                 rules,
-                sizeOptions = GomokuRules.AllowedSizes,
+                sizeOptions = key == "reversi" ? ReversiRules.SizeOptions : GomokuRules.AllowedSizes,
                 moveTimeoutOptions = GameSettingsCatalog.MoveTimeoutOptions,
                 totalTimeoutOptions = GameSettingsCatalog.TotalTimeoutOptions,
                 modeOptions = GameSettingsCatalog.ModeOptions,
@@ -148,6 +149,8 @@ public static class GamesApi
             {
                 "gomoku" => GameSettingsCatalog.Apply(cur,
                     JsonSerializer.Deserialize<GameSettingsCatalog.GomokuRulesDto>(raw, jsonOpts) ?? new()),
+                "reversi" => GameSettingsCatalog.Apply(cur,
+                    JsonSerializer.Deserialize<GameSettingsCatalog.ReversiRulesDto>(raw, jsonOpts) ?? new()),
                 "armychess" => GameSettingsCatalog.Apply(cur,
                     JsonSerializer.Deserialize<GameSettingsCatalog.ArmyChessModeDto>(raw, jsonOpts) ?? new()),
                 _ => GameSettingsCatalog.Apply(cur,
@@ -156,6 +159,7 @@ public static class GamesApi
             user.GameSettings = GameSettingsCatalog.Store(merged);
             db.SaveChanges();
             object rules = key == "gomoku" ? GameSettingsCatalog.ToGomokuRules(merged)
+                : key == "reversi" ? GameSettingsCatalog.ToReversiRules(merged)
                 : key == "armychess" ? GameSettingsCatalog.ToArmyChessMode(merged)
                 : GameSettingsCatalog.ToTimeoutRules(merged, key);
             return ApiKit.Ok(rules);
@@ -292,7 +296,13 @@ public static class GamesApi
             var user = db.Users.FirstOrDefault(x => x.Id == uid)
                        ?? throw new ApiBadRequest("账号不存在");
             var s = GameSettingsCatalog.Load(user.GameSettings);
-            if (req.Size is int rs) s.Size = rs;
+            // Size 按游戏分流写入规则默认（五子棋 13/15/19、黑白棋 6/8/10/12；其它游戏忽略）
+            if (req.Size is int rs)
+            {
+                var rr = s.GetRules(key);
+                rr.Size = rs;
+                s.Games[key] = rr;
+            }
             if (req.Forbidden is bool rf) s.Forbidden = rf;
             if (req.MoveTimeoutSec is int rm) s.MoveTimeoutSec = rm;
             if (req.TotalTimeoutSec is int rt) s.TotalTimeoutSec = rt;
@@ -361,7 +371,7 @@ public static class GamesApi
                 // 翻棋开棋方系统随机（规则文档一、3：开棋方由系统随机选取）；其余 Turn=1
                 Turn = armyMode == "fanqi" ? Random.Shared.Next(1, 3) : 1,
                 AiLevel = (isLudoMulti && ludoSeats!.Any(x => x.IsAi)) ? 2 : aiLevel,
-                Size = s.Size,
+                Size = s.GetRules(key).Size,   // 本局盘面（五子棋/黑白棋分流；其它游戏此值无意义但保留快照）
                 Forbidden = s.Forbidden,
                 MoveTimeoutSec = s.MoveTimeoutSec,
                 TotalTimeoutSec = s.TotalTimeoutSec,

@@ -61,10 +61,23 @@ function run(game, seconds) {
         run(g, 0.4);   // 让冷却走完
     }
     T('掉落仅前 5 级', counts.every(c => c >= 0) && counts.length === 5);
-    const maxIdx = counts.indexOf(Math.max(...counts));
-    const minIdx = counts.indexOf(Math.min(...counts));
-    T('加权：橘子(3 级)最常见', maxIdx === 2, counts.join(','));
-    T('加权：柠檬(4 级)最少', minIdx === 3, counts.join(','));
+    // 权重口径（2026-10-31 改）：直接锁声明权重（橘 4 最大 / 柠 1 最小）。
+    // 原实现靠「连投 600 次统计 curLevel」，新判负规则（顶部越线）下会提前终局，
+    // drop() 恒 false → curLevel 卡 1，统计失效；实投分布另由 [3b] 短程验证。
+    const W = core.WEIGHTS;
+    const maxW = W.indexOf(Math.max(...W));
+    const minW = W.indexOf(Math.min(...W));
+    T('加权：橘子(3 级)权重最大', maxW === 2, W.join(','));
+    T('加权：柠檬(4 级)权重最小', minW === 3, W.join(','));
+    // [3b] 短程实投：每 12 投换新局，避开判负与冷却卡死
+    let gb = core.create({ seed: 99 });
+    const seen = new Set();
+    for (let i = 0; i < 120; i++) {
+        if (gb.over || i % 12 === 0) gb = core.create({ seed: 99 + i });
+        seen.add(gb.curLevel);
+        gb.drop(); run(gb, 0.45);
+    }
+    T('实投只出 1..5 级', [...seen].every(l => l >= 1 && l <= 5), [...seen].join(','));
 }
 
 // ---------- [4] 物理：自由落体着地 ----------

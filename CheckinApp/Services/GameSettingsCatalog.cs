@@ -88,11 +88,11 @@ public class DisplaySettings
     public bool Sound { get; set; } = true;
 }
 
-/// <summary>通用规则默认（新五款用）：size/forbidden + 限时 + 军旗模式（扁平化，不依赖多态）</summary>
-public class GameRuleDefaults
-{
-    /// <summary>盘面大小（仅五子棋用，其它游戏忽略）</summary>
-    public int Size { get; set; } = GomokuRules.DefaultSize;
+    /// <summary>通用规则默认（新五款用）：size/forbidden + 限时 + 军旗模式（扁平化，不依赖多态）</summary>
+    public class GameRuleDefaults
+    {
+        /// <summary>盘面大小：五子棋 13/15/19、黑白棋 6/8/10/12（其它游戏忽略）</summary>
+        public int Size { get; set; } = GomokuRules.DefaultSize;
 
     /// <summary>标准规则禁手（仅五子棋用）</summary>
     public bool Forbidden { get; set; }
@@ -186,7 +186,10 @@ public static class GameSettingsCatalog
 
         foreach (var (key, rules) in s.Games)
         {
-            rules.Size = GomokuRules.ClampSize(rules.Size);
+            // 盘面档位按游戏分流：五子棋 13/15/19、黑白棋 6/8/10/12（别的游戏忽略 Size）
+            rules.Size = key == "reversi"
+                ? ReversiRules.ClampSize(rules.Size)
+                : GomokuRules.ClampSize(rules.Size);
             rules.MoveTimeoutSec = Nearest(MoveTimeoutOptions, rules.MoveTimeoutSec);
             rules.TotalTimeoutSec = Nearest(TotalTimeoutOptions, rules.TotalTimeoutSec);
             rules.Mode = ModeOptions.Contains(rules.Mode) ? rules.Mode : "open";
@@ -245,6 +248,15 @@ public static class GameSettingsCatalog
     {
         /// <summary>open=明棋 / dark=暗棋 / fanqi=翻棋</summary>
         public string Mode { get; set; } = "open";
+        public int MoveTimeoutSec { get; set; }
+        public int TotalTimeoutSec { get; set; }
+    }
+
+    /// <summary>黑白棋规则默认 DTO（红线 19：独立 DTO 不混用）：盘面大小 + 限时</summary>
+    public sealed class ReversiRulesDto
+    {
+        /// <summary>盘面大小：6 / 8 / 10 / 12</summary>
+        public int Size { get; set; } = 8;
         public int MoveTimeoutSec { get; set; }
         public int TotalTimeoutSec { get; set; }
     }
@@ -317,6 +329,29 @@ public static class GameSettingsCatalog
             MoveTimeoutSec = Nearest(MoveTimeoutOptions, r.MoveTimeoutSec),
             TotalTimeoutSec = Nearest(TotalTimeoutOptions, r.TotalTimeoutSec),
         };
+        return Normalize(s);
+    }
+
+    /// <summary>取黑白棋规则默认</summary>
+    public static ReversiRulesDto ToReversiRules(GameSettings s)
+    {
+        var r = s.GetRules("reversi");
+        return new ReversiRulesDto
+        {
+            Size = ReversiRules.ClampSize(r.Size),
+            MoveTimeoutSec = r.MoveTimeoutSec,
+            TotalTimeoutSec = r.TotalTimeoutSec,
+        };
+    }
+
+    /// <summary>应用黑白棋规则默认（只动黑白棋那半，其它游戏不受影响）</summary>
+    public static GameSettings Apply(GameSettings s, ReversiRulesDto v)
+    {
+        var existing = s.GetRules("reversi");
+        existing.Size = ReversiRules.ClampSize(v.Size);
+        existing.MoveTimeoutSec = Nearest(MoveTimeoutOptions, v.MoveTimeoutSec);
+        existing.TotalTimeoutSec = Nearest(TotalTimeoutOptions, v.TotalTimeoutSec);
+        s.Games["reversi"] = existing;
         return Normalize(s);
     }
 

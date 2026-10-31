@@ -239,7 +239,7 @@
   --card: linear-gradient(145deg, #ffffff 0%, #fdf1f6 100%);
   --card-soft: #fbe7f0;
   --topbar-bg: rgba(255, 255, 255, .78);
-  --sidebar-bg: rgba(255, 255, 255, .7);
+  --sidebar-bg: #fdf5f8;   /* 站主定（2026-10-31）：粘土拟态侧栏改为不透明 */
 
   --text: #831843;
   --text-sub: #9d4869;

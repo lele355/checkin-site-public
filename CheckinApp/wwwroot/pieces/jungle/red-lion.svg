@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="g_jungle_red_lion_wood" cx="45%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#DEB887"/>
+      <stop offset="60%" stop-color="#D2A679"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </radialGradient>
+    <radialGradient id="g_jungle_red_lion_txt" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#DC143C"/>
+      <stop offset="100%" stop-color="#8B0000"/>
+    </radialGradient>
+  </defs>
+  <!-- wood disc -->
+  <circle cx="32" cy="32" r="30" fill="url(#g_jungle_red_lion_wood)" stroke="#8B4513" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#A0522D" stroke-width="0.5" opacity="0.5"/>
+  <!-- character -->
+  <text x="32" y="41" text-anchor="middle" font-family="KaiTi, STKaiti, serif" font-size="32" font-weight="bold" fill="url(#g_jungle_red_lion_txt)">狮</text>
+</svg>

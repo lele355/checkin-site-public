@@ -2254,8 +2254,8 @@ html[data-theme="macos"] .sidebar {
 
 /* 侧栏底部那条毛玻璃同理：--sidebar-bg 不透明的主题里（default /
    editorial / neumorphism / natural 全家），模糊结果被不透明背景盖得严严实实。
-   clay 和 macos 的 sidebar-bg 是半透明，那两套保留原样。 */
-html:not([data-theme="clay"]):not([data-theme="macos"]) .sidebar .sidebar-foot {
+   仅 macos 的 sidebar-bg 仍是半透明，保留原样。 */
+html:not([data-theme="macos"]) .sidebar .sidebar-foot {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }

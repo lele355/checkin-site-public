@@ -130,7 +130,8 @@
       var jt = -vt * FRICTION / (1 / ma + 1 / mb);
       a.vx -= jt * tx / ma; a.vy -= jt * ty / ma;
       b.vx += jt * tx / mb; b.vy += jt * ty / mb;
-      a.av += vt / a.r * 0.02; b.av += vt / b.r * 0.02;
+      a.av = Math.max(-6, Math.min(6, a.av + vt / a.r * 0.02));
+      b.av = Math.max(-6, Math.min(6, b.av + vt / b.r * 0.02));
     }
 
     function wallResolve(b) {
@@ -157,6 +158,10 @@
           b.vy += GRAVITY * sub;
           b.x += b.vx * sub; b.y += b.vy * sub;
           b.angle += b.av * sub;
+          // 角速度阻尼 + 限幅（2026-10-31 修「水果不停快速旋转」：接触每帧累加 av 且空中无阻尼 → 无限自旋）
+          b.av *= 0.99;
+          if (Math.abs(b.av) < 0.1) b.av = 0;
+          if (b.angle > 6.283185) b.angle -= 6.283185; else if (b.angle < -6.283185) b.angle += 6.283185;
           b.age += sub;
           if (b.lock > 0) b.lock--;
         }
@@ -180,11 +185,13 @@
         }
         if (cool > 0) cool -= sub;
 
-        // 警戒线：质心越线且静止 > 缓冲 → 判负（M10）
+        // 警戒线：**顶部边缘**越线且静止 > 缓冲 → 判负
+        // （2026-10-31 修：原用质心 b.y，堆高时顶部越线但质心仍在线下 → 永远不判负，线像摆设；
+        //   速度门限放宽 30→60 以容忍堆叠抖动，另给 age>1.5s 的兜底——落体高速穿线由 age/speed 双门挡住）
         var resting = false;
         for (i = 0; i < bodies.length; i++) {
           b = bodies[i];
-          if (b.age > 0.4 && b.y < WARN_Y && Math.abs(b.vx) + Math.abs(b.vy) < 30) { resting = true; break; }
+          if (b.age > 0.4 && (b.y - b.r) < WARN_Y && (Math.abs(b.vx) + Math.abs(b.vy) < 60 || b.age > 1.5)) { resting = true; break; }
         }
         overTimer = resting ? overTimer + sub : Math.max(0, overTimer - sub * 2);
         if (overTimer >= OVER_GRACE) over = true;

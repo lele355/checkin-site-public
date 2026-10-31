@@ -39,6 +39,15 @@
   svg.style.height = 'auto';
   boardHost.appendChild(svg);
 
+  // 视角对调：上方座（side 2）在象棋/斗兽棋/军旗（明棋+暗棋）看到的棋盘上下翻转
+  // （己方恒在下半区，双端一致）；翻棋混布盘不翻。0 = 旁观不翻。
+  function flipView() {
+    if (gameKey !== 'xiangqi' && gameKey !== 'jungle' && gameKey !== 'armychess') return false;
+    if (state.mySide !== 2) return false;
+    if (gameKey === 'armychess' && state.state && state.state.mode === 'fanqi') return false;
+    return true;
+  }
+
   function render() {
     if (!renderer.render) return;
     var deployActive = gameKey === 'armychess' && state.status === 'setup'
@@ -82,6 +91,7 @@
       ghost: ghost,
       deployPieces: deployActive ? deployPieces : null,
       movable: (state.state && state.state.movable) || [],
+      flip: flipView(),
     });
     if (window.__QA_HOOKS__ !== false) window.__gmLastGeom = lastGeom;   // 测试钩子（P3-2：显式 false=Release 隐藏；缺省可见=滚动升级过渡保护工具链）
     if (statusTextEl) {
@@ -258,6 +268,8 @@
 
     var g = window.GameBoards.hit(lastGeom, x, y);
     if (!g) return;
+    // 视角对调：hit 返回的是「显示行号」，翻转视角下换回逻辑行号再走棋（发送/比对均逻辑坐标）
+    if (flipView() && lastGeom) g.y = (lastGeom.rows - 1) - g.y;
 
     // 军旗明棋布阵：点两格互换（约束不合法的交换不动）
     if (gameKey === 'armychess' && state.status === 'setup' && deployPieces) {

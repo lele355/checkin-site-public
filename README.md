@@ -77,7 +77,3 @@ dotnet publish CheckinApp -c Release -o <输出目录>
 ## 许可
 
 MIT，见 [LICENSE](LICENSE)。站点内的个人数据、备案信息与域名不随代码授权。
-
-## 素材致谢 / Credits
-
-棋子图标中的部分剪影素材来自 [game-icons.net](https://game-icons.net)（CC BY 3.0，作者 Lorc、Delapouite、Skoll 等），详见 [LICENSE-THIRD-PARTY.md](LICENSE-THIRD-PARTY.md)。
