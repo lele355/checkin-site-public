@@ -40,15 +40,33 @@
     }
 
     // 棋子
+    // 落子确认预览（任务二尾巴）：半透明石子标记将落点
+    if (opts.pointPreview) {
+      var pp = opts.pointPreview.split(',');
+      var pv = { x: +pp[0], y: +pp[1] };
+      if (!board[pv.x][pv.y]) {
+        var sp = geom.cell * 0.9;
+        svg.appendChild(GB.el('image', {
+          href: '/pieces/reversi-gomoku/' + (opts.mySide === 1 ? 'black-stone' : 'white-stone') + '.svg',
+          x: geom.px(pv.x) - sp / 2, y: geom.px(pv.y) - sp / 2, width: sp, height: sp,
+          opacity: '0.45', 'pointer-events': 'none',
+        }));
+      }
+    }
     var stonesG = GB.el('g', { id: 'rvStones' });
     svg.appendChild(stonesG);
 
     // 从 state.events 重建盘面（或 state 直接给 board）
     var board = buildBoard(state);
+    animP = (opts.placeAt && opts.placeProgress != null) ? Math.min(1, opts.placeProgress) : 1;
     for (var x = 0; x < 8; x++) {
       for (var y = 0; y < 8; y++) {
         if (board[x][y] !== 0) {
-          drawStone(stonesG, geom, x, y, board[x][y]);
+          var k2 = x + ',' + y;
+          var fx = animP >= 1 ? null
+            : (k2 === lastPlaced ? 'pop'
+              : (lastFlips.some(function (f) { return f[0] === x && f[1] === y; }) ? 'flip' : null));
+          drawStone(stonesG, geom, x, y, board[x][y], fx);
         }
       }
     }
@@ -75,14 +93,27 @@
     return { pad: geom.pad, cw: geom.step, ch: geom.step, cols: 8, rows: 8, mode: 'cell' };
   }
 
-  function drawStone(g, geom, x, y, side) {
-    g.appendChild(GB.el('circle', {
-      cx: geom.px(x), cy: geom.px(y), r: geom.cell * 0.42,
-      fill: side === 1 ? '#222' : '#eee',
-      stroke: side === 1 ? '#000' : '#ccc',
-      'stroke-width': '1.5',
+  function drawStone(g, geom, x, y, side, fx) {
+    // 渐变圆子整枚图标（icons-ready 同源，双端同规）；fx=新着回弹/翻子挤压（任务二尾巴）
+    var s = geom.cell * 0.9;
+    var w = s;
+    if (fx === 'pop') {
+      var pr = 1 - Math.pow(1 - (animP || 0), 2);
+      s = s * (0.35 + 0.65 * pr); w = s;
+    } else if (fx === 'flip') {
+      // 翻子：水平挤压过中线（0→1 走半圈余弦），读作翻面
+      w = s * Math.max(0.08, Math.abs(Math.cos(Math.PI * (animP || 0))));
+    }
+    g.appendChild(GB.el('image', {
+      href: '/pieces/reversi-gomoku/' + (side === 1 ? 'black-stone' : 'white-stone') + '.svg',
+      x: geom.px(x) - w / 2, y: geom.px(y) - s / 2, width: w, height: s,
+      'pointer-events': 'none',
     }));
   }
+
+  var animP = 1;          // 任务二尾巴：落子/翻子动画进度（games.js placeProgress 驱动）
+  var lastFlips = [];     // 最后一手翻转的格（翻子动画用）
+  var lastPlaced = null;  // 最后一手落点
 
   function buildBoard(state) {
     var board = [];
@@ -96,9 +127,12 @@
         if (e.t !== 'move' || e.x == null || e.y == null) return;
         if (board[e.x][e.y] !== 0) return;
         board[e.x][e.y] = e.s;
-        getFlips(board, e.x, e.y, e.s, true).forEach(function (f) {
+        var fl = getFlips(board, e.x, e.y, e.s, true);
+        fl.forEach(function (f) {
           board[f[0]][f[1]] = e.s;
         });
+        lastFlips = fl;   // 只留最后一手的翻子集（逐事件覆盖 = 最后事件即最新）
+        lastPlaced = e.x + ',' + e.y;
       });
     }
     return board;

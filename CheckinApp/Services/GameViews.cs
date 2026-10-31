@@ -32,6 +32,27 @@ public static class GameViews
         var legacyMoves = GameEvents.ToLegacyMoves(evs);
         var lastMove = legacyMoves.Count == 0 ? null : legacyMoves[^1];
 
+        // 重建换房握手（设置重建层改动 → 一键重建）：随快照下发，客户端无需额外轮询通道
+        object? rebuild = null;
+        {
+            var ask = evs.LastOrDefault(e => e.t == "rebuildAsk");
+            var vote = evs.LastOrDefault(e => e.t == "rebuildVote");
+            var done = evs.LastOrDefault(e => e.t == "rebuildDone");
+            var cancel = evs.LastOrDefault(e => e.t == "rebuildCancel");
+            if (ask is not null && done is null && cancel is null)
+            {
+                rebuild = new
+                {
+                    askSide = ask.s,
+                    vote = vote?.v,          // null=未表态 / 1=同意 / 0=拒绝
+                };
+            }
+            else if (done is not null)
+            {
+                rebuild = new { askSide = ask?.s ?? 0, vote = (int?)1, doneId = done.v };
+            }
+        }
+
         // 飞行棋多人：players[]（每座 side/color/name/isAi/isMe/active/usedMs/online）
         object? players = null;
         if (isLudo)
@@ -90,6 +111,7 @@ public static class GameViews
             myTurn = r.Status == "playing" && mySide != 0 && r.Turn == mySide,
             canJoin = r.Status == "waiting" && mySide == 0 && (isLudo || (r.GuestUserId is null && r.AiLevel == 0)),
             players,
+            rebuild,
             state,
             createdAt = ApiKit.StampUtc(r.CreatedAt),
             updatedAt = ApiKit.StampUtc(r.UpdatedAt),

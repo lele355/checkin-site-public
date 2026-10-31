@@ -172,13 +172,16 @@ public class LobbyModel(AppDbContext db, CurrentUser me) : PageModel
             .ToList();
         if (stale.Count > 0) _db.GameRooms.RemoveRange(stale);
 
-        // 军旗三模式：建房表单显式带 mode（UI 默认明棋）；缺省/未知 = dark（现状兼容，与 API 同一判）
+        // 军旗三模式（P3-1 与 API 400 对齐）：建房表单显式带 mode（UI 默认明棋）；
+        // 缺省/空 = dark（现状兼容）；未知值与 API 同判——拒绝（ApiBadRequest），不静默降级
         var armyMode = key == "armychess"
             ? (mode?.Trim().ToLowerInvariant() switch
             {
+                "" or null => "dark",
                 "open" => "open",
+                "dark" => "dark",
                 "fanqi" => "fanqi",
-                _ => "dark",
+                _ => throw new ApiBadRequest("没有这种军旗模式"),
             })
             : null;
 

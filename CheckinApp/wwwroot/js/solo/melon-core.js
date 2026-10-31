@@ -48,11 +48,14 @@
     var h = opts.height || H;
     var rng = mulberry32(opts.seed || (Date.now() & 0xffffffff));
 
-    var bodies = [];      // {x,y,vx,vy,r,level,angle,av,lock,age,dead}
+    var bodies = [];      // {x,y,vx,vy,r,level,angle,av,lock,age,born,dead}
     var score = 0;
     var over = false;
     var overTimer = 0;
     var cool = 0;
+    var simT = 0;         // 物理时钟（秒）
+    var combo = 0;        // 连击（Batch D）：3 秒窗内连续合成递增
+    var lastMergeAt = -999;
     var aimX = w / 2;
     var curLevel = weightedRoll(rng);
     var nextLevel = weightedRoll(rng);
@@ -64,7 +67,7 @@
       var b = {
         x: x, y: y, vx: vx || 0, vy: vy || 0,
         r: RADII[level - 1], level: level,
-        angle: 0, av: 0, lock: lock || 0, age: 0, dead: false,
+        angle: 0, av: 0, lock: lock || 0, age: 0, born: simT, dead: false,
       };
       bodies.push(b);
       return b;
@@ -84,11 +87,15 @@
       var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
       var mvx = (a.vx + b.vx) / 2 * 0.9, mvy = (a.vy + b.vy) / 2 * 0.9;
       a.dead = b.dead = true;
-      score += lv;
+      // 连击加成（Batch D）：3 秒窗内连续合成递增 ×1.2 / ×1.5 / ×2 封顶，只加成基础分
+      if (simT - lastMergeAt <= 3) combo++; else combo = 1;
+      lastMergeAt = simT;
+      var mult = combo >= 4 ? 2 : combo === 3 ? 1.5 : combo === 2 ? 1.2 : 1;
+      score += Math.round(lv * mult);
       var nl = lv + 1;
-      if (nl === 11) score += 100;      // 合出完整西瓜额外 +100
+      if (nl === 11) score += 100;      // 合出完整西瓜额外 +100（平加，不吃连击）
       addBody(nl, mx, my, mvx, mvy, MERGE_LOCK);
-      events.push({ type: 'merge', x: mx, y: my, level: nl });
+      events.push({ type: 'merge', x: mx, y: my, level: nl, combo: combo });
     }
 
     function pairResolve(a, b) {
@@ -143,6 +150,7 @@
       var sub = 1 / 60, steps = Math.max(1, Math.round(dt / sub));
       for (var s = 0; s < steps; s++) {
         var i, j, b;
+        simT += sub;
         for (i = 0; i < bodies.length; i++) {
           b = bodies[i];
           if (b.dead) continue;
@@ -214,6 +222,9 @@
       get aimX() { return aimX; },
       get overTimer() { return overTimer; },
       get dropReady() { return cool <= 0 && !over; },
+      get time() { return simT; },
+      get combo() { return combo; },
+      get comboMult() { return combo >= 4 ? 2 : combo === 3 ? 1.5 : combo === 2 ? 1.2 : 1; },
     };
   }
 

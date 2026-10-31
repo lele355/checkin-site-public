@@ -13,6 +13,8 @@
 
   // 兽名
   var RANKS = ['','鼠','猫','狗','狼','豹','虎','狮','象'];
+  // 兽剪影件名（icons-ready 同源）：rank 1..8 → rat..elephant
+  var JUNGLE_ICON = ['', 'rat', 'cat', 'dog', 'wolf', 'leopard', 'tiger', 'lion', 'elephant'];
 
   function isWater(x, y) { return WATER.some(function (p) { return p[0] === x && p[1] === y; }); }
   function isTrap(x, y) { return TRAP.some(function (p) { return p[0] === x && p[1] === y; }); }
@@ -70,19 +72,27 @@
     }
     svg.appendChild(grid);
 
-    // 棋子
+    // 棋子：侧色圆子 + 白色兽剪影（icons-ready 同源）+ 等级角标
     if (state.pieces) {
       state.pieces.forEach(function (p) {
         var isSide1 = p.side === 1;
+        var r = Math.min(cw, ch) * 0.42;
         var g = GB.el('g', {});
         g.appendChild(GB.el('circle', {
-          cx: px(p.x), cy: py(p.y), r: Math.min(cw, ch) * 0.42,
+          cx: px(p.x), cy: py(p.y), r: r,
           fill: isSide1 ? '#d32f2f' : '#1565c0',
           stroke: isSide1 ? '#b71c1c' : '#0d47a1', 'stroke-width': '2',
         }));
+        var bs = r * 1.5;
+        g.appendChild(GB.el('image', {
+          href: '/pieces/jungle/' + (JUNGLE_ICON[p.rank] || 'rat') + '.svg',
+          x: px(p.x) - bs / 2, y: py(p.y) - bs / 2, width: bs, height: bs,
+          style: 'filter: brightness(0) invert(1)', 'pointer-events': 'none',
+        }));
         var t = GB.el('text', {
-          x: px(p.x), y: py(p.y) + 5, 'text-anchor': 'middle',
-          'font-size': '14', fill: '#fff', 'font-weight': 'bold',
+          x: px(p.x) + r * 0.72, y: py(p.y) - r * 0.5, 'text-anchor': 'middle',
+          'font-size': '11', fill: '#fff', 'font-weight': 'bold',
+          stroke: 'rgba(0,0,0,0.35)', 'stroke-width': '2', 'paint-order': 'stroke',
         });
         t.textContent = RANKS[p.rank] || '?';
         g.appendChild(t);
@@ -106,6 +116,45 @@
         width: cw - 4, height: ch - 4,
         fill: 'none', stroke: '#1a73e8', 'stroke-width': 4, rx: 6,
       }));
+    }
+
+    // 可走提示（Batch D）：绿点=可走，红环=可吃
+    if (opts.sel && opts.hints) {
+      var hl = opts.hints[opts.sel.x + ',' + opts.sel.y] || [];
+      hl.forEach(function (tp) {
+        var occ = state.pieces && state.pieces.some(function (q) { return q.x === tp[0] && q.y === tp[1]; });
+        if (occ) {
+          svg.appendChild(GB.el('rect', {
+            x: pad + tp[0] * cw + 5, y: pad + tp[1] * ch + 5, width: cw - 10, height: ch - 10,
+            fill: 'none', stroke: '#e53935', 'stroke-width': 3, rx: 6, opacity: .85,
+          }));
+        } else {
+          svg.appendChild(GB.el('circle', {
+            cx: px(tp[0]), cy: py(tp[1]), r: Math.min(cw, ch) * 0.16,
+            fill: '#2e7d32', opacity: .75,
+          }));
+        }
+      });
+    }
+
+    // 吃子鬼影（Batch D）：被吃子淡出（图标同源）
+    if (opts.ghost && opts.ghost.piece) {
+      var gp = opts.ghost.piece;
+      var isS1G = gp.side === 1;
+      var rG = Math.min(cw, ch) * 0.42;
+      var gg = GB.el('g', { opacity: String(Math.max(0, opts.ghost.alpha)) });
+      gg.appendChild(GB.el('circle', {
+        cx: px(gp.x), cy: py(gp.y), r: rG,
+        fill: isS1G ? '#d32f2f' : '#1565c0',
+        stroke: isS1G ? '#b71c1c' : '#0d47a1', 'stroke-width': '2',
+      }));
+      var bsG = rG * 1.5;
+      gg.appendChild(GB.el('image', {
+        href: '/pieces/jungle/' + (JUNGLE_ICON[gp.rank] || 'rat') + '.svg',
+        x: px(gp.x) - bsG / 2, y: py(gp.y) - bsG / 2, width: bsG, height: bsG,
+        style: 'filter: brightness(0) invert(1)', 'pointer-events': 'none',
+      }));
+      svg.appendChild(gg);
     }
 
     return { pad: pad, cw: cw, ch: ch, cols: W, rows: H, mode: 'cell' };

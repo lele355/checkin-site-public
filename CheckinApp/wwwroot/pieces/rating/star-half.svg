@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="g_star_half" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="50%" stop-color="#F9A825"/>
+      <stop offset="50%" stop-color="#E0D8C8"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 6 L39.5 23.5 L58 25.5 L44 38 L48 56.5 L32 47 L16 56.5 L20 38 L6 25.5 L24.5 23.5 Z"
+        fill="url(#g_star_half)" stroke="#B8860B" stroke-width="2" stroke-linejoin="round"/>
+</svg>

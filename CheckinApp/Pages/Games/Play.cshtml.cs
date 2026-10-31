@@ -245,35 +245,21 @@ public class PlayModel(AppDbContext db, CurrentUser me) : PageModel
                 _ => s.winner == s.mySide ? "你赢了" : "你输了",
             } + (s.resultReason == "resign" ? "（认输）" : s.resultReason == "timeout" ? "（超时）" : s.resultReason == "count" ? "（终局数子）" : ""),
             _ when s.mySide == 0 => "你在旁观这一局",
+            "setup" => "布阵中",   // 军棋布阵期阶段名（与 App/games.js 同词）
             _ when s.myTurn => "轮到你",
             _ => isLudoMulti ? $"等 {turnName} 走棋" : $"等 {s.opponentName} 落子",
         };
 
-        // 给 JS 的初始状态
+        // 给 JS 的初始状态：快照**整包** + 本机显示偏好。
+        // 必须走 GameViews.Snap 同一出口（与轮询 GET /rooms/{id} 同形状）——
+        // 手工匿名投影会漏新加字段（D4-BUG-1：rebuild 双通路全断），整包序列化杜绝这类漂移。
         var u = _db.Users.FirstOrDefault(x => x.Id == uid);
         var settings = GameSettingsCatalog.Load(u?.GameSettings);
-        StateJson = JsonSerializer.Serialize(new
-        {
-            id = room.Id,
-            code = room.Code,
-            gameKey = key,
-            mySide = s.mySide,
-            status = s.status,
-            turn = s.turn,
-            winner = s.winner,
-            resultReason = s.resultReason,
-            revision = s.revision,
-            myTurn = s.myTurn,
-            canJoin = s.canJoin,
-            players = (object?)s.players,
-            tapConfirm = settings.TapConfirm,
-            lastMark = settings.LastMark,
-            showCoord = settings.ShowCoord,
-            moveRemainMs = s.moveRemainMs,
-            myRemainMs = s.myRemainMs,
-            oppRemainMs = s.oppRemainMs,
-            state = s.state,
-        });
+        var node = JsonSerializer.SerializeToNode(snap)!.AsObject();
+        node["tapConfirm"] = settings.Display.TapConfirm;
+        node["lastMark"] = settings.Display.LastMark;
+        node["showCoord"] = settings.Display.ShowCoord;
+        StateJson = node.ToJsonString();
         return true;
     }
 }

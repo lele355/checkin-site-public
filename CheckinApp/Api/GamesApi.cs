@@ -65,6 +65,8 @@ public static class GamesApi
     public record JoinReq(string? Code);
     /// <summary>走子请求体：per-game 字段由引擎解析</summary>
     public record RematchReq(int? Side);
+    /// <summary>重建换房请求体（设置重建层改动）：ask 发起 / vote 对方表态 / execute 执行换房</summary>
+    public record RebuildReq(string? Action = null, bool? Accept = null, int? NewRoomId = null);
     /// <summary>单机记分请求体</summary>
     public record ScoreReq(int Score);
 
@@ -116,25 +118,47 @@ public static class GamesApi
             var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
             var user = db.Users.FirstOrDefault(x => x.Id == uid);
+            var s = GameSettingsCatalog.Load(user?.GameSettings);
+            // 各配独立 DTO（红线 19）：按 gameKey 返回各自形状
+            object rules = key == "gomoku" ? GameSettingsCatalog.ToGomokuRules(s)
+                : key == "armychess" ? GameSettingsCatalog.ToArmyChessMode(s)
+                : GameSettingsCatalog.ToTimeoutRules(s, key);
             return ApiKit.Ok(new
             {
-                rules = GameSettingsCatalog.ToRules(GameSettingsCatalog.Load(user?.GameSettings)),
+                rules,
                 sizeOptions = GomokuRules.AllowedSizes,
                 moveTimeoutOptions = GameSettingsCatalog.MoveTimeoutOptions,
                 totalTimeoutOptions = GameSettingsCatalog.TotalTimeoutOptions,
+                modeOptions = GameSettingsCatalog.ModeOptions,
             });
         });
 
-        gs.MapPut("/settings", (string gameKey, GameSettingsCatalog.RuleDefaults req, AppDbContext db, HttpContext ctx) =>
+        gs.MapPut("/settings", (string gameKey, JsonElement body, AppDbContext db, HttpContext ctx) =>
         {
             var key = GameCatalog.Require(gameKey);
             var uid = ApiKit.MeId(ctx);
             var user = db.Users.FirstOrDefault(x => x.Id == uid)
                        ?? throw new ApiBadRequest("账号不存在");
-            var merged = GameSettingsCatalog.Apply(GameSettingsCatalog.Load(user.GameSettings), req);
+            var cur = GameSettingsCatalog.Load(user.GameSettings);
+            var raw = body.GetRawText();
+            // 各配独立 DTO（红线 19）：按 gameKey 绑定，不混用。
+            // 名字大小写不敏感（前端发 camelCase，与 ASP.NET 模型绑定默认行为一致）
+            var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var merged = key switch
+            {
+                "gomoku" => GameSettingsCatalog.Apply(cur,
+                    JsonSerializer.Deserialize<GameSettingsCatalog.GomokuRulesDto>(raw, jsonOpts) ?? new()),
+                "armychess" => GameSettingsCatalog.Apply(cur,
+                    JsonSerializer.Deserialize<GameSettingsCatalog.ArmyChessModeDto>(raw, jsonOpts) ?? new()),
+                _ => GameSettingsCatalog.Apply(cur,
+                    JsonSerializer.Deserialize<GameSettingsCatalog.TimeoutRuleDefaultsDto>(raw, jsonOpts) ?? new(), key),
+            };
             user.GameSettings = GameSettingsCatalog.Store(merged);
             db.SaveChanges();
-            return ApiKit.Ok(GameSettingsCatalog.ToRules(merged));
+            object rules = key == "gomoku" ? GameSettingsCatalog.ToGomokuRules(merged)
+                : key == "armychess" ? GameSettingsCatalog.ToArmyChessMode(merged)
+                : GameSettingsCatalog.ToTimeoutRules(merged, key);
+            return ApiKit.Ok(rules);
         });
 
         // ==================== 教程 ====================
@@ -739,6 +763,114 @@ public static class GamesApi
 
             db.ChangeTracker.Clear();
             return ApiKit.Ok(GameViews.Snap(Load(db, id, key), uid));
+        });
+
+        // ==================== 可走提示（按需单子，QA §3-P1） ====================
+        // 选中棋子才请求；提示数据仍由正式校验器生成（GameHints.Build 语义不变）。
+        gs.MapGet("/rooms/{id:int}/hints", (string gameKey, int id, int fx, int fy, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            var uid = ApiKit.MeId(ctx);
+            var room = Load(db, id, key);
+            var evs = GameEvents.Parse(room.MovesJson);
+            var mySide = GameViews.MySide(room, uid);
+            var finished = room.Status == "finished";
+            List<int[]>? targets = key switch
+            {
+                "xiangqi" => GameHints.ForPiece(evs, room, mySide, finished,
+                    XiangqiRules.ValidateMove, XiangqiRules.BoardW, XiangqiRules.BoardH, fx, fy),
+                "jungle" => GameHints.ForPiece(evs, room, mySide, finished,
+                    JungleRules.ValidateMove, JungleRules.BoardW, JungleRules.BoardH, fx, fy),
+                "armychess" => room.Mode == "fanqi"
+                    ? GameHints.ForPiece(evs, room, mySide, finished,
+                        FanqiRules.ValidateMove, ArmyChessRules.BoardW, ArmyChessRules.BoardH, fx, fy)
+                    : GameHints.ForPiece(evs, room, mySide, finished,
+                        ArmyChessRules.ValidateMove, ArmyChessRules.BoardW, ArmyChessRules.BoardH, fx, fy),
+                _ => null,
+            };
+            // 与原 state.hints 同形：{"x,y": [[tx,ty], …]}，前端可直接并入提示表
+            var map = new Dictionary<string, List<int[]>>();
+            if (targets is { Count: > 0 }) map[$"{fx},{fy}"] = targets;
+            return ApiKit.Ok(map);
+        });
+
+        // ==================== 重建换房（设置重建层改动：Size/Forbidden/Mode/限时） ====================
+        // 流程（走查表 §3）：ask=发起（AI 局免确认）→ 对方 vote → execute=建新关旧；
+        // 握手状态随快照 rebuild 字段下发（GameViews.Snap），客户端无需额外轮询通道。
+        gs.MapPost("/rooms/{id:int}/rebuild", (string gameKey, int id, RebuildReq req, AppDbContext db, HttpContext ctx) =>
+        {
+            var key = GameCatalog.Require(gameKey);
+            var uid = ApiKit.MeId(ctx);
+            var room = Load(db, id, key);
+            var mySide = GameViews.MySide(room, uid);
+            if (mySide == 0) throw new ApiBadRequest("你不在这一局里");
+            if (room.Status != "playing") throw new ApiBadRequest("对局已结束");
+            var evs = GameEvents.Parse(room.MovesJson);
+            var isAi = room.AiLevel > 0 && room.GuestUserId is null;
+            var action = (req.Action ?? "").Trim().ToLowerInvariant();
+
+            if (action == "ask")
+            {
+                if (isAi) return ApiKit.Ok(new { ready = true });   // AI 局免确认
+                evs.Add(new GameEvent { t = "rebuildAsk", s = mySide });
+                room.MovesJson = GameEvents.Store(evs);
+                room.Revision++;
+                room.UpdatedAt = DateTime.UtcNow;
+                db.SaveChanges();
+                return ApiKit.Ok(new { pending = true });
+            }
+
+            if (action == "vote")
+            {
+                var ask = evs.LastOrDefault(e => e.t == "rebuildAsk");
+                if (ask is null || ask.s == mySide) throw new ApiBadRequest("没有待确认的换房请求");
+                evs.Add(new GameEvent { t = "rebuildVote", s = mySide, v = req.Accept == true ? 1 : 0 });
+                room.MovesJson = GameEvents.Store(evs);
+                room.Revision++;
+                room.UpdatedAt = DateTime.UtcNow;
+                db.SaveChanges();
+                return ApiKit.Ok(new { accepted = req.Accept == true });
+            }
+
+            if (action == "execute")
+            {
+                // 只有发起方可执行；真人局必须已获对方同意
+                var ask = evs.LastOrDefault(e => e.t == "rebuildAsk");
+                if (ask is not null && ask.s != mySide) throw new ApiBadRequest("换房由对方发起");
+                if (!isAi)
+                {
+                    var vote = evs.LastOrDefault(e => e.t == "rebuildVote");
+                    if (vote is not { v: 1 }) throw new ApiBadRequest("对方还没确认换房");
+                }
+                var newId = req.NewRoomId ?? 0;
+                var nroom = db.GameRooms.FirstOrDefault(x => x.Id == newId && x.GameKey == key)
+                            ?? throw new ApiBadRequest("新房不存在");
+                if (nroom.HostUserId != uid) throw new ApiBadRequest("新房不是你建的");
+                // 对方真人 → 直接并入新房（同意即视为加入）
+                if (!isAi && room.GuestUserId is int gid && nroom.GuestUserId is null)
+                {
+                    Join_Internal(db, db.GameRooms.First(x => x.Id == newId), gid);
+                }
+                evs.Add(new GameEvent { t = "rebuildDone", s = mySide, v = newId });
+                room.MovesJson = GameEvents.Store(evs);
+                room.Status = "aborted";
+                room.Revision++;
+                room.UpdatedAt = DateTime.UtcNow;
+                db.SaveChanges();
+                return ApiKit.Ok(new { id = newId });
+            }
+
+            if (action == "cancel")
+            {
+                evs.Add(new GameEvent { t = "rebuildCancel", s = mySide });
+                room.MovesJson = GameEvents.Store(evs);
+                room.Revision++;
+                room.UpdatedAt = DateTime.UtcNow;
+                db.SaveChanges();
+                return ApiKit.Ok(new { canceled = true });
+            }
+
+            throw new ApiBadRequest("没有这种换房操作");
         });
 
         // ==================== 退出 ====================

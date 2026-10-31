@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="g_back_wood" cx="45%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#DEB887"/>
+      <stop offset="60%" stop-color="#D2A679"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="url(#g_back_wood)" stroke="#8B4513" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#A0522D" stroke-width="0.5" opacity="0.5"/>
+  <circle cx="32" cy="32" r="18" fill="none" stroke="#8B4513" stroke-width="1" opacity="0.7"/>
+  <rect x="24" y="24" width="16" height="16" transform="rotate(45 32 32)" fill="none" stroke="#8B4513" stroke-width="1.5" opacity="0.8"/>
+</svg>

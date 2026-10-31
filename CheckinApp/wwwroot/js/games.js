@@ -45,17 +45,45 @@
       && state.mySide > 0 && !(state.state && state.state.deployDone && state.state.deployDone[state.mySide - 1]);
     if (deployActive && !deployPieces) deployPieces = window.ArmyChessBoard.genDeploy(state.mySide);
     if (!deployActive) { deployPieces = null; deploySel = null; }
-    lastGeom = renderer.render(svg, state.state || {}, {
+    // 滑动动画视图（Batch D）：把正在滑的棋子坐标插值成小数（board 的 px/py 线性映射天然支持）
+    var st = state.state || {};
+    var ghost = null;
+    if (anim) {
+      var el = nowMs() - anim.t0;
+      var t = Math.min(1, el / 200);
+      if (t < 1) {
+        var e = 1 - (1 - t) * (1 - t);   // ease-out
+        st = Object.assign({}, st, {
+          pieces: (st.pieces || []).map(function (p) {
+            if (p.x === anim.tx && p.y === anim.ty) {
+              return Object.assign({}, p, {
+                x: anim.fx + (anim.tx - anim.fx) * e,
+                y: anim.fy + (anim.ty - anim.fy) * e,
+              });
+            }
+            return p;
+          }),
+        });
+      }
+      if (anim.cap) ghost = { piece: anim.cap, alpha: Math.max(0, 1 - el / 240) };
+      if (el > 260) anim = null;
+    }
+    lastGeom = renderer.render(svg, st, {
       showCoord: state.showCoord,
       lastMark: state.lastMark,
       mySide: state.mySide,
       myTurn: state.myTurn,
       tapConfirm: state.tapConfirm,
       sel: sel,
+      hints: hintMap,
+      pointPreview: pointPreview,
+      placeProgress: placeAnim ? Math.min(1, (nowMs() - placeAnim.t0) / 220) : 1,
+      placeAt: placeAnim ? (placeAnim.x + ',' + placeAnim.y) : null,
+      ghost: ghost,
       deployPieces: deployActive ? deployPieces : null,
       movable: (state.state && state.state.movable) || [],
     });
-    window.__gmLastGeom = lastGeom;   // UI 冒烟/调试用几何（与点击换算同源）
+    if (window.__QA_HOOKS__ !== false) window.__gmLastGeom = lastGeom;   // 测试钩子（P3-2：显式 false=Release 隐藏；缺省可见=滚动升级过渡保护工具链）
     if (statusTextEl) {
       var txt = statusText(state);
       // 黑白棋：全程比分 + 无子可下提示（状态事实，非解释）
@@ -91,12 +119,64 @@
         && state.state && state.state.needRoll);
       ludoBar.hidden = !needRoll;
     }
+    // 重建换房握手（走查表 §3）：对方请求 → 同意/拒绝；换房完成 → 跳新房
+    updateRebuildBar(state);
+  }
+
+  // 重建换房（设置重建层改动 → 一键重建）：对手端提示条 + 换房完成跳转
+  function updateRebuildBar(s) {
+    var rb = s.rebuild;
+    if (rb && rb.doneId) { location.href = '/Games/' + gameKey + '/Play/' + rb.doneId; return; }
+    var bar = document.getElementById('gmRebuildBar');
+    var show = rb && rb.askSide && rb.askSide !== s.mySide && (rb.vote === null || rb.vote === undefined);
+    if (show) {
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'gmRebuildBar';
+        // 不用 .msg 类（site.js 会把 .msg 收进 toast 化掉按钮）
+        bar.style.cssText = 'display:flex;gap:8px;align-items:center;margin:8px 0;border:1px solid #e53935;border-radius:10px;padding:8px 10px;';
+        var t = document.createElement('span');
+        t.style.flex = '1';
+        t.textContent = '对手请求重建房间';
+        var ok = document.createElement('button');
+        ok.className = 'btn'; ok.type = 'button'; ok.textContent = '同意换房';
+        ok.onclick = function () { voteRebuild(true); };
+        var no = document.createElement('button');
+        no.className = 'btn secondary'; no.type = 'button'; no.textContent = '拒绝';
+        no.onclick = function () { voteRebuild(false); };
+        bar.appendChild(t); bar.appendChild(ok); bar.appendChild(no);
+        var host = document.querySelector('.gm-card') || document.body;
+        host.insertBefore(bar, host.firstChild ? host.firstChild.nextSibling : null);
+      }
+    } else if (bar) {
+      bar.remove();
+    }
+  }
+
+  function voteRebuild(accept) {
+    fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id + '/rebuild', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'vote', accept: accept }),
+    }).then(function () {
+      var bar = document.getElementById('gmRebuildBar');
+      if (bar) bar.remove();
+    }).catch(function () {});
   }
 
   // 最近一次 render 返回的几何（pad/cw/ch/cols/rows/mode）—— 点击换算与渲染同源
   var lastGeom = null;
   // 两段式走子：当前选中的起点 (gx,gy)。象棋/斗兽棋/军旗用。
   var sel = null;
+  // 可走提示按需表（QA §3-P1）：选中棋子才拉单子提示，轮询不再全量下发
+  var hintMap = {};
+  // 单点落子确认（任务二尾巴）：第一下预览，同点第二下落子；点别处换预览
+  var pointPreview = null;
+  // 单点落子/翻子动画（任务二尾巴）：新落点回弹缩放 + 黑白棋翻子挤压
+  var placeAnim = null;
+  // 滑动动画（Batch D）：{fx,fy,tx,ty,t0,cap}，按 lastMove 滑向终点 + 吃子鬼影
+  var anim = null;
+  var animRaf = 0;
   // 军旗明棋布阵：本地排布（客户端生成，确认后提交 deploy）
   var deployPieces = null;
   var deploySel = null;
@@ -108,6 +188,7 @@
       return w;
     }
     if (s.mySide === 0) return '你在旁观这一局';
+    if (s.status === 'setup') return '布阵中';   // 军棋布阵期阶段名（0.2 极简；过渡态不跳 playing 词）
     return s.myTurn ? '轮到你' : '等对手落子';
   }
 
@@ -133,6 +214,27 @@
       if (ps[i].x === gx && ps[i].y === gy && ps[i].side === mine) return true;
     }
     return false;
+  }
+
+  // 可走提示查询（Batch D / 按需化）：以按需单子表为准；未就绪退回直接走（服务端仍兜底校验）
+  function canTarget(fx, fy, tx, ty) {
+    var lst = hintMap[fx + ',' + fy];
+    if (!lst) return true;
+    for (var i = 0; i < lst.length; i++) if (lst[i][0] === tx && lst[i][1] === ty) return true;
+    return false;
+  }
+
+  // 选中起点 = 记录 + 拉这一子的提示（GET /rooms/{id}/hints，单子成本 ≈ 全量/子数）
+  function selectHintPiece(gx, gy) {
+    sel = { x: gx, y: gy };
+    hintMap = {};
+    fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id + '/hints?fx=' + gx + '&fy=' + gy, {
+      credentials: 'same-origin',
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok || !j.data) return;
+      for (var k in j.data) hintMap[k] = j.data[k];
+      render();
+    }).catch(function () {});
   }
 
   // 点击：算到 SVG viewBox 坐标 → 飞行棋点机 / 网格坐标 → 布阵/两段式/单点分发
@@ -182,10 +284,15 @@
         return;
       }
       if (!state.state.settled) return;   // 阵营未定：只能翻子
-      if (ownPieceAt(g.x, g.y)) { sel = { x: g.x, y: g.y }; render(); return; }
+      if (ownPieceAt(g.x, g.y)) { selectHintPiece(g.x, g.y); render(); return; }
       if (sel && !(sel.x === g.x && sel.y === g.y)) {
-        sendMove({ fx: sel.x, fy: sel.y, tx: g.x, ty: g.y });
-        sel = null;
+        // 可走提示点内才发着；点别处 = 取消选中（Batch D）
+        if (canTarget(sel.x, sel.y, g.x, g.y)) {
+          sendMove({ fx: sel.x, fy: sel.y, tx: g.x, ty: g.y });
+          sel = null;
+        } else {
+          sel = null;
+        }
         render();
         return;
       }
@@ -200,14 +307,18 @@
     if (mode === 'two') {
       // 点己方另一子 = 改选起点（必须在 sendMove 之前判，否则改选分支不可达）
       if (ownPieceAt(g.x, g.y)) {
-        sel = { x: g.x, y: g.y };
+        selectHintPiece(g.x, g.y);
         render();
         return;
       }
-      // 已有起点且点的是别处 → 提交 {fx,fy,tx,ty}
+      // 已有起点：提示点内 → 提交 {fx,fy,tx,ty}；点别处 → 取消选中（Batch D）
       if (sel && !(sel.x === g.x && sel.y === g.y)) {
-        sendMove({ fx: sel.x, fy: sel.y, tx: g.x, ty: g.y });
-        sel = null;
+        if (canTarget(sel.x, sel.y, g.x, g.y)) {
+          sendMove({ fx: sel.x, fy: sel.y, tx: g.x, ty: g.y });
+          sel = null;
+        } else {
+          sel = null;   // BUG-1：点别处取消选中（与 fanqi 分支/App 端对齐，红线 0.1）
+        }
         render();
         return;
       }
@@ -216,7 +327,16 @@
       return;
     }
 
-    // 单点落子（五子棋/黑白棋）
+    // 单点落子（五子棋/黑白棋）：开「落子确认」时第一下只预览、同点第二下落（点别处=换预览，与 App 同规）
+    if (state.tapConfirm) {
+      var pk = g.x + ',' + g.y;
+      if (pointPreview !== pk) {
+        pointPreview = pk;
+        render();
+        return;
+      }
+      pointPreview = null;
+    }
     sendMove({ x: g.x, y: g.y });
   });
 
@@ -261,8 +381,9 @@
 
   function apply(data) {
     if (data.revision === state.revision) return;
+    var prevPieces = (state.state && state.state.pieces) || [];
     state.revision = data.revision;
-    if (!data.myTurn) sel = null;   // 轮到对方时清掉两段式选中
+    if (!data.myTurn) { sel = null; pointPreview = null; }   // 轮到对方时清掉选中/预览
     state.status = data.status;
     state.turn = data.turn;
     state.winner = data.winner;
@@ -273,8 +394,47 @@
     state.moveRemainMs = data.moveRemainMs;
     state.myRemainMs = data.myRemainMs;
     state.oppRemainMs = data.oppRemainMs;
+    state.players = data.players;     // 飞行棋多座（D4-BUG-1 同类风险，一并补）
+    state.rebuild = data.rebuild;     // 重建换房握手（D4-BUG-1：漏拷对手端按钮永远不出现）
+    startAnim(prevPieces, data.state);
+    // 单点落子动画（任务二尾巴）：五子棋/黑白棋新着回弹 + 翻子
+    if ((gameKey === 'gomoku' || gameKey === 'reversi') && data.state && data.state.lastMove) {
+      var lm0 = data.state.lastMove;
+      placeAnim = { x: lm0.tx, y: lm0.ty, t0: nowMs() };
+      if (!anim && !animRaf) animRaf = requestAnimationFrame(step);
+    }
     render();
   }
+
+  function step() {
+    animRaf = 0;
+    render();
+    var pa = placeAnim && nowMs() - placeAnim.t0 < 300;
+    if ((anim && nowMs() - anim.t0 < 260) || pa) animRaf = requestAnimationFrame(step);
+    else if (!pa) placeAnim = placeAnim && nowMs() - placeAnim.t0 < 300 ? placeAnim : null;
+  }
+
+  // 滑动动画（Batch D）：按 lastMove 从起点滑向终点；吃子在目标点留淡出鬼影
+  function startAnim(prevPieces, st) {
+    anim = null;
+    var lm = st && st.lastMove;
+    if (!lm || lm.fx === undefined || lm.fx === null) return;          // 翻子等无滑动
+    if (lm.fx === lm.tx && lm.fy === lm.ty) return;                    // 原地不动
+    var cap = null;
+    for (var i = 0; i < prevPieces.length; i++) {
+      var p = prevPieces[i];
+      if (p.x === lm.tx && p.y === lm.ty) { cap = p; break; }
+    }
+    anim = { fx: lm.fx, fy: lm.fy, tx: lm.tx, ty: lm.ty, t0: nowMs(), cap: cap };
+    if (animRaf) return;
+    var step = function () {
+      animRaf = 0;
+      render();
+      if (anim && nowMs() - anim.t0 < 260) animRaf = requestAnimationFrame(step);
+    };
+    animRaf = requestAnimationFrame(step);
+  }
+  function nowMs() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
 
   function poll() {
     fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id, {

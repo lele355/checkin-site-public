@@ -9,6 +9,11 @@
   // 红=帅仕相马车炮兵 / 黑=将士象马车炮卒（下标 = 服务端 PieceType）
   var RED_NAMES = ['', '帅', '仕', '相', '马', '车', '炮', '兵'];
   var BLACK_NAMES = ['', '将', '士', '象', '马', '车', '炮', '卒'];
+  // 木纹圆饼字子图标（icons-ready 同源）：type 1..7 → 色套件名
+  var XQ_ICON = {
+    1: ['', 'red-shuai', 'red-shi', 'red-xiang', 'red-ma', 'red-che', 'red-pao', 'red-bing'],
+    2: ['', 'black-jiang', 'black-shi', 'black-xiang', 'black-ma', 'black-che', 'black-pao', 'black-zu'],
+  };
 
   function render(svg, state, opts) {
     svg.innerHTML = '';
@@ -65,24 +70,16 @@
     river.appendChild(rt2);
     svg.appendChild(river);
 
-    // 棋子（放在交叉点上）
+    // 棋子（放在交叉点上）：整枚图标替换旧圆圈+文字（icons-ready 同源）
     if (state.pieces) {
       state.pieces.forEach(function (p) {
-        var isRed = p.side === 1;
-        var name = (isRed ? RED_NAMES : BLACK_NAMES)[p.type] || '?';
-
-        var g = GB.el('g', {});
-        g.appendChild(GB.el('circle', {
-          cx: px(p.x), cy: py(p.y), r: 22,
-          fill: '#f5e6c8', stroke: isRed ? '#c62828' : '#212121', 'stroke-width': '2.5',
+        var key = (XQ_ICON[p.side === 1 ? 1 : 2] || XQ_ICON[2])[p.type];
+        if (!key) return;
+        svg.appendChild(GB.el('image', {
+          href: '/pieces/xiangqi/' + key + '.svg',
+          x: px(p.x) - 24, y: py(p.y) - 24, width: 48, height: 48,
+          'pointer-events': 'none',
         }));
-        var t = GB.el('text', {
-          x: px(p.x), y: py(p.y) + 7, 'text-anchor': 'middle',
-          'font-size': '18', fill: isRed ? '#c62828' : '#212121', 'font-weight': 'bold',
-        });
-        t.textContent = name;
-        g.appendChild(t);
-        svg.appendChild(g);
       });
     }
 
@@ -112,6 +109,44 @@
         cx: px(opts.sel.x), cy: py(opts.sel.y), r: 24,
         fill: 'none', stroke: '#1a73e8', 'stroke-width': 4, opacity: .9,
       }));
+    }
+
+    // 可走提示（Batch D）：绿点=可走，红环=可吃
+    if (opts.sel && opts.hints) {
+      var hl = opts.hints[opts.sel.x + ',' + opts.sel.y] || [];
+      hl.forEach(function (tp) {
+        var occ = state.pieces && state.pieces.some(function (q) { return q.x === tp[0] && q.y === tp[1]; });
+        if (occ) {
+          svg.appendChild(GB.el('circle', {
+            cx: px(tp[0]), cy: py(tp[1]), r: 25,
+            fill: 'none', stroke: '#e53935', 'stroke-width': 3, opacity: .85,
+          }));
+        } else {
+          svg.appendChild(GB.el('circle', {
+            cx: px(tp[0]), cy: py(tp[1]), r: 7,
+            fill: '#2e7d32', opacity: .75,
+          }));
+        }
+      });
+    }
+
+    // 吃子鬼影（Batch D）：被吃子淡出
+    if (opts.ghost && opts.ghost.piece) {
+      var gp = opts.ghost.piece;
+      var isRedG = gp.side === 1;
+      var nameG = (isRedG ? RED_NAMES : BLACK_NAMES)[gp.type] || '?';
+      var gg = GB.el('g', { opacity: String(Math.max(0, opts.ghost.alpha)) });
+      gg.appendChild(GB.el('circle', {
+        cx: px(gp.x), cy: py(gp.y), r: 22,
+        fill: '#f5e6c8', stroke: isRedG ? '#c62828' : '#212121', 'stroke-width': '2.5',
+      }));
+      var tg = GB.el('text', {
+        x: px(gp.x), y: py(gp.y) + 7, 'text-anchor': 'middle',
+        'font-size': '18', fill: isRedG ? '#c62828' : '#212121', 'font-weight': 'bold',
+      });
+      tg.textContent = nameG;
+      gg.appendChild(tg);
+      svg.appendChild(gg);
     }
 
     // 交叉点盘：点击取最近交叉点（round）

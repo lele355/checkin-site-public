@@ -7,11 +7,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace CheckinApp.Pages.Games;
 
 /// <summary>
-/// 游戏总设置 —— 只管「我这台设备上怎么显示」：落子二次确认 / 坐标 / 最后一手标记 / 落子震动。
+/// 游戏总设置 —— 只管「我这台设备上怎么显示」：落子二次确认 / 坐标 / 最后一手标记 / 落子震动 / 音效。
 ///
-/// 这四项**不进房间、不上服务端判定**，纯前端表现，所以改它不影响对手、也不用快照。
-/// 影响对局的规则（盘面 / 禁手 / 限时）在各自的「游戏设置」里，
-/// 目前只有五子棋 → /Games/Gomoku/Settings。
+/// 这些**不进房间、不上服务端判定**，纯前端表现，所以改它不影响对手、也不用快照。
+/// 影响对局的规则（盘面 / 禁手 / 军旗模式 / 限时）在各自的「游戏设置」里（按 gameKey 过滤）。
 /// </summary>
 [Authorize(Policy = "perm:games.use")]
 public class SettingsModel(AppDbContext db, CurrentUser me) : PageModel
@@ -42,6 +41,7 @@ public class SettingsModel(AppDbContext db, CurrentUser me) : PageModel
             ShowCoord = Chk("showCoord"),
             LastMark = Chk("lastMark"),
             Vibrate = Chk("vibrate"),
+            Sound = Chk("sound"),
         };
         var merged = GameSettingsCatalog.Apply(GameSettingsCatalog.Load(user.GameSettings), d);
         user.GameSettings = GameSettingsCatalog.Store(merged);

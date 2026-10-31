@@ -120,5 +120,48 @@ function run(game, seconds) {
     T('新的下一个已推进且在 1..5', g.nextLevel >= 1 && g.nextLevel <= 5);
 }
 
+// ---------- [8] 连击计分（Batch D）：3 秒窗 ×1.2/×1.5/×2 封顶，超窗复位 ----------
+{
+    const g = core.create({ seed: 5 });
+    // 每对用不同级（产物互不相同，避免产物之间二次合成污染分数）
+    const pair = (lv, y) => { g.debugAdd(lv, 100, y); g.debugAdd(lv, 120, y); };
+    pair(4, 400); run(g, 0.3);                      // 合成 1：+4×1
+    T('第 1 次合成 ×1（基础 4）', g.score === 4, 'score=' + g.score);
+    pair(5, 300); run(g, 0.3);                      // 合成 2：+round(5×1.2)=6
+    T('3 秒内第 2 次合成 ×1.2', g.score === 10, 'score=' + g.score);
+    pair(6, 200); run(g, 0.3);                      // 合成 3：+round(6×1.5)=9
+    T('3 秒内第 3 次合成 ×1.5', g.score === 19, 'score=' + g.score);
+    pair(7, 100); run(g, 0.3);                      // 合成 4：+round(7×2)=14
+    T('第 4 次起 ×2 封顶', g.score === 33, 'score=' + g.score);
+    run(g, 3.5);                                    // 超 3 秒窗
+    pair(3, 350); run(g, 0.3);                      // 合成 5：复位 ×1 → +3
+    T('超窗连击复位 ×1', g.score === 36, 'score=' + g.score);
+    T('连击状态可读', g.combo === 1 && g.comboMult === 1, 'combo=' + g.combo + ' mult=' + g.comboMult);
+}
+
+// ---------- [9] 取整口径回归（BUG-2）：round 口径 9 个分歧格 ----------
+// 历史 bug：App toInt 截断 vs 网页 Math.round，30 个（源级×倍率）组合里 9 个分歧 →
+// 双端分数漂移。本节把 round 口径锁死在全部分歧格上（旧单测选值恰好全落在整数格）。
+// 双列分放（x=100 列 vs x=280 列）防产物互撞污染分数。
+{
+    const cells12 = [[3, 4], [4, 5], [8, 10], [9, 11]];           // [lv, round(lv×1.2)]
+    const cells15 = [[1, 2], [3, 5], [5, 8], [7, 11], [9, 14]];   // [lv, round(lv×1.5)]
+    for (const [k, want] of cells12) {
+        const g = core.create({ seed: 9 });
+        g.debugAdd(4, 100, 400); g.debugAdd(4, 120, 400); run(g, 0.3);   // 连击 1（×1）
+        const s0 = g.score;
+        g.debugAdd(k, 280, 300); g.debugAdd(k, 300, 300); run(g, 0.3);  // 连击 2 → ×1.2
+        T(`BUG-2 分歧格 lv${k}×1.2 = +${want}（round 口径）`, g.score - s0 === want, `delta=${g.score - s0}`);
+    }
+    for (const [k, want] of cells15) {
+        const g = core.create({ seed: 9 });
+        g.debugAdd(4, 100, 400); g.debugAdd(4, 120, 400); run(g, 0.3);   // 连击 1（×1）
+        g.debugAdd(5, 60, 300); g.debugAdd(5, 80, 300); run(g, 0.3);     // 连击 2（×1.2）
+        const s0 = g.score;
+        g.debugAdd(k, 280, 300); g.debugAdd(k, 300, 300); run(g, 0.3);  // 连击 3 → ×1.5
+        T(`BUG-2 分歧格 lv${k}×1.5 = +${want}（round 口径）`, g.score - s0 === want, `delta=${g.score - s0}`);
+    }
+}
+
 console.log(`\n===== melon_unit: ${pass} 通过 / ${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);

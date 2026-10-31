@@ -43,15 +43,32 @@
       svg.appendChild(cg);
     }
 
-    // 棋子
+    // 落子确认预览（任务二尾巴）：半透明石子标记将落点，与 App 预览圈同规
+    if (opts.pointPreview) {
+      var pp = opts.pointPreview.split(',');
+      var pv = { x: +pp[0], y: +pp[1] };
+      if (!(state && (state.moves || []).some(function (m) { return m.x === pv.x && m.y === pv.y; }))) {
+        var sp = geom.cell * 0.9;
+        svg.appendChild(GB.el('image', {
+          href: '/pieces/reversi-gomoku/' + (state.mySide === 1 ? 'black-stone' : 'white-stone') + '.svg',
+          x: geom.px(pv.x) - sp / 2, y: geom.px(pv.y) - sp / 2, width: sp, height: sp,
+          opacity: '0.45', 'pointer-events': 'none',
+        }));
+      }
+    }
+
+    // 棋子：渐变圆子整枚图标（icons-ready 同源，双端同规）
     var stonesG = GB.el('g', {});
     var moves = (state && state.moves) || [];
     moves.forEach(function (m) {
-      stonesG.appendChild(GB.el('circle', {
-        cx: geom.px(m.x), cy: geom.px(m.y), r: geom.cell * 0.42,
-        fill: m.s === 1 ? '#222' : '#eee',
-        stroke: m.s === 1 ? '#000' : '#ccc',
-        'stroke-width': '1.5',
+      // 新着回弹（任务二尾巴）：0.35→1 缓出缩放
+      var isLast = opts.placeAt === (m.x + ',' + m.y) && opts.placeProgress < 1;
+      var pr = isLast ? (1 - Math.pow(1 - (opts.placeProgress || 0), 2)) : 1;
+      var s = geom.cell * 0.9 * (isLast ? 0.35 + 0.65 * pr : 1);
+      stonesG.appendChild(GB.el('image', {
+        href: '/pieces/reversi-gomoku/' + (m.s === 1 ? 'black-stone' : 'white-stone') + '.svg',
+        x: geom.px(m.x) - s / 2, y: geom.px(m.y) - s / 2, width: s, height: s,
+        'pointer-events': 'none',
       }));
     });
 

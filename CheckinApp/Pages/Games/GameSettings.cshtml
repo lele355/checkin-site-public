@@ -2,12 +2,11 @@
 @model CheckinApp.Pages.Games.GameSettingsModel
 @using CheckinApp.Ui
 @{
-    ViewData["Title"] = Model.GameName + " · 默认规则";
-    var r = Model.Rules;
+    ViewData["Title"] = Model.GameName + " · 设置";
 }
 <div class="card">
     <div class="page-head">
-        <h2>@Model.GameName · 默认规则</h2>
+        <h2>@Model.GameName · 设置</h2>
         <a class="btn secondary" href="/Games/@Model.GameKey">@Html.Raw(Icons.Svg("chevron-left", 16)) 返回</a>
     </div>
 
@@ -16,53 +15,170 @@
         <div class="msg ok">@Model.Ok</div>
     }
 
-    <form method="post" asp-page-handler="Save">
-        <input type="hidden" name="gameKey" value="@Model.GameKey" />
-        @if (Model.GameKey == "gomoku")
-        {
-            <div class="field">
-                <label>盘面大小</label>
-                <select name="size">
-                    <option value="13" selected="@(Model.GomokuSize == 13)">13 路</option>
-                    <option value="15" selected="@(Model.GomokuSize == 15)">15 路</option>
-                    <option value="19" selected="@(Model.GomokuSize == 19)">19 路</option>
-                </select>
-            </div>
-            <div class="field">
-                <label>禁手</label>
-                <select name="forbidden">
-                    <option value="true" selected="@(Model.GomokuForbidden)">标准规则</option>
-                    <option value="false" selected="@(!Model.GomokuForbidden)">自由规则</option>
-                </select>
-            </div>
-        }
-        <div class="field">
-            <label>单步限时</label>
-            <select name="moveTimeoutSec">
-                @foreach (var t in Model.MoveTimeoutOptions)
-                {
-                    <option value="@t" selected="@(t == Model.MoveTimeoutSec)">@(t == 0 ? "不限" : t < 60 ? $"{t} 秒" : $"{t / 60} 分钟")</option>
-                }
-            </select>
+    @if (Model.RebuildPrompt)
+    {
+        @* 重建提醒条：不用 .msg（site.js 会把 .msg 收进 toast 化掉按钮） *@
+        <div id="rebuildBar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #e53935;border-radius:10px;padding:10px 12px;margin:10px 0;">
+            <span style="flex:1;">⚠ 该设置需重建房间生效</span>
+            <button class="btn" type="submit" form="settingsForm" name="rebuildConfirm" value="true">一键重建</button>
+            <a class="btn secondary" href="/Games/@Model.GameKey/Settings">取消</a>
         </div>
-        <div class="field">
-            <label>每方总用时</label>
-            <select name="totalTimeoutSec">
-                @foreach (var t in Model.TotalTimeoutOptions)
-                {
-                    <option value="@t" selected="@(t == Model.TotalTimeoutSec)">@(t == 0 ? "不限" : $"{t / 60} 分钟")</option>
-                }
-            </select>
-        </div>
-        <div class="form-actions">
-            <button class="btn" type="submit">保存设置</button>
-        </div>
-    </form>
+    }
 
-    <form method="post" asp-page-handler="Reset" data-confirm="恢复成默认设置？" style="margin-top:8px;">
-        <input type="hidden" name="gameKey" value="@Model.GameKey" />
-        <div class="form-actions">
-            <button class="btn secondary" type="submit">恢复默认</button>
-        </div>
-    </form>
+    @if (Model.HasItems)
+    {
+        <form method="post" asp-page-handler="Save" id="settingsForm">
+            <input type="hidden" name="gameKey" value="@Model.GameKey" />
+
+            @if (Model.ShowTapConfirm)
+            {
+                <div class="field">
+                    <label>
+                        <input type="checkbox" class="switch" name="tapConfirm" value="true" checked="@Model.TapConfirm" />
+                        落子确认
+                    </label>
+                </div>
+            }
+            @if (Model.ShowCoord)
+            {
+                <div class="field">
+                    <label>
+                        <input type="checkbox" class="switch" name="showCoord" value="true" checked="@Model.ShowCoordVal" />
+                        坐标显示
+                    </label>
+                </div>
+            }
+            @if (Model.ShowLastMark)
+            {
+                <div class="field">
+                    <label>
+                        <input type="checkbox" class="switch" name="lastMark" value="true" checked="@Model.LastMark" />
+                        最后落子标记
+                    </label>
+                </div>
+            }
+            @if (Model.ShowSound)
+            {
+                <div class="field">
+                    <label>
+                        <input type="checkbox" class="switch" name="sound" value="true" checked="@Model.SoundVal" />
+                        音效
+                    </label>
+                </div>
+            }
+
+            @if (Model.ShowSize)
+            {
+                <div class="field">
+                    <label>盘面大小</label>
+                    <select name="size">
+                        <option value="13" selected="@(Model.GomokuSize == 13)">13 路</option>
+                        <option value="15" selected="@(Model.GomokuSize == 15)">15 路</option>
+                        <option value="19" selected="@(Model.GomokuSize == 19)">19 路</option>
+                    </select>
+                </div>
+            }
+            @if (Model.ShowForbidden)
+            {
+                <div class="field">
+                    <label>禁手</label>
+                    <select name="forbidden">
+                        <option value="true" selected="@Model.GomokuForbidden">标准规则</option>
+                        <option value="false" selected="@(!Model.GomokuForbidden)">自由规则</option>
+                    </select>
+                </div>
+            }
+            @if (Model.ShowMode)
+            {
+                <div class="field">
+                    <label>军旗模式</label>
+                    <select name="mode">
+                        <option value="open" selected="@(Model.ArmyMode == "open")">明棋</option>
+                        <option value="dark" selected="@(Model.ArmyMode == "dark")">暗棋</option>
+                        <option value="fanqi" selected="@(Model.ArmyMode == "fanqi")">翻棋</option>
+                    </select>
+                </div>
+            }
+            @if (Model.ShowTimers)
+            {
+                <div class="field">
+                    <label>单步限时</label>
+                    <select name="moveTimeoutSec">
+                        @foreach (var t in Model.MoveTimeoutOptions)
+                        {
+                            <option value="@t" selected="@(t == Model.MoveTimeoutSec)">@(t == 0 ? "不限" : t < 60 ? $"{t} 秒" : $"{t / 60} 分钟")</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label>每方总局时</label>
+                    <select name="totalTimeoutSec">
+                        @foreach (var t in Model.TotalTimeoutOptions)
+                        {
+                            <option value="@t" selected="@(t == Model.TotalTimeoutSec)">@(t == 0 ? "不限" : $"{t / 60} 分钟")</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            <div class="form-actions">
+                <button class="btn" type="submit">保存设置</button>
+            </div>
+        </form>
+
+        <form method="post" asp-page-handler="Reset" data-confirm="恢复成默认设置？" style="margin-top:8px;">
+            <input type="hidden" name="gameKey" value="@Model.GameKey" />
+            <div class="form-actions">
+                <button class="btn secondary" type="submit">恢复默认</button>
+            </div>
+        </form>
+    }
 </div>
+
+@if (Model.RebuildRoomId > 0 && !Model.RebuildPrompt)
+{
+    @* 一键重建：建新关旧（AI 直接重建 / 真人先征得对方同意），走正式 API *@
+    <script>
+    (async function () {
+        const cfg = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {
+            gameKey = Model.GameKey,
+            oldId = Model.RebuildRoomId,
+            isAi = Model.RebuildIsAi,
+            aiLevel = Model.RebuildAiLevel,
+        }));
+        const api = (p, body) => fetch('/api/v1/games/' + cfg.gameKey + p, {
+            method: body ? 'POST' : 'GET',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined,
+        }).then(r => r.json());
+        try {
+            if (!cfg.isAi) {
+                // 真人对手：先征得同意（拒绝 → 回滚提示，设置已存但本局保留）
+                await api('/rooms/' + cfg.oldId + '/rebuild', { action: 'ask' });
+                let vote = null;
+                for (let i = 0; i < 90 && vote === null; i++) {
+                    await new Promise(r => setTimeout(r, 2000));
+                    const st = await api('/rooms/' + cfg.oldId);
+                    const rb = st && st.data && st.data.rebuild;
+                    if (rb && rb.doneId) { location.href = '/Games/' + cfg.gameKey + '/Play/' + rb.doneId; return; }
+                    if (rb && rb.vote !== null && rb.vote !== undefined) vote = rb.vote;
+                }
+                if (vote !== 1) {
+                    await api('/rooms/' + cfg.oldId + '/rebuild', { action: 'cancel' });
+                    alert('已保留当前对局');
+                    location.href = '/Games/' + cfg.gameKey + '/Settings';
+                    return;
+                }
+            }
+            const created = await api('/rooms', { side: 1, opponent: cfg.isAi ? 'ai' : null, aiLevel: cfg.isAi ? cfg.aiLevel : null });
+            const newId = created && created.data && created.data.id;
+            if (!newId) { alert('重建失败，请重试'); return; }
+            await api('/rooms/' + cfg.oldId + '/rebuild', { action: 'execute', newRoomId: newId });
+            location.href = '/Games/' + cfg.gameKey + '/Play/' + newId;
+        } catch (e) {
+            alert('重建失败，请重试');
+        }
+    })();
+    </script>
+}

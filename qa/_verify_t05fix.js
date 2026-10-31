@@ -200,7 +200,7 @@ async function loginApi(u) { const r = await fetch(BASE + '/api/v1/auth/login', 
             const j = await r.json();
             return j.data && (j.data.displayName || j.data.name);
         });
-        T('显示名 = 安家乐', me === '管理员', 'displayName=' + me);
+        T('显示名 = 管理员', me === '管理员', 'displayName=' + me);
         await ctxM.close();
     }
 

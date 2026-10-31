@@ -34,7 +34,9 @@
 
 @section Scripts {
     @if (Model.GameKey == "melon") {
-        <script src="~/js/solo/melon-core.js" asp-append-version="true"></script>
+        @* P3-2：测试钩子开关恒注入显式极性（Debug=true/Release=false）——视图与静态同版滚动升级不断链 *@
+    <script>window.__QA_HOOKS__ = @(CheckinApp.Ui.QaHooks.Enabled ? "true" : "false");</script>
+    <script src="~/js/solo/melon-core.js" asp-append-version="true"></script>
     }
     <script src="~/js/solo/@(Model.GameKey).js" asp-append-version="true"></script>
 }

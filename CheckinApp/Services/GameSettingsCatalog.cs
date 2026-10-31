@@ -32,37 +32,48 @@ public sealed class GameSettings
     public DisplaySettings GetDisplay() => Display;
 
     // ---------- 兼容旧扁平属性（读嵌套，下版删） ----------
+    // 注意：全部 [JsonIgnore] ——「写侧只写新」。若序列化泄漏这些扁平字段，
+    // 读侧垫片会把每一行都误判为旧扁平格式并触发 MigrateFromFlat，
+    // 非五子棋的游戏规则（军旗模式/各限时）与新增显示项会被静默丢弃。
     /// <summary>兼容：五子棋盘面（读 games.gomoku）</summary>
+    [JsonIgnore]
     public int Size
     {
         get => GetRules("gomoku").Size;
         set { var r = GetRules("gomoku"); r.Size = value; Games["gomoku"] = r; }
     }
     /// <summary>兼容：五子棋禁手</summary>
+    [JsonIgnore]
     public bool Forbidden
     {
         get => GetRules("gomoku").Forbidden;
         set { var r = GetRules("gomoku"); r.Forbidden = value; Games["gomoku"] = r; }
     }
     /// <summary>兼容：单步限时（五子棋）</summary>
+    [JsonIgnore]
     public int MoveTimeoutSec
     {
         get => GetRules("gomoku").MoveTimeoutSec;
         set { var r = GetRules("gomoku"); r.MoveTimeoutSec = value; Games["gomoku"] = r; }
     }
     /// <summary>兼容：每方总用时（五子棋）</summary>
+    [JsonIgnore]
     public int TotalTimeoutSec
     {
         get => GetRules("gomoku").TotalTimeoutSec;
         set { var r = GetRules("gomoku"); r.TotalTimeoutSec = value; Games["gomoku"] = r; }
     }
     /// <summary>兼容：落子二次确认</summary>
+    [JsonIgnore]
     public bool TapConfirm { get => Display.TapConfirm; set => Display.TapConfirm = value; }
     /// <summary>兼容：显示坐标</summary>
+    [JsonIgnore]
     public bool ShowCoord { get => Display.ShowCoord; set => Display.ShowCoord = value; }
     /// <summary>兼容：标记最后一手</summary>
+    [JsonIgnore]
     public bool LastMark { get => Display.LastMark; set => Display.LastMark = value; }
     /// <summary>兼容：震动</summary>
+    [JsonIgnore]
     public bool Vibrate { get => Display.Vibrate; set => Display.Vibrate = value; }
 }
 
@@ -73,9 +84,11 @@ public class DisplaySettings
     public bool ShowCoord { get; set; } = true;
     public bool LastMark { get; set; } = true;
     public bool Vibrate { get; set; } = true;
+    /// <summary>音效（有音效的游戏才显示该项；网页 WebAudio / App GameSfx 同读）</summary>
+    public bool Sound { get; set; } = true;
 }
 
-/// <summary>通用规则默认（新五款用）：size/forbidden + 限时（扁平化，不依赖多态）</summary>
+/// <summary>通用规则默认（新五款用）：size/forbidden + 限时 + 军旗模式（扁平化，不依赖多态）</summary>
 public class GameRuleDefaults
 {
     /// <summary>盘面大小（仅五子棋用，其它游戏忽略）</summary>
@@ -89,6 +102,9 @@ public class GameRuleDefaults
 
     /// <summary>每方总用时上限（秒），0 = 不限</summary>
     public int TotalTimeoutSec { get; set; }
+
+    /// <summary>军旗模式（仅军旗用）：open=明棋 / dark=暗棋 / fanqi=翻棋</summary>
+    public string Mode { get; set; } = "open";
 }
 
 /// <summary>兼容旧类型名（= GameRuleDefaults，保留避免编译错误）</summary>
@@ -116,8 +132,10 @@ public static class GameSettingsCatalog
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            // 读侧垫片：旧扁平格式（有 Size/TapConfirm 等顶层字段）→ 转嵌套
-            if (root.TryGetProperty("Size", out _) || root.TryGetProperty("TapConfirm", out _))
+            // 读侧垫片：旧扁平格式（有 Size/TapConfirm 等顶层字段且**没有** Games）→ 转嵌套。
+            // 有 Games 的一律按新格式读（历史上写侧曾泄漏扁平兼容字段，别再误迁移把非五子棋规则丢掉）
+            if ((root.TryGetProperty("Size", out _) || root.TryGetProperty("TapConfirm", out _))
+                && !root.TryGetProperty("Games", out _))
             {
                 return MigrateFromFlat(root);
             }
@@ -164,15 +182,20 @@ public static class GameSettingsCatalog
         s.Display.ShowCoord = s.Display.ShowCoord;
         s.Display.LastMark = s.Display.LastMark;
         s.Display.Vibrate = s.Display.Vibrate;
+        s.Display.Sound = s.Display.Sound;
 
         foreach (var (key, rules) in s.Games)
         {
             rules.Size = GomokuRules.ClampSize(rules.Size);
             rules.MoveTimeoutSec = Nearest(MoveTimeoutOptions, rules.MoveTimeoutSec);
             rules.TotalTimeoutSec = Nearest(TotalTimeoutOptions, rules.TotalTimeoutSec);
+            rules.Mode = ModeOptions.Contains(rules.Mode) ? rules.Mode : "open";
         }
         return s;
     }
+
+    /// <summary>军旗模式可选值：open=明棋 / dark=暗棋 / fanqi=翻棋</summary>
+    public static readonly string[] ModeOptions = ["open", "dark", "fanqi"];
 
     /// <summary>序列化成存库字符串（只写新嵌套格式）</summary>
     public static string Store(GameSettings s) => JsonSerializer.Serialize(Normalize(s), JsonOpts);
@@ -197,6 +220,8 @@ public static class GameSettingsCatalog
         public bool ShowCoord { get; set; } = true;
         public bool LastMark { get; set; } = true;
         public bool Vibrate { get; set; } = true;
+        /// <summary>音效（有音效的游戏才显示该项）</summary>
+        public bool Sound { get; set; } = true;
     }
 
     /// <summary>五子棋规则默认 DTO（含 size/forbidden）</summary>
@@ -215,12 +240,22 @@ public static class GameSettingsCatalog
         public int TotalTimeoutSec { get; set; }
     }
 
+    /// <summary>军旗模式规则默认 DTO（红线 19：独立 DTO 不混用）：模式 + 限时</summary>
+    public sealed class ArmyChessModeDto
+    {
+        /// <summary>open=明棋 / dark=暗棋 / fanqi=翻棋</summary>
+        public string Mode { get; set; } = "open";
+        public int MoveTimeoutSec { get; set; }
+        public int TotalTimeoutSec { get; set; }
+    }
+
     public static DisplayDto ToDisplay(GameSettings s) => new()
     {
         TapConfirm = s.Display.TapConfirm,
         ShowCoord = s.Display.ShowCoord,
         LastMark = s.Display.LastMark,
         Vibrate = s.Display.Vibrate,
+        Sound = s.Display.Sound,
     };
 
     public static GameSettings Apply(GameSettings s, DisplayDto d)
@@ -231,7 +266,31 @@ public static class GameSettingsCatalog
             ShowCoord = d.ShowCoord,
             LastMark = d.LastMark,
             Vibrate = d.Vibrate,
+            Sound = d.Sound,
         };
+        return Normalize(s);
+    }
+
+    /// <summary>取军旗模式默认</summary>
+    public static ArmyChessModeDto ToArmyChessMode(GameSettings s)
+    {
+        var r = s.GetRules("armychess");
+        return new ArmyChessModeDto
+        {
+            Mode = ModeOptions.Contains(r.Mode) ? r.Mode : "open",
+            MoveTimeoutSec = r.MoveTimeoutSec,
+            TotalTimeoutSec = r.TotalTimeoutSec,
+        };
+    }
+
+    /// <summary>应用军旗模式默认（只动军旗那半，其它游戏不受影响）</summary>
+    public static GameSettings Apply(GameSettings s, ArmyChessModeDto m)
+    {
+        var existing = s.GetRules("armychess");
+        existing.Mode = ModeOptions.Contains(m.Mode) ? m.Mode : "open";
+        existing.MoveTimeoutSec = Nearest(MoveTimeoutOptions, m.MoveTimeoutSec);
+        existing.TotalTimeoutSec = Nearest(TotalTimeoutOptions, m.TotalTimeoutSec);
+        s.Games["armychess"] = existing;
         return Normalize(s);
     }
 
@@ -318,5 +377,6 @@ public static class GameSettingsCatalog
         ShowCoord = d.ShowCoord,
         LastMark = d.LastMark,
         Vibrate = d.Vibrate,
+        Sound = d.Sound,
     });
 }

@@ -462,6 +462,8 @@ public static class FanqiRules
         var last = evs.LastOrDefault(e => e.t is "move" or "battle" or "flip");
         var myColor = mySide is 1 or 2 ? st.ColorOf(mySide) : 0;
 
+        // 可走提示（Batch D）：己方已翻开棋子的合法落点（暗子不可动，正式校验器逐格试）
+        // 可走提示按需化（QA §3-P1）：不再随快照全量 Build；单子提示走 GET /rooms/{id}/hints
         return new
         {
             boardW = ArmyChessRules.BoardW,
@@ -474,7 +476,9 @@ public static class FanqiRules
             lastMove = last is null
                 ? null
                 : last.t == "flip"
-                    ? new { fx = (int?)null, fy = (int?)null, tx = last.x, ty = last.y }
+                    // BUG-3 兼容哨兵：翻子无起点 → fx=tx, fy=ty（旧 App 非空 Int 反序列化不炸，
+                    // 双端均视 fx==tx&&fy==ty 为无滑动动画；勿改回 null = 旧 App 契约破坏）
+                    ? new { fx = last.x, fy = last.y, tx = last.x, ty = last.y }
                     : new { fx = last.fx, fy = last.fy, tx = last.tx, ty = last.ty },
             myColor,
             oppColor = myColor == 0 ? 0 : (myColor == 1 ? 2 : 1),

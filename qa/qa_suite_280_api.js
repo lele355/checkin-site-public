@@ -617,10 +617,15 @@ async function testLudo() {
     // L4 终点航道反弹（新规则：v=骰点、Replay 确定性重放；t=h+roll，==6 进中心，>6 回弹 h'=12−t）
     {
         const rm = await mkRoom('ludo', { join: true });
-        // 造 p0 上航道 h3(pos55)：起飞6→0；6→6；6→落12 整链(跳4→飞12→跳4)=32；4→40(跳4)；4→48(跳4)；6→55
+        // 造 p0 上航道 h3(pos55)：起飞6→0；6→6；3→9；3→12→跳16→飞28（R-P0-1：因跳到入口，飞后不再跳；
+        // P4-2：原第 3 手 v=6 拆成 3+3——落点路径等价（6→9→12→…）且骰序无连六，真实掷骰流程可复现
+        // （QA 追踪：连六会在 PendingPenalty 处被拦，原 6,6,6 序只有 craftMoves 能走通）；
+        // 4→32→跳36；2→38（非本色不跳）；6→44→跳48；6→48 走满经 HomeEntry 入航道 h3=55
         const toH3 = [
-            { t: 'move', s: 1, p: 0, v: 6 }, { t: 'move', s: 1, p: 0, v: 6 }, { t: 'move', s: 1, p: 0, v: 6 },
-            { t: 'move', s: 1, p: 0, v: 4 }, { t: 'move', s: 1, p: 0, v: 4 }, { t: 'move', s: 1, p: 0, v: 6 },
+            { t: 'move', s: 1, p: 0, v: 6 }, { t: 'move', s: 1, p: 0, v: 6 },
+            { t: 'move', s: 1, p: 0, v: 3 }, { t: 'move', s: 1, p: 0, v: 3 },
+            { t: 'move', s: 1, p: 0, v: 4 }, { t: 'move', s: 1, p: 0, v: 2 }, { t: 'move', s: 1, p: 0, v: 6 },
+            { t: 'move', s: 1, p: 0, v: 6 },
         ];
         // 55(h3)+4 → t=7>6 回弹 h'=5 → 57
         craftMoves(rm.id, [...toH3, { t: 'roll', s: 1, v: 4 }], { Turn: 1, Revision: 10 });

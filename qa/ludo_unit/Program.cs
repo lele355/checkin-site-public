@@ -1,6 +1,6 @@
 // ludo_unit —— 飞行棋引擎 v2（中国飞行棋）规则单测（B3/T05 验收证据）。
 // 直接驱动 CheckinApp.Services.LudoRules 纯函数，覆盖全部规则分支：
-// 常量映射 / 起飞 / 主环撞子 / 跳4不连跳 / 捷径飞 / 20 格极值链 / 入航道 /
+// 常量映射 / 起飞 / 主环撞子 / 跳4不连跳 / 捷径飞 / 连动链 R-P0-1（跳→飞不二跳）/ 入航道 /
 // 终点反弹 / 三连六罚单（第一手·顺延·空转·链界）/ movable / Think 红线 / Judge 终局。
 // 用法：dotnet run（退出码 = 失败数，0 = 全绿）
 using System.Text.Json;
@@ -43,6 +43,9 @@ T("HomeEntry 50/11/24/37",
 T("捷径入口/落点 +12",
     LudoRules.ShortcutEntryOf(1) == 16 && LudoRules.ShortcutLandOf(1) == 28
     && LudoRules.ShortcutEntryOf(3) == 42 && LudoRules.ShortcutLandOf(3) == 2);
+T("捷径四色全对（绿 3→15，§7.2 表 51 系笔误，以公式 start+28 为准）",
+    LudoRules.ShortcutEntryOf(2) == 29 && LudoRules.ShortcutLandOf(2) == 41
+    && LudoRules.ShortcutEntryOf(4) == 3 && LudoRules.ShortcutLandOf(4) == 15);
 T("起点格恰为本色格", LudoRules.ColorOfCell(LudoRules.StartOf(2)) == 1 && LudoRules.ColorOfCell(LudoRules.StartOf(3)) == 2);
 
 // ---------------- 2. 起飞（F5） ----------------
@@ -108,20 +111,43 @@ Console.WriteLine("[5] 虚线捷径");
     T("落地跳 4 途经撞子", b[2, 3] == -1);
 }
 
-// ---------------- 6. 连动极值链 20 格（跳4→飞12→跳4） ----------------
-Console.WriteLine("[6] 20 格极值链");
+// ---------------- 6. 连动链（R-P0-1：跳→飞后不再跳；掷→飞后可跳） ----------------
+Console.WriteLine("[6] 连动链（R-P0-1）");
 {
+    // a. 因「跳 4」落到虚线入口 → 可飞 12，但飞后不再跳 4（旧版错在飞后重置 jumped = +20 链）
     var b = NewBoard();
     b[1, 0] = 8;
-    LudoRules.ApplyMove(b, 1, 0, 4);   // 走到 12 → 跳 16 → 飞 28 → 跳 32
-    T("跳4→飞12→跳4 = +20", b[1, 0] == 32, $"pos={b[1, 0]}");
+    LudoRules.ApplyMove(b, 1, 0, 4);   // 走到 12（本色）→ 跳 16（入口）→ 飞 28 → 不再跳
+    T("跳4→飞12 不二跳（落 28）", b[1, 0] == 28, $"pos={b[1, 0]}");
 
+    // b. 以骰子点数踏到入口 → 飞 12 后可再跳 4（+16 链保持）
+    var b1 = NewBoard();
+    b1[1, 0] = 10;
+    LudoRules.ApplyMove(b1, 1, 0, 6);  // 走到 16（入口，掷到）→ 飞 28 → 跳 32
+    T("掷→飞12→跳4 = 落 32", b1[1, 0] == 32, $"pos={b1[1, 0]}");
+
+    // c. 落 12 触发同链的对称例（原「落 12 触发整条链」）：跳16 → 飞28 → 不二跳
     var b2 = NewBoard();
-    b2[1, 0] = 12;                     // 起点即本色：跳 16 → 飞 28 → 跳 32（roll=0 不可达，用 roll=4 走回 12 的对称链）
+    b2[1, 0] = 12;
     b2[1, 1] = 11;
-    LudoRules.ApplyMove(b2, 1, 1, 1);  // 走到 12 → 跳16 → 飞28 → 跳32
-    T("落 12 触发整条链", b2[1, 1] == 32, $"pos={b2[1, 1]}");
+    LudoRules.ApplyMove(b2, 1, 1, 1);  // 走到 12 → 跳16 → 飞28 → 不再跳
+    T("落 12 触发跳→飞止于 28", b2[1, 1] == 28, $"pos={b2[1, 1]}");
     T("链内同侧多机共存", b2[1, 0] == 12);
+
+    // d. R-P0-1 新用例：黄方跳→飞后不再跳（25 本色跳到 29 入口）
+    var b3 = NewBoard();
+    b3[2, 0] = 21;
+    LudoRules.ApplyMove(b3, 2, 0, 4);  // 走到 25（本色）→ 跳 29（入口）→ 飞 41 → 不再跳 45
+    T("黄方跳→飞后不二跳（落 41）", b3[2, 0] == 41, $"pos={b3[2, 0]}");
+
+    // e. R-P0-1 新用例：蓝方掷到入口 → 飞后可再跳（42 入口飞 2，2 为本色跳 6）
+    var b4 = NewBoard();
+    b4[3, 0] = 36;
+    LudoRules.ApplyMove(b4, 3, 0, 6);  // 走到 42（入口，掷到）→ 飞 2 → 跳 6
+    T("蓝方掷→飞后可跳（落 6）", b4[3, 0] == 6, $"pos={b4[3, 0]}");
+
+    // f. 修复点正向对照：飞后落点是本色格（红 28%4=0），不二跳完全依赖 jumped 不被重置
+    T("飞后落点为本色格（不二跳的判定关键）", LudoRules.ColorOfCell(28) == 0 && LudoRules.ColorOfCell(41) == 1);
 }
 
 // ---------------- 7. 入终点航道 ----------------

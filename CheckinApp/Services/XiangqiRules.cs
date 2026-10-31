@@ -129,12 +129,16 @@ public static class XiangqiRules
         var inCheck1 = IsGeneralAttacked(board, 1);
         var inCheck2 = IsGeneralAttacked(board, 2);
 
+        // 可走提示按需化（QA §3-P1）：不再随快照全量 Build（曾 1424 次 ValidateMove/轮询）；
+        // 单子提示走 GET /rooms/{id}/hints，数据仍由正式校验器生成。
+
         return new
         {
             boardW = BoardW,
             boardH = BoardH,
             pieces,
-            lastMove = lastMove is null ? null : new { fx = lastMove.fx, fy = lastMove.fy, tx = lastMove.tx, ty = lastMove.ty },
+            // fx/fy 兼容哨兵（BUG-3）：缺失时序列化 fx=tx, fy=ty，旧 App 非空 Int 反序列化不炸
+            lastMove = lastMove is null ? null : new { fx = lastMove.fx ?? lastMove.tx, fy = lastMove.fy ?? lastMove.ty, tx = lastMove.tx, ty = lastMove.ty },
             inCheck = mySide == 1 ? inCheck1 : inCheck2,
         };
     }

@@ -13,9 +13,53 @@
   var maxScore = parseInt(host.dataset.maxScore || '1000000', 10);
 
   var game = window.MelonCore.create({ width: canvas.width, height: canvas.height });
-  window.__melonGame = game;   // UI 冒烟/调试钩子（与 __gmLastGeom 同模式）
+  if (window.__QA_HOOKS__ !== false) window.__melonGame = game;   // 测试钩子（P3-2：显式 false=Release 隐藏，缺省可见护工具链）
   var best = 0;
   var particles = [];   // 合成爆裂小点
+  var flashes = [];     // 合成闪光环（Batch D 特效）
+
+  // ---- 音效（M13）：WebAudio 合成音，合成/爆瓜/结束三类；音效开关走 DisplaySettings.Sound ----
+  var sfx = (function () {
+    var ac = null;
+    var enabled = true;
+    function ensure() {
+      if (!ac) {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return false;
+        try { ac = new Ctx(); } catch (e) { return false; }
+      }
+      if (ac.state === 'suspended') { try { ac.resume(); } catch (e) { } }
+      return true;
+    }
+    function tone(f0, f1, dur, vol, type) {
+      if (!ac) return;
+      var t0 = ac.currentTime;
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(f0, t0);
+      o.frequency.linearRampToValueAtTime(f1, t0 + dur);
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g); g.connect(ac.destination);
+      o.start(t0); o.stop(t0 + dur + 0.02);
+    }
+    function play(name) {
+      if (!enabled || !ensure()) return;
+      if (name === 'merge') tone(420, 720, 0.1, 0.3, 'sine');
+      else if (name === 'explode') { tone(220, 640, 0.16, 0.34, 'triangle'); tone(640, 180, 0.2, 0.26, 'sine'); }
+      else if (name === 'end') { tone(660, 660, 0.14, 0.3, 'sine'); setTimeout(function () { tone(440, 440, 0.14, 0.3, 'sine'); }, 150); setTimeout(function () { tone(294, 294, 0.3, 0.3, 'sine'); }, 300); }
+    }
+    return {
+      ensure: ensure,
+      play: play,
+      setEnabled: function (on) { enabled = !!on; },
+    };
+  })();
+  // 音效开关（设置面板「音效」项；melon 属有音效游戏，M13 落地）
+  fetch('/api/v1/games/settings', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (j && j.ok && j.data) sfx.setEnabled(j.data.sound !== false); })
+    .catch(function () { });
   var lastTs = 0;
   var reported = false;
 
@@ -57,97 +101,38 @@
       .catch(function () {});
   }
 
-  // ---- 果面（M6：按级画特征，不再是纯色圆+白字）----
-  function drawFruit(x, y, level, angle, alpha) {
-    var r = game.radii[level - 1];
+  // ---- 果面（图标统一制式：级色圆子 + 白色果剪影，icons-ready 同源，双端同规）----
+  var FRUIT_ICON = ['', 'grape', 'cherry', 'orange', 'lemon', 'kiwi', 'tomato', 'peach', 'pineapple', 'coconut', 'half-watermelon', 'watermelon'];
+  var FRUIT_BASE = ['', '#9C27B0', '#E53935', '#FB8C00', '#F9A825', '#7CB342', '#EF5350', '#F48FB1', '#F9A825', '#8D6E63', '#43A047', '#2E7D32'];
+  var iconImgs = {};
+  function iconImg(name) {
+    if (!iconImgs[name]) {
+      var im = new Image();
+      im.src = '/pieces/melon/' + name + '.svg';
+      iconImgs[name] = im;
+    }
+    return iconImgs[name];
+  }
+
+  function drawFruit(x, y, level, angle, alpha, scale) {
+    var r = game.radii[level - 1] * (scale || 1);
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle || 0);
     ctx.globalAlpha = alpha === undefined ? 1 : alpha;
 
-    function circle(fill) {
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.stroke();
-    }
-    function dots(color, n, spread, size) {
-      ctx.fillStyle = color;
-      for (var i = 0; i < n; i++) {
-        var a = (i / n) * Math.PI * 2 + level;
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * r * spread, Math.sin(a) * r * spread, r * size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+    // 级色圆子（碰撞形状可读性）
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fillStyle = FRUIT_BASE[level] || '#9E9E9E'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.stroke();
 
-    switch (level) {
-      case 1: // 葡萄：紫圆 + 颗粒点
-        circle('#9C27B0'); dots('rgba(255,255,255,0.35)', 7, 0.55, 0.16);
-        break;
-      case 2: // 樱桃：红圆 + 核点 + 梗
-        circle('#E53935');
-        ctx.strokeStyle = '#4E342E'; ctx.lineWidth = Math.max(1.5, r * 0.12);
-        ctx.beginPath(); ctx.moveTo(0, -r * 0.6); ctx.quadraticCurveTo(r * 0.4, -r * 1.15, r * 0.75, -r * 1.0); ctx.stroke();
-        dots('rgba(120,0,0,0.5)', 1, 0, 0.3);
-        break;
-      case 3: // 橘子：橙圆 + 皮孔
-        circle('#FB8C00'); dots('rgba(255,240,200,0.5)', 8, 0.6, 0.1);
-        break;
-      case 4: // 柠檬：黄椭圆感
-        circle('#F9A825');
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 1.08, r * 0.86, 0, 0, Math.PI * 2); ctx.fillStyle = '#FDD835'; ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2); ctx.fillStyle = '#FEE581'; ctx.fill();
-        break;
-      case 5: // 猕猴桃：绿切面 + 籽粒环
-        circle('#7CB342');
-        ctx.beginPath(); ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2); ctx.fillStyle = '#AED581'; ctx.fill();
-        dots('rgba(30,60,20,0.7)', 10, 0.75, 0.08);
-        break;
-      case 6: // 番茄：红圆 + 绿蒂
-        circle('#EF5350');
-        ctx.fillStyle = '#2E7D32';
-        ctx.beginPath();
-        for (var i = 0; i < 5; i++) {
-          var a = (i / 5) * Math.PI * 2 - Math.PI / 2;
-          ctx.lineTo(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5 - r * 0.75);
-          ctx.lineTo(Math.cos(a + 0.6) * r * 0.22, Math.sin(a + 0.6) * r * 0.22 - r * 0.75);
-        }
-        ctx.closePath(); ctx.fill();
-        break;
-      case 7: // 桃子：粉圆 + 缝线
-        circle('#F48FB1');
-        ctx.strokeStyle = 'rgba(196,80,110,0.8)'; ctx.lineWidth = r * 0.08;
-        ctx.beginPath(); ctx.moveTo(0, -r * 0.9); ctx.quadraticCurveTo(r * 0.25, 0, 0, r * 0.9); ctx.stroke();
-        break;
-      case 8: // 菠萝：黄圆 + 网纹 + 顶冠
-        circle('#F9A825');
-        ctx.strokeStyle = 'rgba(180,110,20,0.55)'; ctx.lineWidth = r * 0.07;
-        for (var g = -2; g <= 2; g++) {
-          ctx.beginPath(); ctx.moveTo(-r, g * r * 0.4); ctx.lineTo(r, g * r * 0.4 + r * 0.4); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(-r, g * r * 0.4 + r * 0.4); ctx.lineTo(r, g * r * 0.4); ctx.stroke();
-        }
-        ctx.fillStyle = '#2E7D32';
-        ctx.beginPath(); ctx.moveTo(-r * 0.45, -r * 0.85); ctx.lineTo(0, -r * 1.35); ctx.lineTo(r * 0.45, -r * 0.85); ctx.closePath(); ctx.fill();
-        break;
-      case 9: // 椰子：棕壳 + 白肉心
-        circle('#8D6E63');
-        ctx.beginPath(); ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2); ctx.fillStyle = '#EFEBE9'; ctx.fill();
-        dots('rgba(60,40,25,0.8)', 3, 0.18, 0.12);
-        break;
-      case 10: // 半个西瓜：下绿皮上红瓤黑籽
-        circle('#43A047');
-        ctx.beginPath(); ctx.arc(0, r * 0.25, r * 0.95, Math.PI, 0); ctx.closePath(); ctx.fillStyle = '#EF5350'; ctx.fill();
-        dots('rgba(20,20,20,0.85)', 5, 0.45, 0.09);
-        break;
-      default: // 西瓜：绿条纹
-        circle('#2E7D32');
-        ctx.strokeStyle = '#81C784'; ctx.lineWidth = r * 0.14;
-        for (var s = -2; s <= 2; s++) {
-          ctx.beginPath();
-          ctx.moveTo(s * r * 0.38, -r * 0.98);
-          ctx.quadraticCurveTo(s * r * 0.62, 0, s * r * 0.38, r * 0.98);
-          ctx.stroke();
-        }
-        break;
+    // 白色果剪影（icons-ready 同源素材）
+    var im = iconImg(FRUIT_ICON[level] || 'grape');
+    if (im.complete && im.naturalWidth) {
+      var s2 = r * 1.5;
+      try { ctx.filter = 'brightness(0) invert(1)'; } catch (e) { }
+      ctx.drawImage(im, -s2 / 2, -s2 / 2, s2, s2);
+      try { ctx.filter = 'none'; } catch (e) { }
     }
     ctx.globalAlpha = 1;
     ctx.restore();
@@ -174,10 +159,24 @@
     ctx.beginPath(); ctx.moveTo(6, game.warnY); ctx.lineTo(W - 6, game.warnY); ctx.stroke();
     ctx.setLineDash([]);
 
-    // 已落水果
+    // 已落水果（合成新果 0.2s 弹跳缩放，Batch D 特效）
     for (var i = 0; i < game.bodies.length; i++) {
       var b = game.bodies[i];
-      drawFruit(b.x, b.y, b.level, b.angle);
+      var age = game.time - b.born;
+      var sc = age < 0.2 && age >= 0 ? 0.6 + 0.4 * (age / 0.2) : 1;
+      drawFruit(b.x, b.y, b.level, b.angle, 1, sc);
+    }
+
+    // 合成闪光环（Batch D：扩散圆环）
+    for (var f = flashes.length - 1; f >= 0; f--) {
+      var fl = flashes[f];
+      fl.r += 3.2; fl.life -= 1;
+      if (fl.life <= 0) { flashes.splice(f, 1); continue; }
+      ctx.globalAlpha = Math.min(1, fl.life / 14) * 0.8;
+      ctx.strokeStyle = fl.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(fl.x, fl.y, fl.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     // 落点预览（半透明当前果 + 虚线导引，M3/M5）
@@ -205,6 +204,14 @@
       ctx.fillStyle = pt.color;
       ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
+    }
+
+    // 连击 HUD（Batch D：3 秒窗连续合成递增）
+    if (game.combo >= 2 && !game.over) {
+      ctx.fillStyle = '#FF6F00';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('连击 ×' + game.comboMult, 12, 26);
     }
 
     // 结束弹窗（M12：分数 + 最高分 + 重开按钮）
@@ -236,11 +243,14 @@
     var evs = game.drainEvents();
     for (var i = 0; i < evs.length; i++) {
       burst(evs[i].x, evs[i].y, evs[i].level);
+      flashes.push({ x: evs[i].x, y: evs[i].y, r: 12, life: 14, color: evs[i].type === 'explode' ? '#FFD54F' : '#FFFFFF' });
+      sfx.play(evs[i].type === 'explode' ? 'explode' : 'merge');   // M13 音效
     }
     if (game.score > best) best = game.score;
     updateHud();
     draw();
     if (game.over) {
+      sfx.play('end');   // M13 终局音（停表前播一次）
       submitScore(Math.min(game.score, maxScore));
       return; // 停表；重开后恢复
     }
@@ -275,8 +285,9 @@
     var modal = document.getElementById('soloEndModal');
     if (modal) modal.hidden = true;
     game = window.MelonCore.create({ width: canvas.width, height: canvas.height });
-    window.__melonGame = game;
+    if (window.__QA_HOOKS__ !== false) window.__melonGame = game;
     particles = [];
+    flashes = [];
     reported = false;
     lastTs = 0;
     updateHud();

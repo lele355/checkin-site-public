@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="rind" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#6AB04A"/>
+      <stop offset="100%" stop-color="#2E7D32"/>
+    </radialGradient>
+    <radialGradient id="flesh" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF6B6B"/>
+      <stop offset="80%" stop-color="#E74C3C"/>
+      <stop offset="100%" stop-color="#C0392B"/>
+    </radialGradient>
+  </defs>
+  <!-- half circle: green rind outer -->
+  <path d="M 8 32 A 24 24 0 0 1 56 32 Z" fill="url(#rind)"/>
+  <!-- red flesh inner -->
+  <path d="M 12 32 A 20 20 0 0 1 52 32 Z" fill="url(#flesh)"/>
+  <!-- seeds -->
+  <ellipse cx="24" cy="24" rx="1.5" ry="2.5" fill="#2C2C2C" transform="rotate(-15 24 24)"/>
+  <ellipse cx="32" cy="20" rx="1.5" ry="2.5" fill="#2C2C2C"/>
+  <ellipse cx="40" cy="24" rx="1.5" ry="2.5" fill="#2C2C2C" transform="rotate(15 40 24)"/>
+  <ellipse cx="28" cy="28" rx="1.5" ry="2.5" fill="#2C2C2C" transform="rotate(-8 28 28)"/>
+  <ellipse cx="36" cy="28" rx="1.5" ry="2.5" fill="#2C2C2C" transform="rotate(8 36 28)"/>
+</svg>

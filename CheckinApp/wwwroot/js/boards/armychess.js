@@ -19,6 +19,17 @@
     rank_company: '连长', rank_platoon: '排长', rank_engineer: '工兵',
     rank_mine: '地雷', rank_flag: '军旗', rank_bomb: '炸弹',
   };
+  // 军牌字子图标（icons-ready 同源）：字面 → 件名；暗子/无归属 → 背面
+  var ARMY_ICON = {
+    '司令': 'siling', '军长': 'junzhang', '师长': 'shizhang', '旅长': 'lvzhang',
+    '团长': 'tuanzhang', '营长': 'yingzhang', '连长': 'lianzhang', '排长': 'paizhang',
+    '工兵': 'gongbing', '地雷': 'dilei', '炸弹': 'zhadan', '军旗': 'junqi',
+  };
+  function armyIconKey(p) {
+    if (p.hidden || (p.side !== 1 && p.side !== 2)) return 'back';
+    var k = ARMY_ICON[RANK_NAMES[p.rank] || ''];
+    return k ? (p.side === 1 ? 'red-' : 'blue-') + k : 'back';
+  }
 
   function isCamp(x, y) { return CAMPS.some(function (p) { return p[0] === x && p[1] === y; }); }
   function isDen(x, y) { return DENS.some(function (p) { return p[0] === x && p[1] === y; }); }
@@ -134,26 +145,13 @@
       return { x: p.x, y: p.y, side: opts.mySide, rank: p.rank, hidden: false };
     }));
     pieces.forEach(function (p) {
-      var isSide1 = p.side === 1;
-      var tagW = cw * 0.78, tagH = ch * 0.46;
-      var tx = px(p.x) - tagW / 2, ty = py(p.y) - tagH / 2;
-      var g = GB.el('g', {});
-      // 翻棋暗子无归属（p.side 缺省）→ 中性灰「军」背；明/暗棋按红蓝分色
-      var hasSide = p.side === 1 || p.side === 2;
-      g.appendChild(GB.el('rect', {
-        x: tx, y: ty, width: tagW, height: tagH, rx: 6,
-        fill: hasSide ? (isSide1 ? '#d32f2f' : '#1565c0') : '#616161',
-        stroke: hasSide ? (isSide1 ? '#8e0000' : '#0d47a1') : '#37474f', 'stroke-width': '2',
+      // 整枚图标替换旧军牌（icons-ready 同源；暗子/翻棋未翻开 → back）
+      var side = Math.min(cw, ch) * 0.94;
+      svg.appendChild(GB.el('image', {
+        href: '/pieces/armychess/' + armyIconKey(p) + '.svg',
+        x: px(p.x) - side / 2, y: py(p.y) - side / 2,
+        width: side, height: side, 'pointer-events': 'none',
       }));
-      var label = p.hidden ? '军' : (RANK_NAMES[p.rank] || '?');
-      var t = GB.el('text', {
-        x: px(p.x), y: py(p.y) + 7, 'text-anchor': 'middle',
-        'font-size': Math.min(17, tagH * 0.5), fill: '#fff', 'font-weight': 'bold',
-        'pointer-events': 'none',
-      });
-      t.textContent = label;
-      g.appendChild(t);
-      svg.appendChild(g);
     });
 
     // 最后一手
@@ -170,6 +168,38 @@
         x: nx(opts.sel.x) + 2, y: ny(opts.sel.y) + 2, width: cw - 4, height: ch - 4,
         fill: 'none', stroke: '#1a73e8', 'stroke-width': 4, rx: 6,
       }));
+    }
+
+    // 可走提示（Batch D）：绿点=可走，红环=可吃
+    if (opts.sel && opts.hints) {
+      var hl = opts.hints[opts.sel.x + ',' + opts.sel.y] || [];
+      hl.forEach(function (tp) {
+        var occ = (state.pieces || []).some(function (q) { return q.x === tp[0] && q.y === tp[1]; });
+        if (occ) {
+          svg.appendChild(GB.el('rect', {
+            x: nx(tp[0]) + 4, y: ny(tp[1]) + 4, width: cw - 8, height: ch - 8,
+            fill: 'none', stroke: '#e53935', 'stroke-width': 3, rx: 6, opacity: .85,
+          }));
+        } else {
+          svg.appendChild(GB.el('circle', {
+            cx: px(tp[0]), cy: py(tp[1]), r: Math.min(cw, ch) * 0.14,
+            fill: '#2e7d32', opacity: .75,
+          }));
+        }
+      });
+    }
+
+    // 吃子鬼影（Batch D）：被吃军牌淡出
+    if (opts.ghost && opts.ghost.piece) {
+      var gp = opts.ghost.piece;
+      var sideG = Math.min(cw, ch) * 0.94;
+      var gg = GB.el('g', { opacity: String(Math.max(0, opts.ghost.alpha)) });
+      gg.appendChild(GB.el('image', {
+        href: '/pieces/armychess/' + armyIconKey(gp) + '.svg',
+        x: px(gp.x) - sideG / 2, y: py(gp.y) - sideG / 2,
+        width: sideG, height: sideG, 'pointer-events': 'none',
+      }));
+      svg.appendChild(gg);
     }
 
     return { pad: pad, cw: cw, ch: ch, cols: W, rows: H, mode: 'cell' };

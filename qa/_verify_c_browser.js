@@ -18,10 +18,25 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
     const browser = await chromium.launch({ channel: 'msedge' });
 
+    // 登录态注入（QA_alpha）：站点 Solo 页需登录，原脚本全新 context 会 302 到登录页（2026-10-31 QA 实跑修正）
+    const ss = await (async () => {
+        const c0 = await browser.newContext();
+        const p0 = await c0.newPage();
+        await p0.goto(BASE + '/Login');
+        await p0.fill('#Username', 'QA_alpha');
+        await p0.fill('#Password', 'QaGames2026!');
+        await p0.click('button[type=submit]');
+        await p0.waitForLoadState('networkidle').catch(() => {});
+        await sleep(400);
+        const s = await c0.storageState();
+        await c0.close();
+        return s;
+    })();
+
     // ================= M1 melon 真实点击链路 =================
     console.log('[M1] melon 真实点击「落→撞→合→分」+ 现实堆形泄漏');
     {
-        const ctx = await browser.newContext({ viewport: { width: 900, height: 950 }, reducedMotion: 'reduce' });
+        const ctx = await browser.newContext({ viewport: { width: 900, height: 950 }, reducedMotion: 'reduce', storageState: ss });
         const page = await ctx.newPage();
         page.setDefaultTimeout(20000);
         await page.goto(BASE + '/Games/melon/Solo');
@@ -64,7 +79,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // ================= F1 fish 3 命 + 无敌时间签名 =================
     console.log('[F1] fish 3 命耗尽结束 + 无敌 2s 不掉命（时间签名）');
     {
-        const ctx = await browser.newContext({ viewport: { width: 900, height: 950 }, reducedMotion: 'reduce' });
+        const ctx = await browser.newContext({ viewport: { width: 900, height: 950 }, reducedMotion: 'reduce', storageState: ss });
         await ctx.addInitScript(() => {
             Math.random = () => 0.99;    // 全部刷 6 级大鱼（玩家 0 级必被吃）；珍珠/补刷概率归零
             Math.hypot = () => 0;        // 强制接触：每帧必撞（故障注入）
@@ -92,7 +107,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // ================= F2 fish 同级可吃 + 连击倍率（单帧确定性签名） =================
     console.log('[F2] fish 同级可吃 + 连击 3 连×1.5 / 6 连×2（签名 625）');
     {
-        const ctx = await browser.newContext({ viewport: { width: 900, height: 950 }, reducedMotion: 'reduce' });
+        const ctx = await browser.newContext({ viewport: { width: 900, height: 950 }, reducedMotion: 'reduce', storageState: ss });
         await ctx.addInitScript(() => {
             Math.random = () => 0.1;     // 全部刷 0 级小鱼（同级）；每校 2 条 → 场上恰 8 条；无珍珠补刷
             Math.hypot = (function (orig) {
@@ -132,7 +147,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // ================= F3 fish 冲刺冷却（画布质心追踪） =================
     console.log('[F3] fish 冲刺 1.2s 冷却（点按转向只在冷却结束后生效）');
     {
-        const ctx = await browser.newContext({ viewport: { width: 900, height: 950 }, reducedMotion: 'reduce' });
+        const ctx = await browser.newContext({ viewport: { width: 900, height: 950 }, reducedMotion: 'reduce', storageState: ss });
         await ctx.addInitScript(() => { Math.random = () => 0.1; });   // 小鱼无威胁、不干扰质心
         const page = await ctx.newPage();
         await page.goto(BASE + '/Games/fish/Solo');

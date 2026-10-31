@@ -286,8 +286,9 @@ public static class LudoRules
             return;
         }
 
-        // 确定性链：跳4 → 飞12 → 再跳4（硬上限 3 跳，最大 20 格；
-        // 飞后可再跳一次 = 4+12+4 极值链，跳不能连跳、飞一生一次，杜绝循环）
+        // 确定性链（R-P0-1）：跳4 → 飞12 →（仅掷到入口时）再跳4；硬上限 3 跳、飞一生一次。
+        // 规则依据（维基/萌娘/腾讯问问一致）：以骰子点数踏到虚线入口 → 飞 12 后可再跳 4（+16）；
+        // 因「跳 +4」而落到入口 → 可飞 12 但飞后不再跳 4（仅 +12）；跳不能连跳，杜绝循环。
         var jumped = false;
         var flown = false;
         var land = pos;
@@ -300,7 +301,8 @@ public static class LudoRules
                 land = ShortcutLandOf(side);
                 CaptureAt(board, side, land);
                 flown = true;
-                jumped = false;   // 飞完落点若为本色 → 允许再跳一次（F4）
+                // R-P0-1：不重置 jumped —— 因跳而到入口时（jumped=true）飞后不再跳 4；
+                // 掷到入口时（jumped=false）飞后落点为本色仍可跳 4 一次
                 continue;
             }
             if (ColorOfCell(land) == SideColorIndex(side) && !jumped)
