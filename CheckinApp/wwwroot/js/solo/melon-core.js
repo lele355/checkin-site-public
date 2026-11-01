@@ -11,7 +11,7 @@
   var NAMES = ['葡萄', '樱桃', '橘子', '柠檬', '猕猴桃', '番茄', '桃子', '菠萝', '椰子', '半个西瓜', '西瓜'];
   var GRAVITY = 1600;        // px/s²
   var RESTITUTION = 0.22;    // 弹性
-  var FRICTION = 0.10;       // 切向摩擦
+  var FRICTION = 0.07;       // 切向摩擦（0.10→0.07：堆体能被倾斜整体推动，2026-11-01）
   var ITER = 8;              // 每步松弛迭代（堆叠稳定性）
   var DROP_Y = 46;           // 悬停/释放高度
   var WARN_Y = 96;           // 警戒线（质心越线且静止计时）
@@ -141,7 +141,7 @@
       if (b.y + b.r > h) {
         b.y = h - b.r;
         if (b.vy > 0) b.vy = -b.vy * RESTITUTION;
-        b.vx *= 0.985;                 // 地面摩擦
+        b.vx *= 0.99;                  // 地面摩擦（0.985→0.99：倾斜能推动堆体，2026-11-01）
         b.av *= 0.985;
       }
     }
@@ -157,9 +157,11 @@
           b = bodies[i];
           if (b.dead) continue;
           b.vy += GRAVITY * sub;
-          if (tiltX) b.vx += GRAVITY * 0.22 * tiltX * sub;   // 体感倾斜：水平力=重力 22%×tilt（限幅后≤10%g，温和）
+          if (tiltX) b.vx += GRAVITY * 0.55 * tiltX * sub;   // 体感倾斜：斜重力传导到堆体（2026-11-01 加大 0.22→0.55）
           b.x += b.vx * sub; b.y += b.vy * sub;
-          b.angle += b.av * sub;
+          // 旋转恢复（跟角度，但**静止后冻结不转**——接触微扰不再画成乱转）
+          if (Math.abs(b.vx) + Math.abs(b.vy) > 2) b.angle += b.av * sub;
+          else b.av *= 0.6;            // 静止时快速衰掉角速度残余
           // 角速度阻尼 + 限幅（2026-10-31 修「水果不停快速旋转」：接触每帧累加 av 且空中无阻尼 → 无限自旋）
           b.av *= 0.99;
           if (Math.abs(b.av) < 0.1) b.av = 0;
@@ -224,12 +226,16 @@
       warnY: WARN_Y, dropY: DROP_Y, radii: RADII, names: NAMES,
       step: step, aim: aim, drop: drop, debugAdd: debugAdd,
       drainEvents: function () { var e = events; events = []; return e; },
-      // 体感（2026-11-01）：tiltX 倾斜输入（-1..1，调用方限幅）；shake 横向小推脉冲
+      // 体感（2026-11-01）：tiltX 倾斜输入（-1..1，调用方限幅）；shake 打乱堆体（随机横推+轻微上抛）
       get tiltX() { return tiltX; },
       set tiltX(v) { tiltX = v || 0; },
       shake: function (dirX) {
-        var d = dirX > 0 ? 1 : -1;
-        for (var i = 0; i < bodies.length; i++) if (!bodies[i].dead) bodies[i].vx += d * 5;
+        for (var i = 0; i < bodies.length; i++) {
+          if (bodies[i].dead) continue;
+          var side = Math.random() < 0.7 ? (dirX > 0 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
+          bodies[i].vx += side * (9 + Math.random() * 7);   // 9~16 横推
+          bodies[i].vy -= (4 + Math.random() * 6);          // 4~10 轻微上抛（松动堆叠）
+        }
       },
       get score() { return score; },
       get over() { return over; },
