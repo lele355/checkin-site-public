@@ -15,7 +15,7 @@
   var ITER = 8;              // 每步松弛迭代（堆叠稳定性）
   var DROP_Y = 46;           // 悬停/释放高度
   var WARN_Y = 96;           // 警戒线（质心越线且静止计时）
-  var OVER_GRACE = 0.8;      // 越线停留缓冲秒数（M10）
+  var OVER_GRACE = 1.5;      // 越线停留缓冲秒数（2026-11-01 站主定：稳定之后再判定，放宽 0.8→1.5）
   var MERGE_LOCK = 8;        // 新果冻结步数（防连锁抖动）
   var DROP_COOLDOWN = 0.35;  // 两次掉落间隔
   var WEIGHTS = [2, 3, 4, 1, 2];  // 掉落加权（1..5 级）：橘子最常见、柠檬最少（M8）
@@ -53,6 +53,7 @@
     var over = false;
     var overTimer = 0;
     var cool = 0;
+    var tiltX = 0;        // 体感倾斜输入（-1..1，App 传感器喂；Web 无传感器恒 0）
     var simT = 0;         // 物理时钟（秒）
     var combo = 0;        // 连击（Batch D）：3 秒窗内连续合成递增
     var lastMergeAt = -999;
@@ -156,6 +157,7 @@
           b = bodies[i];
           if (b.dead) continue;
           b.vy += GRAVITY * sub;
+          if (tiltX) b.vx += GRAVITY * 0.22 * tiltX * sub;   // 体感倾斜：水平力=重力 22%×tilt（限幅后≤10%g，温和）
           b.x += b.vx * sub; b.y += b.vy * sub;
           b.angle += b.av * sub;
           // 角速度阻尼 + 限幅（2026-10-31 修「水果不停快速旋转」：接触每帧累加 av 且空中无阻尼 → 无限自旋）
@@ -185,15 +187,16 @@
         }
         if (cool > 0) cool -= sub;
 
-        // 警戒线：**顶部边缘**越线且静止 > 缓冲 → 判负
-        // （2026-10-31 修：原用质心 b.y，堆高时顶部越线但质心仍在线下 → 永远不判负，线像摆设；
-        //   速度门限放宽 30→60 以容忍堆叠抖动，另给 age>1.5s 的兜底——落体高速穿线由 age/speed 双门挡住）
+        // 警戒线：**顶部边缘**越线且**物理稳定后**才判负
+        // （2026-10-31 修质心口径；2026-11-01 站主定「稳定之后再判定」：静止=速度真小 <28，
+        //   长时间微动兜底 age>3s&&速度<130；落体/滚动高速穿线不误判。缓冲 OVER_GRACE 1.5s）
         var resting = false;
         for (i = 0; i < bodies.length; i++) {
           b = bodies[i];
-          if (b.age > 0.4 && (b.y - b.r) < WARN_Y && (Math.abs(b.vx) + Math.abs(b.vy) < 60 || b.age > 1.5)) { resting = true; break; }
+          if (b.age > 0.6 && (b.y - b.r) < WARN_Y &&
+              (Math.abs(b.vx) + Math.abs(b.vy) < 28 || (b.age > 3.0 && Math.abs(b.vx) + Math.abs(b.vy) < 130))) { resting = true; break; }
         }
-        overTimer = resting ? overTimer + sub : Math.max(0, overTimer - sub * 2);
+        overTimer = resting ? overTimer + sub : Math.max(0, overTimer - sub * 1.5);
         if (overTimer >= OVER_GRACE) over = true;
       }
     }
@@ -221,6 +224,13 @@
       warnY: WARN_Y, dropY: DROP_Y, radii: RADII, names: NAMES,
       step: step, aim: aim, drop: drop, debugAdd: debugAdd,
       drainEvents: function () { var e = events; events = []; return e; },
+      // 体感（2026-11-01）：tiltX 倾斜输入（-1..1，调用方限幅）；shake 横向小推脉冲
+      get tiltX() { return tiltX; },
+      set tiltX(v) { tiltX = v || 0; },
+      shake: function (dirX) {
+        var d = dirX > 0 ? 1 : -1;
+        for (var i = 0; i < bodies.length; i++) if (!bodies[i].dead) bodies[i].vx += d * 5;
+      },
       get score() { return score; },
       get over() { return over; },
       get bodies() { return bodies; },
