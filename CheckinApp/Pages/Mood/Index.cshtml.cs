@@ -35,6 +35,7 @@ public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : P
     [BindProperty] public int SaveMood { get; set; }
     [BindProperty] public string SaveNote { get; set; } = "";
     [BindProperty] public int SaveOwner { get; set; }
+    public string? Error { get; private set; }
 
     public void OnGet(string? month)
     {
@@ -70,6 +71,7 @@ public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : P
         if (_me.UserId is not int uid) return RedirectToPage("/Login");
         if (SaveMood is < 1 or > 6) return RedirectToPage();
         if (!DateTime.TryParse(SaveDate, out var date)) date = DateTime.Today;
+        if (date.Date > DateTime.Today) { Error = "不能给未来记心情。"; Load(); return Page(); }   // 日期边界（2026-11-02 站主定）
         var owner = SaveOwner == 0 ? uid : SaveOwner;
         if (!_couple.IsMember(owner)) return RedirectToPage();
         var row = _db.MoodLogs.FirstOrDefault(x => x.UserId == owner && x.Date == date.Date);
@@ -78,6 +80,17 @@ public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : P
         row.Note = SaveNote?.Trim() ?? "";
         row.UpdatedAt = DateTime.UtcNow;
         _db.SaveChanges();
+        return RedirectToPage(new { month = date.ToString("yyyy-MM") });
+    }
+
+    public IActionResult OnPostDelete()
+    {
+        if (_me.UserId is not int uid) return RedirectToPage("/Login");
+        if (!DateTime.TryParse(SaveDate, out var date)) return RedirectToPage();
+        var owner = SaveOwner == 0 ? uid : SaveOwner;
+        if (!_couple.IsMember(owner)) return RedirectToPage();
+        var row = _db.MoodLogs.FirstOrDefault(x => x.UserId == owner && x.Date == date.Date);
+        if (row is not null) { _db.MoodLogs.Remove(row); _db.SaveChanges(); }
         return RedirectToPage(new { month = date.ToString("yyyy-MM") });
     }
 }

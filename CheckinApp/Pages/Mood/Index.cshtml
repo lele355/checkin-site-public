@@ -7,6 +7,12 @@
     var first = Model.MonthStart;
     var daysInMonth = DateTime.DaysInMonth(first.Year, first.Month);
     var offset = ((int)first.DayOfWeek + 6) % 7;   // 周一开头
+    var today = DateTime.Today;
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="card"><div class="mini" style="color:#c62828;">@Model.Error</div></div>
 }
 
 <div class="page-head">
@@ -47,16 +53,25 @@
                         else
                         {
                             var d = day;
-                            <td style="padding:4px 2px;text-align:center;vertical-align:top;border:1px solid var(--line,#eee);border-radius:8px;">
+                            var dateVal = first.ToString("yyyy-MM") + "-" + d.ToString("00");
+                            var isFuture = DateTime.Parse(dateVal) > today;
+                            <td style="padding:4px 2px;text-align:center;vertical-align:top;border:1px solid var(--line,#eee);border-radius:8px;@(isFuture ? "opacity:.35;" : "")">
                                 <div class="mini">@d</div>
                                 @foreach (var m in Model.Members)
                                 {
                                     var key = (m.Uid, d);
                                     var has = Model.MoodMap.TryGetValue(key, out var mv);
-                                    <a href="#" style="text-decoration:none;"
-                                       onclick="document.getElementById('sv-date').value='@first.ToString("yyyy-MM")-@d.ToString("00")';document.getElementById('sv-owner').value='@m.Uid';document.getElementById('save-form').style.display='block';return false;">
-                                        <div style="font-size:17px;line-height:1.25;opacity:@(has ? "1" : ".25");">@(has ? moods[mv - 1] : "·")</div>
-                                    </a>
+                                    if (isFuture)
+                                    {
+                                        <div style="font-size:17px;line-height:1.25;opacity:.25;">·</div>
+                                    }
+                                    else
+                                    {
+                                        <a href="#" style="text-decoration:none;"
+                                           onclick="document.getElementById('sv-date').value='@dateVal';document.getElementById('sv-owner').value='@m.Uid';document.getElementById('sv-has').value='@(has ? "1" : "0")';document.getElementById('save-form').style.display='block';return false;">
+                                            <div style="font-size:17px;line-height:1.25;opacity:@(has ? "1" : ".25");">@(has ? moods[mv - 1] : "·")</div>
+                                        </a>
+                                    }
                                 }
                             </td>
                             day++;
@@ -74,6 +89,7 @@
     <form method="post" asp-page-handler="Save" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <input type="hidden" id="sv-date" name="SaveDate" />
         <input type="hidden" id="sv-owner" name="SaveOwner" />
+        <input type="hidden" id="sv-has" value="0" />
         <div>
             @for (var i = 1; i <= 6; i++)
             {
@@ -85,6 +101,23 @@
         <input name="SaveNote" placeholder="说点什么（可留空）" style="flex:1;min-width:160px;" maxlength="200" />
         <button class="btn" type="submit">保存</button>
     </form>
+    <form method="post" asp-page-handler="Delete" data-confirm id="del-form" style="display:none;margin-top:8px;">
+        <input type="hidden" name="SaveDate" id="del-date" />
+        <input type="hidden" name="SaveOwner" id="del-owner" />
+        <button class="btn ghost" type="submit">删除这天的心情</button>
+    </form>
+    <script>
+        (function () {
+            var of = document.getElementById('save-form');
+            var obs = new MutationObserver(function () {
+                var has = document.getElementById('sv-has').value === '1';
+                document.getElementById('del-form').style.display = has ? 'block' : 'none';
+                document.getElementById('del-date').value = document.getElementById('sv-date').value;
+                document.getElementById('del-owner').value = document.getElementById('sv-owner').value;
+            });
+            obs.observe(of, { attributes: true, attributeFilter: ['style'] });
+        })();
+    </script>
 </div>
 
 <div class="card">

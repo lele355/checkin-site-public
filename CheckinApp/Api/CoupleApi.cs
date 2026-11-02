@@ -47,6 +47,7 @@ public static class CoupleApi
             var uid = ApiKit.MeId(ctx);
             if (req.Mood is < 1 or > 6) throw new ApiBadRequest("心情档位不对");
             var date = ApiKit.ParseDate(req.Date) ?? DateTime.Today;
+            if (date.Date > DateTime.Today) throw new ApiBadRequest("不能给未来记心情");   // 日期边界（2026-11-02 站主定）
             var owner = req.UserId ?? uid;
             if (!couple.IsMember(owner)) throw new ApiBadRequest("只能为自己或对方记录");
             var row = db.MoodLogs.FirstOrDefault(x => x.UserId == owner && x.Date == date);
@@ -60,6 +61,20 @@ public static class CoupleApi
             row.UpdatedAt = DateTime.UtcNow;
             db.SaveChanges();
             return ApiKit.Ok(new { id = row.Id });   // 必须带 data（App unwrap 的 Unit as T 会炸，2026-11-02 修）
+        });
+
+        c.MapDelete("/mood", (string? date, int? userId, AppDbContext db, [FromServices] CoupleScope couple, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var d = ApiKit.ParseDate(date) ?? DateTime.Today;
+            var owner = userId ?? uid;
+            var uids = couple.MemberUids();
+            if (!uids.Contains(owner)) return ApiKit.Err("只能删自己或对方的");
+            var row = db.MoodLogs.FirstOrDefault(x => x.UserId == owner && x.Date == d.Date);
+            if (row is null) return ApiKit.NotFound("记录不存在");
+            db.MoodLogs.Remove(row);
+            db.SaveChanges();
+            return ApiKit.Ok(new { id = row.Id });
         });
 
         // ==================== 排便（点一下记一次，双方互见） ====================
