@@ -1,0 +1,84 @@
+@page
+@model CheckinApp.Pages.Questions.IndexModel
+@{
+    ViewData["Title"] = "互相提问";
+}
+
+<div class="page-head">
+    <h1>互相提问</h1>
+    <div class="mini">未答 @Model.Unanswered · 共 @Model.Total</div>
+</div>
+
+<div class="card">
+    <div class="group-head">问对方一个问题</div>
+    <form method="post" asp-page-handler="Ask" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input asp-for="AskContent" placeholder="想问 TA 什么…" maxlength="500" style="flex:1;min-width:220px;" />
+        <button class="btn" type="submit">提问</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="group-head">
+        问题列表
+        <span style="float:right;display:flex;gap:6px;">
+            <a class="chip" style="text-decoration:none;@(Model.Status == "all" ? "font-weight:700;" : "")" href="?status=all&month=@Model.Month">全部</a>
+            <a class="chip" style="text-decoration:none;@(Model.Status == "unanswered" ? "font-weight:700;" : "")" href="?status=unanswered&month=@Model.Month">未答</a>
+            <a class="chip" style="text-decoration:none;@(Model.Status == "answered" ? "font-weight:700;" : "")" href="?status=answered&month=@Model.Month">已答</a>
+            <a class="chip" style="text-decoration:none;" href="?status=@Model.Status&month=@DateTime.Today.ToString("yyyy-MM")">本月归档</a>
+            @if (!string.IsNullOrWhiteSpace(Model.Month))
+            {
+                <a class="chip" style="text-decoration:none;" href="?status=@Model.Status">清除月份</a>
+            }
+        </span>
+    </div>
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty"><span class="big">❓</span>还没有问题，问 TA 一个吧</div>
+    }
+    else
+    {
+        <div class="stack">
+            @foreach (var q in Model.Items)
+            {
+                <div class="row-item">
+                    <div class="mini">@q.From → @q.To · @q.AskedAt</div>
+                    <div style="font-weight:600;margin:4px 0;">@q.Content</div>
+                    @if (q.Answer is not null)
+                    {
+                        <div class="mini" style="color:var(--accent-strong);">💬 @q.Answer <span style="opacity:.7;">· @q.AnsweredAt</span></div>
+                    }
+                    else if (q.MineToAnswer)
+                    {
+                        <form method="post" asp-page-handler="Answer" style="display:flex;gap:8px;margin-top:6px;">
+                            <input type="hidden" asp-for="AnswerId" value="@q.Id" />
+                            <input asp-for="AnswerContent" placeholder="写下你的回答…" maxlength="500" style="flex:1;" />
+                            <button class="btn ghost" type="submit">回答</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="mini">等 @q.To 回答…</div>
+                    }
+                    <form method="post" asp-page-handler="Delete" data-confirm style="margin-top:6px;">
+                        <input type="hidden" name="id" value="@q.Id" />
+                        <button class="btn ghost" type="submit" style="font-size:11px;">删</button>
+                    </form>
+                </div>
+            }
+        </div>
+        @if (Model.Pages > 1)
+        {
+            <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+                @if (Model.Page > 1)
+                {
+                    <a class="btn ghost" href="?status=@Model.Status&month=@Model.Month&page=@(Model.Page - 1)">上一页</a>
+                }
+                <span class="mini" style="align-self:center;">@Model.Page / @Model.Pages</span>
+                @if (Model.Page < Model.Pages)
+                {
+                    <a class="btn ghost" href="?status=@Model.Status&month=@Model.Month&page=@(Model.Page + 1)">下一页</a>
+                }
+            </div>
+        }
+    }
+</div>

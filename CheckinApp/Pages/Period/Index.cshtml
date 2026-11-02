@@ -43,6 +43,24 @@
         {
             <p class="mini" style="margin-top:8px;">记录满两次后才会显示周期预测。</p>
         }
+        @* 对方预测（情侣互见：双方可看可记） *@
+        @if (Model.PartnerUid > 0 && Model.PartnerNext is DateTime pp)
+        {
+            <div class="stat-box" style="margin-top:10px;">
+                <div class="mini">@Model.Names.GetValueOrDefault(Model.PartnerUid, "TA") 的预计下次</div>
+                <div class="stat-num" style="font-size:16px;">
+                    @pp.ToString("M月d日")
+                    @if (Model.PartnerDaysToNext >= 0)
+                    {
+                        <span class="mini">（还有 @Model.PartnerDaysToNext 天）</span>
+                    }
+                    else
+                    {
+                        <span class="mini">（已推迟 @(-Model.PartnerDaysToNext) 天）</span>
+                    }
+                </div>
+            </div>
+        }
     }
 </div>
 
@@ -61,6 +79,10 @@ else
                     <div style="flex:1;min-width:180px;">
                         <div style="font-weight:600;">
                             @r.StartDate.ToString("yyyy年M月d日")
+                            @if (r.UserId != Model.MyUid)
+                            {
+                                <span class="chip" style="margin-left:6px;">@Model.Names.GetValueOrDefault(r.UserId, "TA")</span>
+                            }
                             @if (r.EndDate is DateTime e)
                             {
                                 <span class="mini">→ @e.ToString("M月d日")（@((e.Date - r.StartDate.Date).Days + 1) 天）</span>

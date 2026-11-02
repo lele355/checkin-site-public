@@ -8,12 +8,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CheckinApp.Pages.Couples;
 
-/// <summary>情侣空间 —— 仅 couples.view 权限可见（默认只有「情侣」角色与管理员）。</summary>
+/// <summary>情侣空间 —— 情侣大类聚合主页（2026-11-02 站主规划）：在一起天数 + 小纸条 + 双方经期速览 + 大类快捷入口。</summary>
 [Authorize(Policy = "perm:couples.view")]
-public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
+public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : PageModel
 {
     private readonly AppDbContext _db = db;
     private readonly CurrentUser _me = me;
+    private readonly CoupleScope _couple = couple;
 
     public CoupleSetting Setting { get; set; } = new() { StartDate = DateTime.Today };
     public int DaysTogether { get; set; }
@@ -26,6 +27,10 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
 
     /// <summary>最近一个「每年重复」纪念日的倒计时（可空）</summary>
     public (string Title, int DaysLeft)? NextAnniversary { get; set; }
+
+    // 经期速览（情侣互见：双方各一行）
+    public record PeriodPeek(string Name, DateTime? Next, int DaysLeft, bool Enough);
+    public List<PeriodPeek> PeriodPeeks { get; private set; } = [];
 
     public void OnGet()
     {
@@ -63,6 +68,27 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
             if (days < best.DaysLeft) best = (a.Title, days);
         }
         if (best.DaysLeft != int.MaxValue) NextAnniversary = best;
+
+        // 经期速览（双方各算各的预测）
+        var uids = _couple.MemberUids();
+        var names = _db.Users.Where(u => uids.Contains(u.Id)).ToDictionary(u => u.Id, u => u.DisplayName);
+        foreach (var u in uids.OrderBy(x => x == uid ? 0 : 1))
+        {
+            var starts = _db.PeriodRecords.Where(x => x.UserId == u)
+                .Select(x => x.StartDate.Date).OrderBy(d => d).ToList();
+            if (starts.Count >= 2)
+            {
+                var cycles = new List<int>();
+                for (var i = starts.Count - 1; i > 0 && cycles.Count < 3; i--)
+                    cycles.Add((starts[i] - starts[i - 1]).Days);
+                var next = starts[^1].AddDays((int)Math.Round(cycles.Average()));
+                PeriodPeeks.Add(new PeriodPeek(names.GetValueOrDefault(u, "?"), next, (next - DateTime.Today).Days, true));
+            }
+            else
+            {
+                PeriodPeeks.Add(new PeriodPeek(names.GetValueOrDefault(u, "?"), null, 0, false));
+            }
+        }
     }
 
     public IActionResult OnPostSaveSetting()

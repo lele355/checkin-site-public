@@ -64,8 +64,12 @@ public static class AiApi
             db.AiMessages.Add(sent);
             db.SaveChanges();
 
+            // 对话历史（含情侣域：对方的 couple_summary 对话双方可见，2026-11-02 站主规划）
+            var coupleUids = db.Users
+                .Where(u => u.IsActive && u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"))
+                .Select(u => u.Id).ToList();
             var history = db.AiMessages.AsNoTracking()
-                .Where(m => m.UserId == uid)
+                .Where(m => m.UserId == uid || (m.CoupleChat && coupleUids.Contains(m.UserId)))
                 .OrderByDescending(m => m.Id).Take(20).OrderBy(m => m.Id)
                 .Select(m => new AiMessage { Id = m.Id, Role = m.Role, Content = m.Content, ImageMime = m.ImageMime })
                 .ToList();
@@ -120,9 +124,14 @@ public static class AiApi
             // 有结构化建议时正文只留一句结论（模型爱在正文复述明细，还容易写错）
             display = AiPrompt.CompactDisplay(display, actionsJson);
 
+            // 情侣域标记（站主规划）：问月度总结的对话 = 双方可见 + 只留 3 天
+            var coupleChat = (actionsJson ?? "").Contains("couple_summary") || display.Contains("月度总结");
+            if (coupleChat) sent.CoupleChat = true;
+
             db.AiMessages.Add(new AiMessage
             {
                 UserId = uid, Role = "assistant", Content = display, ActionsJson = actionsJson ?? "",
+                CoupleChat = coupleChat,
             });
             db.SaveChanges();
 

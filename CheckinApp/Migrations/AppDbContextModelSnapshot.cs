@@ -31,6 +31,9 @@ namespace CheckinApp.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("CoupleChat")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -207,6 +210,67 @@ namespace CheckinApp.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("BoardMessages");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.CoupleMonthlySummary", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsFinal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Month")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ScopeDays")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CoupleMonthlySummaries");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.CoupleQuestion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Answer")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("AnsweredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FromUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ToUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromUserId");
+
+                    b.HasIndex("ToUserId");
+
+                    b.ToTable("CoupleQuestions");
                 });
 
             modelBuilder.Entity("CheckinApp.Models.CoupleSetting", b =>
@@ -811,6 +875,35 @@ namespace CheckinApp.Migrations
                     b.ToTable("Memos");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.MoodLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Mood")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("MoodLogs");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.NotifySetting", b =>
                 {
                     b.Property<int>("Id")
@@ -936,6 +1029,32 @@ namespace CheckinApp.Migrations
                         .IsUnique();
 
                     b.ToTable("Permissions");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.PoopLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PoopLogs");
                 });
 
             modelBuilder.Entity("CheckinApp.Models.Role", b =>
@@ -1187,6 +1306,25 @@ namespace CheckinApp.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.CoupleQuestion", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "FromUser")
+                        .WithMany()
+                        .HasForeignKey("FromUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CheckinApp.Models.User", "ToUser")
+                        .WithMany()
+                        .HasForeignKey("ToUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FromUser");
+
+                    b.Navigation("ToUser");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.Course", b =>
                 {
                     b.HasOne("CheckinApp.Models.Semester", "Semester")
@@ -1363,6 +1501,17 @@ namespace CheckinApp.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.MoodLog", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.NotifySetting", b =>
                 {
                     b.HasOne("CheckinApp.Models.User", "User")
@@ -1375,6 +1524,17 @@ namespace CheckinApp.Migrations
                 });
 
             modelBuilder.Entity("CheckinApp.Models.PeriodRecord", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.PoopLog", b =>
                 {
                     b.HasOne("CheckinApp.Models.User", "User")
                         .WithMany()

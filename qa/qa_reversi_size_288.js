@@ -68,6 +68,8 @@ async function api(method, path, body, token) {
     T('6×6 建房 state.size=6', room6.json.data.state.size === 6, 'size=' + room6.json.data.state.size);
 
     // ---------- 汇总 ----------
+    // 复位（README 规矩：会改库的脚本要自己复位）：size 回 8，防止污染其它套件的固定造局
+    await api('PUT', '/api/v1/games/reversi/settings', { size: 8, moveTimeoutSec: 0, totalTimeoutSec: 0 }, tok);
     const pass = results.filter(r => r.ok).length;
     console.log(`\n===== qa_reversi_size_288: ${pass} 通过 / ${results.length - pass} 失败 =====`);
     process.exit(pass === results.length ? 0 : 1);

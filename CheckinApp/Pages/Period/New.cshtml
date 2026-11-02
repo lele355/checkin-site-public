@@ -12,6 +12,22 @@
     }
 
     <form method="post">
+        @if (Model.Members.Count > 1)
+        {
+            <div class="field">
+                <label>记录归属（情侣互见，可给对方记）</label>
+                <select asp-for="OwnerUid">
+                    @foreach (var m in Model.Members)
+                    {
+                        <option value="@m.Uid">@m.Name</option>
+                    }
+                </select>
+            </div>
+        }
+        else
+        {
+            <input type="hidden" asp-for="OwnerUid" />
+        }
         <div class="field">
             <label>开始日期</label>
             <input asp-for="StartDate" type="date" required />

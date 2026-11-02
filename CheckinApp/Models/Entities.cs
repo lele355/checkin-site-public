@@ -344,6 +344,8 @@ public class AiMessage
     /// <summary>user / assistant</summary>
     public required string Role { get; set; }
     public string Content { get; set; } = "";
+    /// <summary>情侣域对话标记（2026-11-02 站主规划）：AI 助手问月度总结的对话 = 双方可见 + 只留 3 天</summary>
+    public bool CoupleChat { get; set; }
     /// <summary>建议单 JSON（assistant 消息独有）；执行后清空</summary>
     public string ActionsJson { get; set; } = "";
     /// <summary>随消息附带的图片 MIME（空 = 无图）。图片只做单次打包：存一次、只随当轮请求发送。</summary>
@@ -581,4 +583,74 @@ public class GameScore
     /// <summary>最高分（只增不减）</summary>
     public int BestScore { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// 心情记录 —— 情侣大类（2026-11-02 站主规划）：双方每日一个心情，相互可见。
+/// 每人每日一行（upsert）。Mood 1..6：开心/平淡/难过/生气/困/害羞。
+/// </summary>
+public class MoodLog
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    /// <summary>日期（每天一行）</summary>
+    public DateTime Date { get; set; }
+    /// <summary>心情档 1..6：1 开心 / 2 平淡 / 3 难过 / 4 生气 / 5 困 / 6 害羞</summary>
+    public int Mood { get; set; }
+    public string Note { get; set; } = "";
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// 排便记录 —— 情侣大类（2026-11-02 站主规划）：点一下记一次，双方相互可见。
+/// 每次一行（At 自动带当前时刻）。
+/// </summary>
+public class PoopLog
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    /// <summary>记录时刻</summary>
+    public DateTime At { get; set; }
+    public string Note { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// 互相提问 —— 情侣大类（2026-11-02 站主规划）：双方互问互答，对方回答。
+/// 页面管理：未答/已答筛选 + 分页 + 按月归档（控条数）。双方可见。
+/// </summary>
+public class CoupleQuestion
+{
+    public int Id { get; set; }
+    public int FromUserId { get; set; }
+    public User? FromUser { get; set; }
+    public int ToUserId { get; set; }
+    public User? ToUser { get; set; }
+    /// <summary>问题内容</summary>
+    public required string Content { get; set; }
+    /// <summary>回答（null=未答）</summary>
+    public string? Answer { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? AnsweredAt { get; set; }
+}
+
+/// <summary>
+/// 情侣月度总结 —— 情侣大类（2026-11-02 站主规划）：mimo AI 生成。
+/// 每日生成「当月截至今日」阶段总结（IsFinal=false，留存可查）；
+/// 每月最后一天生成定稿（IsFinal=true）作为当月总结。全部留存可查阅。
+/// </summary>
+public class CoupleMonthlySummary
+{
+    public int Id { get; set; }
+    /// <summary>月份（YYYY-MM-01）</summary>
+    public DateTime Month { get; set; }
+    /// <summary>总结覆盖天数（截至生成日）</summary>
+    public int ScopeDays { get; set; }
+    /// <summary>是否月末定稿</summary>
+    public bool IsFinal { get; set; }
+    /// <summary>AI 生成的总结内容</summary>
+    public required string Content { get; set; }
+    public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
 }

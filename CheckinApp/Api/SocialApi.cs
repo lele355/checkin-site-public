@@ -1,6 +1,7 @@
 using CheckinApp.Data;
 using CheckinApp.Models;
 using CheckinApp.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Text.Json;
@@ -14,7 +15,7 @@ public static class SocialApi
     public record BoardReq(string? Content);
     public record CoupleReq(string? Title, string? StartDate);
     public record NoteReq(string? Content);
-    public record PeriodReq(string? StartDate, string? EndDate, string? Note);
+    public record PeriodReq(string? StartDate, string? EndDate, string? Note, int? UserId = null);   // UserId：归属人（可给对方记，情侣互见）
 
     public static void Map(WebApplication app)
     {
@@ -206,57 +207,76 @@ public static class SocialApi
             return ApiKit.Ok();
         });
 
-        // ==================== 经期 ====================
+        // ==================== 经期（情侣大类：双方可看可记，2026-11-02 站主规划） ====================
         var pd = g.MapGroup("/period").RequireAuthorization("perm:period.use");
 
-        pd.MapGet("", (AppDbContext db, HttpContext ctx) =>
+        // 预测算法（近 3 次周期均值；按人分组，双方各算各的）
+        object? PredictOf(List<PeriodRecord> rows)
+        {
+            var starts = rows.Select(x => x.StartDate.Date).OrderBy(d => d).ToList();
+            if (starts.Count < 2) return null;
+            var cycles = new List<int>();
+            for (var i = starts.Count - 1; i > 0 && cycles.Count < 3; i--)
+                cycles.Add((starts[i] - starts[i - 1]).Days);
+            var avg = (int)Math.Round(cycles.Average());
+            var next = starts[^1].AddDays(avg);
+            var lastLen = rows.FirstOrDefault(r => r.EndDate is not null) is { } lr
+                ? (lr.EndDate!.Value.Date - lr.StartDate.Date).Days + 1 : 5;
+            return new
+            {
+                nextDate = ApiKit.D(next),
+                daysLeft = (next - DateTime.Today).Days,
+                avgCycle = avg,
+                avgLength = lastLen,
+            };
+        }
+
+        pd.MapGet("", (AppDbContext db, HttpContext ctx, [FromServices] CoupleScope couple) =>
         {
             var uid = ApiKit.MeId(ctx);
-            var rows = db.PeriodRecords.Where(x => x.UserId == uid)
-                .OrderByDescending(x => x.StartDate).Take(24).ToList();
+            var uids = couple.MemberUids();
+            var rows = db.PeriodRecords.Where(x => uids.Contains(x.UserId))
+                .OrderByDescending(x => x.StartDate).Take(48).ToList();
+            var names = db.Users.Where(u => uids.Contains(u.Id))
+                .ToDictionary(u => u.Id, u => u.DisplayName);
 
             var items = rows.Select(r => new
             {
                 id = r.Id,
+                userId = r.UserId,
+                owner = names.GetValueOrDefault(r.UserId, "?"),
                 startDate = ApiKit.D(r.StartDate),
                 endDate = ApiKit.DN(r.EndDate),
                 note = r.Note,
                 length = r.EndDate is null ? (int?)null : (r.EndDate.Value.Date - r.StartDate.Date).Days + 1,
             }).ToList();
 
-            // 预测：近 3 次周期的平均（与提醒中心同一套算法）
-            object? predict = null;
-            var starts = rows.Select(x => x.StartDate.Date).OrderBy(d => d).ToList();
-            if (starts.Count >= 2)
-            {
-                var cycles = new List<int>();
-                for (var i = starts.Count - 1; i > 0 && cycles.Count < 3; i--)
-                    cycles.Add((starts[i] - starts[i - 1]).Days);
-                var avg = (int)Math.Round(cycles.Average());
-                var next = starts[^1].AddDays(avg);
-                var lastLen = rows.FirstOrDefault(r => r.EndDate is not null) is { } lr
-                    ? (lr.EndDate!.Value.Date - lr.StartDate.Date).Days + 1 : 5;
-                predict = new
-                {
-                    nextDate = ApiKit.D(next),
-                    daysLeft = (next - DateTime.Today).Days,
-                    avgCycle = avg,
-                    avgLength = lastLen,
-                };
-            }
+            var mine = rows.Where(x => x.UserId == uid).ToList();
+            var partnerUid = uids.FirstOrDefault(x => x != uid);
+            var partner = rows.Where(x => x.UserId == partnerUid).ToList();
 
-            return ApiKit.Ok(new { items, predict, today = ApiKit.D(DateTime.Today) });
+            return ApiKit.Ok(new
+            {
+                items,
+                predict = PredictOf(mine),
+                partnerPredict = PredictOf(partner),
+                partnerName = partnerUid == 0 ? null : names.GetValueOrDefault(partnerUid, "?"),
+                today = ApiKit.D(DateTime.Today),
+            });
         });
 
-        pd.MapPost("", (PeriodReq req, AppDbContext db, HttpContext ctx) =>
+        pd.MapPost("", (PeriodReq req, AppDbContext db, HttpContext ctx, [FromServices] CoupleScope couple) =>
         {
             var uid = ApiKit.MeId(ctx);
             var start = ApiKit.ParseDate(req.StartDate) ?? throw new ApiBadRequest("请选择开始日期");
             var end = ApiKit.ParseDate(req.EndDate);
             if (end is not null && end < start) throw new ApiBadRequest("结束日期不能早于开始日期");
+            // 归属人：默认自己；可给对方记（双方可看可记，须是情侣域成员）
+            var owner = req.UserId ?? uid;
+            if (!couple.IsMember(owner)) throw new ApiBadRequest("只能为自己或对方记录");
             var r = new PeriodRecord
             {
-                UserId = uid, StartDate = start, EndDate = end, Note = ApiKit.Cut(req.Note, 200),
+                UserId = owner, StartDate = start, EndDate = end, Note = ApiKit.Cut(req.Note, 200),
                 CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
             };
             db.PeriodRecords.Add(r);
@@ -264,10 +284,10 @@ public static class SocialApi
             return ApiKit.Ok(new { id = r.Id });
         });
 
-        pd.MapPut("/{id:int}", (int id, PeriodReq req, AppDbContext db, HttpContext ctx) =>
+        pd.MapPut("/{id:int}", (int id, PeriodReq req, AppDbContext db, HttpContext ctx, [FromServices] CoupleScope couple) =>
         {
-            var uid = ApiKit.MeId(ctx);
-            var r = db.PeriodRecords.FirstOrDefault(x => x.Id == id && x.UserId == uid)
+            var uids = couple.MemberUids();
+            var r = db.PeriodRecords.FirstOrDefault(x => x.Id == id && uids.Contains(x.UserId))
                     ?? throw new ApiBadRequest("记录不存在或已删除");
             var start = ApiKit.ParseDate(req.StartDate) ?? r.StartDate;
             var end = ApiKit.ParseDate(req.EndDate);
@@ -279,10 +299,10 @@ public static class SocialApi
             return ApiKit.Ok(new { id });
         });
 
-        pd.MapDelete("/{id:int}", (int id, AppDbContext db, HttpContext ctx) =>
+        pd.MapDelete("/{id:int}", (int id, AppDbContext db, HttpContext ctx, [FromServices] CoupleScope couple) =>
         {
-            var uid = ApiKit.MeId(ctx);
-            var r = db.PeriodRecords.FirstOrDefault(x => x.Id == id && x.UserId == uid);
+            var uids = couple.MemberUids();
+            var r = db.PeriodRecords.FirstOrDefault(x => x.Id == id && uids.Contains(x.UserId));
             if (r is null) return ApiKit.NotFound("记录不存在或已删除");
             db.PeriodRecords.Remove(r);
             db.SaveChanges();

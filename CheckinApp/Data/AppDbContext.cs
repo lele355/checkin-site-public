@@ -39,6 +39,11 @@ public partial class AppDbContext : DbContext
     /// <summary>单机游戏最高分，一人一游戏一行</summary>
     public DbSet<GameScore> GameScores => Set<GameScore>();
 
+    public DbSet<MoodLog> MoodLogs => Set<MoodLog>();
+    public DbSet<PoopLog> PoopLogs => Set<PoopLog>();
+    public DbSet<CoupleQuestion> CoupleQuestions => Set<CoupleQuestion>();
+    public DbSet<CoupleMonthlySummary> CoupleMonthlySummaries => Set<CoupleMonthlySummary>();
+
     protected override void OnModelCreating(ModelBuilder m)
     {
         m.Entity<RolePermission>(e => e.HasKey(x => new { x.RoleId, x.PermissionId }));

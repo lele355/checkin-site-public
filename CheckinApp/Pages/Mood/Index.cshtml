@@ -1,0 +1,109 @@
+@page
+@model CheckinApp.Pages.Mood.IndexModel
+@{
+    ViewData["Title"] = "心情记录";
+    var moods = CheckinApp.Pages.Mood.IndexModel.Emojis;
+    var moodNames = CheckinApp.Pages.Mood.IndexModel.Names;
+    var first = Model.MonthStart;
+    var daysInMonth = DateTime.DaysInMonth(first.Year, first.Month);
+    var offset = ((int)first.DayOfWeek + 6) % 7;   // 周一开头
+}
+
+<div class="page-head">
+    <h1>心情记录</h1>
+    <div style="display:flex;gap:8px;">
+        <a class="btn ghost" href="?month=@first.AddMonths(-1).ToString("yyyy-MM")">← 上月</a>
+        <a class="btn ghost" href="?month=@first.AddMonths(1).ToString("yyyy-MM")">下月 →</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="group-head">@first.ToString("yyyy年M月") · 双方心情（上：@Model.Members.FirstOrDefault().Name ／ 下：@(Model.Members.Count > 1 ? Model.Members[1].Name : "—")）</div>
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <thead>
+            <tr>
+                @foreach (var d in new[] { "一", "二", "三", "四", "五", "六", "日" })
+                {
+                    <th class="mini" style="padding:4px 0;text-align:center;">@d</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @{
+                var day = 1;
+                var cells = offset + daysInMonth;
+                var rows = (cells + 6) / 7;
+            }
+            @for (var w = 0; w < rows; w++)
+            {
+                <tr>
+                    @for (var col = 0; col < 7; col++)
+                    {
+                        var idx = w * 7 + col;
+                        if (idx < offset || day > daysInMonth)
+                        {
+                            <td style="padding:4px 2px;"></td>
+                        }
+                        else
+                        {
+                            var d = day;
+                            <td style="padding:4px 2px;text-align:center;vertical-align:top;border:1px solid var(--line,#eee);border-radius:8px;">
+                                <div class="mini">@d</div>
+                                @foreach (var m in Model.Members)
+                                {
+                                    var key = (m.Uid, d);
+                                    var has = Model.MoodMap.TryGetValue(key, out var mv);
+                                    <a href="#" style="text-decoration:none;"
+                                       onclick="document.getElementById('sv-date').value='@first.ToString("yyyy-MM")-@d.ToString("00")';document.getElementById('sv-owner').value='@m.Uid';document.getElementById('save-form').style.display='block';return false;">
+                                        <div style="font-size:17px;line-height:1.25;opacity:@(has ? "1" : ".25");">@(has ? moods[mv - 1] : "·")</div>
+                                    </a>
+                                }
+                            </td>
+                            day++;
+                        }
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@* 记录表单（点日历格出现） *@
+<div class="card" id="save-form" style="display:none;">
+    <div class="group-head">记一个心情</div>
+    <form method="post" asp-page-handler="Save" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="hidden" id="sv-date" name="SaveDate" />
+        <input type="hidden" id="sv-owner" name="SaveOwner" />
+        <div>
+            @for (var i = 1; i <= 6; i++)
+            {
+                <label style="cursor:pointer;font-size:22px;margin-right:4px;">
+                    <input type="radio" name="SaveMood" value="@i" required /> @moods[i - 1]
+                </label>
+            }
+        </div>
+        <input name="SaveNote" placeholder="说点什么（可留空）" style="flex:1;min-width:160px;" maxlength="200" />
+        <button class="btn" type="submit">保存</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="group-head">本月心情分布</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        @for (var u = 0; u < Model.Members.Count; u++)
+        {
+            var dist = u == 0 ? Model.MyDist : Model.PartnerDist;
+            <div>
+                <div class="mini" style="margin-bottom:4px;">@Model.Members[u].Name</div>
+                @for (var i = 1; i <= 6; i++)
+                {
+                    var c = dist.GetValueOrDefault(i);
+                    if (c > 0)
+                    {
+                        <span class="chip" style="margin:2px;">@moods[i - 1] @c</span>
+                    }
+                }
+            </div>
+        }
+    </div>
+</div>

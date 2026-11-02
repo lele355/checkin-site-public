@@ -9,6 +9,8 @@ public static class NavCatalog
     public const string GroupLife = "生活";
     public const string GroupTool = "工具";
     public const string GroupAdmin = "管理";
+    /// <summary>情侣大类（2026-11-02 站主规划：情侣空间升格一级大类，双方数据互见）。</summary>
+    public const string GroupLove = "情侣";
 
     public static readonly List<NavItem> Items =
     [
@@ -20,11 +22,16 @@ public static class NavCatalog
         new("habits",      "打卡",   "check",    "/Habits",      "habits.use",     GroupLife, true),
         new("courses",     "课程表", "grid",     "/Courses",     "courses.use",    GroupLife, true),
         new("anniversary", "纪念日", "heart",    "/Anniversaries","anniversary.use",GroupLife, true),
-        new("couples",     "情侣空间","couple",  "/Couples",     "couples.view",   GroupLife, true),
         new("board",       "留言板", "chat",     "/Board",       "board.use",      GroupLife, true),
         new("games",       "小游戏", "gamepad",  "/Games",       "games.use",      GroupLife, true),
         new("expense",     "记账",   "wallet",   "/Expenses",    "expense.use",    GroupLife, true),
-        new("period",      "经期",   "drop",     "/Period",      "period.use",     GroupLife, true),
+        // ---- 情侣大类（couples.view 门控，双方数据互见）----
+        new("couples",     "情侣空间","couple",  "/Couples",     "couples.view",   GroupLove, true),
+        new("mood",        "心情",   "smile",    "/Mood",        "couples.view",   GroupLove, true),
+        new("poop",        "排便",   "poop",     "/Poop",        "couples.view",   GroupLove, true),
+        new("questions",   "提问",   "chat",     "/Questions",   "couples.view",   GroupLove, true),
+        new("summary",     "月度总结","chart",   "/Summary",     "couples.view",   GroupLove, true),
+        new("period",      "经期",   "drop",     "/Period",      "period.use",     GroupLove, true),
         new("reminders",   "提醒",   "bell",     "/Reminders",   "reminders.use",  GroupTool, true),
         new("stats",       "统计",   "chart",    "/Stats",       "stats.use",      GroupTool, true),
         new("export",      "导出",   "download", "/Export",      "export.use",     GroupTool, true),

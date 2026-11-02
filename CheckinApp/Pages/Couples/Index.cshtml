@@ -19,6 +19,46 @@
     }
 </div>
 
+@* 情侣大类快捷入口（2026-11-02 站主规划） *@
+<div class="card">
+    <div class="group-head">情侣功能</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a class="chip" style="text-decoration:none;padding:10px 16px;" href="/Period">🌸 经期</a>
+        <span class="chip" style="padding:10px 16px;opacity:.5;">😊 心情（即将上线）</span>
+        <span class="chip" style="padding:10px 16px;opacity:.5;">💩 排便（即将上线）</span>
+        <span class="chip" style="padding:10px 16px;opacity:.5;">❓ 提问（即将上线）</span>
+        <span class="chip" style="padding:10px 16px;opacity:.5;">📊 月度总结（即将上线）</span>
+    </div>
+</div>
+
+@* 双方经期速览（情侣互见） *@
+@if (Model.PeriodPeeks.Count > 0)
+{
+    <div class="card">
+        <div class="group-head">经期速览</div>
+        <div class="stack">
+            @foreach (var pk in Model.PeriodPeeks)
+            {
+                <div class="row-item" style="display:flex;align-items:center;gap:12px;">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;">@pk.Name</div>
+                        <div class="mini">
+                            @if (pk.Enough && pk.Next is DateTime pn)
+                            {
+                                <span>预计下次 @pn.ToString("M月d日")（@(pk.DaysLeft >= 0 ? $"还有 {pk.DaysLeft} 天" : $"已推迟 {-pk.DaysLeft} 天")）</span>
+                            }
+                            else
+                            {
+                                <span>记录满两次后显示预测</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
 <div class="card">
     <div class="page-head">
         <h2>小纸条</h2>

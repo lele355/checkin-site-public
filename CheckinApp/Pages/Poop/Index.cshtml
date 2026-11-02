@@ -1,0 +1,59 @@
+@page
+@model CheckinApp.Pages.Poop.IndexModel
+@{
+    ViewData["Title"] = "排便记录";
+}
+
+<div class="page-head">
+    <h1>排便记录</h1>
+    <div class="mini">@Model.MonthLabel · 双方可见</div>
+</div>
+
+@* 点一下打卡 *@
+<div class="card" style="text-align:center;padding:26px 16px;">
+    <div class="group-head">今天，来感觉了就点一下</div>
+    <form method="post" asp-page-handler="Tap" style="display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;">
+        @if (Model.Members.Count > 1)
+        {
+            <select name="SaveOwner" style="padding:8px 12px;border-radius:10px;">
+                @foreach (var m in Model.Members)
+                {
+                    <option value="@m.Uid">@m.Name</option>
+                }
+            </select>
+        }
+        else
+        {
+            <input type="hidden" name="SaveOwner" value="0" />
+        }
+        <button class="btn" type="submit" style="font-size:18px;padding:14px 34px;border-radius:16px;">💩 记一次</button>
+    </form>
+    <div class="mini" style="margin-top:10px;">本月：@Model.Members.FirstOrDefault().Name @Model.MyCount 次 @if (Model.Members.Count > 1) { <text>· @Model.Members[1].Name @Model.PartnerCount 次</text> }</div>
+</div>
+
+@* 列表 *@
+<div class="card">
+    <div class="group-head">本月记录</div>
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="empty"><span class="big">🌱</span>这个月还没有记录</div>
+    }
+    else
+    {
+        <div class="stack">
+            @foreach (var (r, owner) in Model.Rows)
+            {
+                <div class="row-item" style="display:flex;align-items:center;gap:10px;">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;">@r.At.AddHours(8).ToString("M月d日 HH:mm")</div>
+                        <div class="mini">@owner @if (!string.IsNullOrWhiteSpace(r.Note)) { <text>· @r.Note</text> }</div>
+                    </div>
+                    <form method="post" asp-page-handler="Delete" data-confirm>
+                        <input type="hidden" name="id" value="@r.Id" />
+                        <button class="btn ghost" type="submit">删</button>
+                    </form>
+                </div>
+            }
+        </div>
+    }
+</div>

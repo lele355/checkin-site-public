@@ -134,6 +134,9 @@ builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler
 // 当前用户上下文 + 登录限速
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUser>();
+builder.Services.AddScoped<CoupleScope>();   // 情侣域（2026-11-02 情侣大类：双方数据互见边界）
+builder.Services.AddScoped<CoupleSummaryService>();   // 情侣月度总结（mimo 生成）
+builder.Services.AddHostedService<CoupleSummaryHostedService>();   // 每日阶段总结 + 月末定稿
 builder.Services.AddSingleton<LoginRateLimiter>();
 
 // App 接口令牌（Bearer）：与网站 Cookie 认证并行的第二条通道
@@ -264,6 +267,7 @@ CheckinApp.Api.AuthApi.Map(app);
 CheckinApp.Api.CoreApi.Map(app);
 CheckinApp.Api.LifeApi.Map(app);
 CheckinApp.Api.SocialApi.Map(app);
+CheckinApp.Api.CoupleApi.MapCoupleApi(app);   // 情侣大类（心情/排便/统计，2026-11-02）
 CheckinApp.Api.AiApi.Map(app);
 CheckinApp.Api.EmailApi.Map(app);
 CheckinApp.Api.AdminApi.Map(app);

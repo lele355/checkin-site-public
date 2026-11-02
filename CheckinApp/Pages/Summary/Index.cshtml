@@ -1,0 +1,52 @@
+@page
+@model CheckinApp.Pages.Summary.IndexModel
+@{
+    ViewData["Title"] = "月度总结";
+}
+
+<div class="page-head">
+    <h1>月度总结</h1>
+    <form method="post" asp-page-handler="Generate">
+        <button class="btn" type="submit">✨ 生成截至今天的总结</button>
+    </form>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Notice))
+{
+    <div class="card"><div class="mini">@Model.Notice</div></div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="card"><div class="mini" style="color:#c62828;">@Model.Error</div></div>
+}
+
+<div class="card">
+    <div class="group-head">总结档案（每日阶段版 + 月末定稿，全部留存）</div>
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty"><span class="big">📊</span>还没有总结。每天 23:30 自动生成，也可以点右上按钮立即生成。</div>
+    }
+    else
+    {
+        <div class="stack">
+            @foreach (var s in Model.Items)
+            {
+                <div class="row-item">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <strong>@s.Month</strong>
+                        @if (s.IsFinal)
+                        {
+                            <span class="chip" style="background:var(--accent-soft);color:var(--accent-strong);">当月定稿</span>
+                        }
+                        else
+                        {
+                            <span class="chip">截至 @s.ScopeDays 天</span>
+                        }
+                        <span class="mini" style="margin-left:auto;">@s.GeneratedAt</span>
+                    </div>
+                    <div style="margin-top:6px;white-space:pre-wrap;">@s.Content</div>
+                </div>
+            }
+        </div>
+    }
+</div>

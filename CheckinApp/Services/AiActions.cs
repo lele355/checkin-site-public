@@ -25,6 +25,24 @@ public static class AiTools
             type = "function",
             function = new
             {
+                name = "couple_summary",
+                description = "查询情侣月度总结（AI 生成的当月记录回顾）。用户问情侣月度总结、这个月怎么样、月度回顾、最近的总结时用它。",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        action = new { type = "string", description = "query=查询最新总结（默认）" },
+                    },
+                    required = Array.Empty<string>(),
+                },
+            },
+        },
+        new
+        {
+            type = "function",
+            function = new
+            {
                 name = "create_schedule",
                 description = "新建一条日程（会议、约会、待办安排等）。用户提到任何要安排在某个时间的事都用它。",
                 parameters = new
@@ -272,6 +290,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
     /// <summary>动作白名单（菜单制）：不在这里的一律拒绝 —— 这就是「禁区」的硬围栏。</summary>
     private static readonly Dictionary<string, string> RequiredPerm = new()
     {
+        ["couple_summary"]    = "couples.view",
         ["create_schedule"]   = "schedule.use",
         ["create_memo"]       = "memo.use",
         ["create_expense"]    = "expense.use",
@@ -283,6 +302,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
     /// <summary>动作 → 中文名（确认卡展示用）</summary>
     public static readonly Dictionary<string, string> ActionLabels = new()
     {
+        ["couple_summary"]     = "情侣月度总结",
         ["create_schedule"]    = "新建日程",
         ["create_memo"]        = "新建备忘",
         ["create_expense"]     = "记一笔账",
@@ -311,6 +331,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
 
         return type switch
         {
+            "couple_summary"     => CoupleSummary(uid, act),
             "create_schedule"    => CreateSchedule(uid, act),
             "create_memo"        => CreateMemo(uid, act),
             "create_expense"     => CreateExpense(uid, act),
@@ -322,6 +343,17 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
     }
 
     // ---------- 5 个白名单动作：每个都先校验字段再落库，属主一律取登录态 ----------
+
+    /// <summary>情侣月度总结（2026-11-02 站主规划）：查询最新总结（生成走每日定时 + 页面按钮）。</summary>
+    private AiActionResult CoupleSummary(int uid, JsonElement a)
+    {
+        var row = db.CoupleMonthlySummaries
+            .OrderByDescending(x => x.Month).ThenByDescending(x => x.IsFinal).ThenByDescending(x => x.GeneratedAt)
+            .FirstOrDefault();
+        if (row is null) return new(false, "还没有月度总结（每天会自动生成，也可以到情侣空间手动生成一份）");
+        var kind = row.IsFinal ? "当月定稿" : $"截至本月 {row.ScopeDays} 天的阶段总结";
+        return new(true, $"【{row.Month:yyyy年M月} · {kind}】\n{row.Content}");
+    }
 
     private AiActionResult CreateSchedule(int uid, JsonElement a)
     {
