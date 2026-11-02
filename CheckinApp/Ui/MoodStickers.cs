@@ -45,22 +45,23 @@ public static class MoodStickers
                 <circle cx="23.2" cy="{eyY}" r="2.4" fill="#5B4632"/>
                 <circle cx="40.8" cy="{eyY}" r="2.4" fill="#5B4632"/>
                 """, $"""<path d="M28 {eyY + 8} h8" stroke="#5B4632" stroke-width="2.6" stroke-linecap="round"/>"""),
-            // 3 难过：下垂眼 + 波浪嘴
+            // 3 不开心/难过：八字眉 + 下垂眼 + 撇嘴（∩ 型，强化"不开心"，2026-11-02 站主定）
             3 => ($"""
+                <path d="M19.5 25.5 q3.5 -2.2 7 -0.8 M44.5 25.5 q-3.5 -2.2 -7 -0.8" stroke="#5B4632" stroke-width="2.2" stroke-linecap="round" fill="none"/>
                 <path d="M20 {eyY + 1.5} q3.2 3.6 6.4 0" fill="none" stroke="#5B4632" stroke-width="2.6" stroke-linecap="round"/>
                 <path d="M37.6 {eyY + 1.5} q3.2 3.6 6.4 0" fill="none" stroke="#5B4632" stroke-width="2.6" stroke-linecap="round"/>
-                """, $"""<path d="M27 {eyY + 9.5} q3 -3 6 0 q3 3 6 0" fill="none" stroke="#5B4632" stroke-width="2.4" stroke-linecap="round"/>"""),
+                """, $"""<path d="M26 {eyY + 10} q6 -5.5 12 0" fill="none" stroke="#5B4632" stroke-width="2.6" stroke-linecap="round"/>"""),
             // 4 生气：皱眉斜眼 + 撅嘴
             4 => ($"""
                 <path d="M19.5 {eyY - 3} l6.5 2.2 M44.5 {eyY - 3} l-6.5 2.2" stroke="#5B4632" stroke-width="2.4" stroke-linecap="round"/>
                 <circle cx="23.6" cy="{eyY + 1.8}" r="2.1" fill="#5B4632"/>
                 <circle cx="40.4" cy="{eyY + 1.8}" r="2.1" fill="#5B4632"/>
                 """, $"""<path d="M27 {eyY + 10} q6 -4.4 12 0" fill="none" stroke="#5B4632" stroke-width="2.6" stroke-linecap="round"/>"""),
-            // 5 困：闭眼线 + 小 o 嘴 + 💤
+            // 5 困：闭眼线 + 小 o 嘴（不是笑弧！与开心拉开）+ zzz
             5 => ($"""
                 <path d="M20 {eyY} h6.4 M37.6 {eyY} h6.4" stroke="#5B4632" stroke-width="2.6" stroke-linecap="round"/>
                 """, $"""
-                <path d="M26 {eyY + 8} q6 6.2 12 0" fill="none" stroke="#5B4632" stroke-width="2.6" stroke-linecap="round"/>
+                <ellipse cx="32" cy="{eyY + 9}" rx="3" ry="3.8" fill="none" stroke="#5B4632" stroke-width="2.4"/>
                 <text x="47" y="18" font-size="12" fill="#8FA9C9">z</text>
                 <text x="53" y="12" font-size="9" fill="#8FA9C9">z</text>
                 """),
