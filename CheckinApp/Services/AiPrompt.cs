@@ -153,12 +153,12 @@ public static class AiPrompt
 
         // 情侣域数据（2026-11-02 站主定：AI 能回答全部个人/情侣数据问题；双方互见）
         var coupleUids = db.Users
-            .Where(u => u.IsActive && u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"))
+            .Where(u => u.IsActive && u.Role.Name == "情侣")
             .Select(u => u.Id).ToList();
         if (coupleUids.Count > 1)
         {
             var names = db.Users.Where(u => coupleUids.Contains(u.Id)).ToDictionary(u => u.Id, u => u.DisplayName);
-            var mn = new[] { "开心", "平淡", "难过", "生气", "困", "害羞" };
+            var mn = new[] { "生气", "难过", "困", "平淡", "害羞", "开心" };
             var today0 = now.Date;
             var moods2 = db.MoodLogs.Where(x => coupleUids.Contains(x.UserId) && x.Date >= today0.AddDays(-1))
                 .OrderByDescending(x => x.Date).Take(4).ToList();

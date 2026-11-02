@@ -56,12 +56,11 @@ public static class CoupleApi
             if (req.Mood is < 1 or > 6) throw new ApiBadRequest("心情档位不对");
             var date = ApiKit.ParseDate(req.Date) ?? DateTime.Today;
             if (date.Date > DateTime.Today) throw new ApiBadRequest("不能给未来记心情");   // 日期边界（2026-11-02 站主定）
-            var owner = req.UserId ?? uid;
-            if (!couple.IsMember(owner)) throw new ApiBadRequest("只能为自己或对方记录");
-            var row = db.MoodLogs.FirstOrDefault(x => x.UserId == owner && x.Date == date);
+            // 只能记自己的心情（2026-11-02 站主定：不能设置对方的心情）
+            var row = db.MoodLogs.FirstOrDefault(x => x.UserId == uid && x.Date == date);
             if (row is null)
             {
-                row = new MoodLog { UserId = owner, Date = date };
+                row = new MoodLog { UserId = uid, Date = date };
                 db.MoodLogs.Add(row);
             }
             row.Mood = req.Mood;
@@ -71,14 +70,12 @@ public static class CoupleApi
             return ApiKit.Ok(new { id = row.Id });   // 必须带 data（App unwrap 的 Unit as T 会炸，2026-11-02 修）
         });
 
-        c.MapDelete("/mood", (string? date, int? userId, AppDbContext db, [FromServices] CoupleScope couple, HttpContext ctx) =>
+        c.MapDelete("/mood", (string? date, AppDbContext db, [FromServices] CoupleScope couple, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
             var d = ApiKit.ParseDate(date) ?? DateTime.Today;
-            var owner = userId ?? uid;
-            var uids = couple.MemberUids();
-            if (!uids.Contains(owner)) return ApiKit.Err("只能删自己或对方的");
-            var row = db.MoodLogs.FirstOrDefault(x => x.UserId == owner && x.Date == d.Date);
+            // 只能删自己的（2026-11-02 站主定）
+            var row = db.MoodLogs.FirstOrDefault(x => x.UserId == uid && x.Date == d.Date);
             if (row is null) return ApiKit.NotFound("记录不存在");
             db.MoodLogs.Remove(row);
             db.SaveChanges();
@@ -264,7 +261,7 @@ public static class CoupleApi
     }
 
     /// <summary>心情档名（1..6）</summary>
-    public static readonly string[] MoodNames = ["开心", "平淡", "难过", "生气", "困", "害羞"];
+    public static readonly string[] MoodNames = ["生气", "难过", "困", "平淡", "害羞", "开心"];
 
     private static (DateTime, DateTime) MonthRange(string? month)
     {

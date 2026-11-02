@@ -400,7 +400,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
 
         // 情侣域成员（心情/排便/提问/经期双方互见）
         var coupleUids = db.Users
-            .Where(u => u.IsActive && u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"))
+            .Where(u => u.IsActive && u.Role.Name == "情侣")
             .Select(u => u.Id).ToList();
 
         switch (module)
@@ -449,7 +449,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
                 var rows = db.MoodLogs.Where(x => coupleUids.Contains(x.UserId) && x.Date >= since.Date)
                     .OrderByDescending(x => x.Date).Take(20).ToList();
                 var names = db.Users.Where(u => coupleUids.Contains(u.Id)).ToDictionary(u => u.Id, u => u.DisplayName);
-                var mn = new[] { "开心", "平淡", "难过", "生气", "困", "害羞" };
+                var mn = new[] { "生气", "难过", "困", "平淡", "害羞", "开心" };
                 return new(true, $"最近 {days} 天心情记录（双方）：\n" +
                     string.Join("\n", rows.Select(x => $"- {x.Date:M月d日} {names.GetValueOrDefault(x.UserId, "?")}：{mn[Math.Clamp(x.Mood, 1, 6) - 1]}{(x.Note == "" ? "" : $"（{x.Note}）")}")));
             }
@@ -517,7 +517,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         if (ownerRaw != "" && int.TryParse(ownerRaw, out var ow))
         {
             var isMember = db.Users.Any(u => u.Id == ow && u.IsActive &&
-                u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"));
+                u.Role.Name == "情侣");
             if (!isMember) return new(false, "只能为自己或对方记录");
             owner = ow;
         }

@@ -28,7 +28,7 @@ public class CoupleSummaryService(AppDbContext db, AiClient ai, CoupleScope coup
         var moods = _db.MoodLogs.Where(x => uids.Contains(x.UserId) && x.Date >= monthStart && x.Date <= today).ToList();
         var poops = _db.PoopLogs.Where(x => uids.Contains(x.UserId) && x.At >= monthStart && x.At < today.AddDays(1)).ToList();
         var qs = _db.CoupleQuestions.Where(x => uids.Contains(x.FromUserId) && x.CreatedAt >= monthStart).ToList();
-        var moodNames = new[] { "开心", "平淡", "难过", "生气", "困", "害羞" };
+        var moodNames = new[] { "生气", "难过", "困", "平淡", "害羞", "开心" };
 
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"这是情侣本月（{monthStart:yyyy年M月}，截至今日共 {scopeDays} 天）的记录摘要，请写一份温馨可爱的中文月度总结（250 字以内，轻松活泼，可带少量 emoji）：");

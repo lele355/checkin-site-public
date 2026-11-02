@@ -66,7 +66,7 @@ public static class AiApi
 
             // 对话历史（含情侣域：对方的 couple_summary 对话双方可见，2026-11-02 站主规划）
             var coupleUids = db.Users
-                .Where(u => u.IsActive && u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"))
+                .Where(u => u.IsActive && u.Role.Name == "情侣")
                 .Select(u => u.Id).ToList();
             var history = db.AiMessages.AsNoTracking()
                 .Where(m => m.UserId == uid || (m.CoupleChat && coupleUids.Contains(m.UserId)))

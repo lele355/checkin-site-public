@@ -13,11 +13,11 @@ public class CoupleScope(AppDbContext db, CurrentUser me)
     private readonly AppDbContext _db = db;
     private readonly CurrentUser _me = me;
 
-    /// <summary>情侣域成员 UserId 集合（持有 couples.view 的用户；含本人）。</summary>
+    /// <summary>情侣域成员 UserId 集合 —— 只认「情侣」角色（2026-11-02 站主定：就现有两人，管理员不混入）。</summary>
     public List<int> MemberUids()
     {
         return _db.Users
-            .Where(u => u.IsActive && u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"))
+            .Where(u => u.IsActive && u.Role.Name == "情侣")
             .Select(u => u.Id)
             .ToList();
     }
