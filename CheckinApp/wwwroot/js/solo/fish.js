@@ -87,6 +87,16 @@
     .catch(function () {});
 
   function radius(lvl) { return 10 + lvl * 5; }
+
+  // 视觉鱼形椭圆半轴（与 drawFish 各 kind 几何同源）：判定贴合贴图（2026-11-02 站主定：判定大小和贴图对不上）
+  function halfAxes(lvl, kind) {
+    var r = radius(lvl);
+    if (kind === 1) return [r * 1.25, r * 0.82];   // 梭鱼（尖嘴+身）
+    if (kind === 2) return [r * 1.1, r * 0.95];    // 鳐（菱形身）
+    if (kind === 3) return [r * 1.0, r * 0.7];     // 水母（伞盖；触手不算判定）
+    if (kind === 4) return [r * 1.05, r * 0.85];   // 鲨（身+背鳍包络）
+    return [r * 1.05, r * 0.82];                   // 普通鱼
+  }
   function growthNeed(l) { return 4 + l * 2; }          // 成长条阈值（F1）
   function fishValue(l) { return VALUES[Math.min(l, 6)]; }
 
@@ -254,12 +264,14 @@
       if (bb.y < -6) { bb.y = H + 6; bb.x = Math.random() * W; }
     }
 
-    // 吃珍珠（F10 先行）
-    var pr = radius(level);
+    // 吃珍珠（F10 先行）——椭圆判定（玩家视觉半轴+珍珠半径，贴图即判定）
+    var PH = halfAxes(level, 4);   // 玩家=鲨形
     for (var k = pearls.length - 1; k >= 0; k--) {
       var po = pearls[k];
       po.t += dt * 3;
-      if (Math.hypot(po.x - px, po.y - py) < pr + po.r + 2) {
+      var pdx = po.x - px, pdy = po.y - py;
+      var pex = PH[0] + po.r + 2, pey = PH[1] + po.r + 2;
+      if (pdx * pdx / (pex * pex) + pdy * pdy / (pey * pey) < 1) {
         pearls.splice(k, 1);
         score += 10;
         sfx.play('eat');
@@ -268,11 +280,14 @@
     }
 
     // 吃鱼 / 被吃（F8：普通鱼同级可吃；F12：天敌恒危险；F2：三条命 + 无敌帧）
+    // 椭圆接触（双方视觉半轴求和，2026-11-02 判定贴合贴图）
     var eaten = 0;
     for (var m = fishes.length - 1; m >= 0; m--) {
       var fi = fishes[m];
-      var rr = radius(fi.level) + pr - 4;
-      if (Math.hypot(fi.x - px, fi.y - py) >= rr) continue;
+      var FH = halfAxes(fi.level, fi.kind);
+      var ex = PH[0] + FH[0] - 4, ey = PH[1] + FH[1] - 4;
+      var ddx = fi.x - px, ddy = fi.y - py;
+      if (ddx * ddx / (ex * ex) + ddy * ddy / (ey * ey) >= 1) continue;
       if (fi.kind < 3 && fi.level <= level) {
         chain++; chainTimer = 3;
         score += Math.round(fishValue(fi.level) * comboMult());
