@@ -32,20 +32,15 @@
         <div class="stack">
             @foreach (var n in Model.Notes)
             {
-                <div class="row-item">
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <div class="mini" style="flex:1;">@n.FromUser?.DisplayName · @n.CreatedAt.AddHours(8).ToString("M月d日 HH:mm")</div>
-                        @if (Model.User.Identity?.Name == n.FromUser?.Username)
-                        {
-                            @* 删除按钮在右上角（2026-11-02 站主定：优化位置） *@
-                            <form method="post" asp-page-handler="Delete" data-confirm style="margin:0;">
-                                <input type="hidden" name="id" value="@n.Id" />
-                                <button class="btn ghost" type="submit" style="font-size:11px;padding:3px 10px;">删</button>
-                            </form>
-                        }
+                @* 点纸条弹确认删除（2026-11-02 站主定：取消按钮，点纸条弹窗删除+二次确认） *@
+                <form method="post" asp-page-handler="Delete" data-confirm style="margin:0;">
+                    <input type="hidden" name="id" value="@n.Id" />
+                    <div class="row-item" style="cursor:@(Model.User.Identity?.Name == n.FromUser?.Username ? "pointer" : "default");"
+                         onclick="@(Model.User.Identity?.Name == n.FromUser?.Username ? "this.closest('form').requestSubmit()" : "")">
+                        <div class="mini">@n.FromUser?.DisplayName · @n.CreatedAt.AddHours(8).ToString("M月d日 HH:mm")</div>
+                        <div style="margin-top:4px;white-space:pre-wrap;">@n.Content</div>
                     </div>
-                    <div style="margin-top:4px;white-space:pre-wrap;">@n.Content</div>
-                </div>
+                </form>
             }
         </div>
     }
