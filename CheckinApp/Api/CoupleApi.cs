@@ -23,8 +23,9 @@ public static class CoupleApi
         var c = g.MapGroup("/api/v1/couple").RequireAuthorization("perm:couples.view");
 
         // ==================== 心情（每人每日一行 upsert，双方互见） ====================
-        c.MapGet("/moods", (string? month, AppDbContext db, [FromServices] CoupleScope couple) =>
+        c.MapGet("/moods", (string? month, AppDbContext db, [FromServices] CoupleScope couple, HttpContext ctx) =>
         {
+            var meId = ApiKit.MeId(ctx);
             var uids = couple.MemberUids();
             var (from, to) = MonthRange(month);
             var rows = db.MoodLogs.Where(x => uids.Contains(x.UserId) && x.Date >= from && x.Date < to)
@@ -39,7 +40,14 @@ public static class CoupleApi
                 mood = r.Mood,
                 note = r.Note,
             }).ToList();
-            return ApiKit.Ok(new { items, moods = MoodNames });
+            // members 固定顺序（自己在前）——日历行归属固定，不搞混（2026-11-02 站主定）
+            var ordered = uids.OrderBy(x => x == meId ? 0 : 1).ToList();
+            return ApiKit.Ok(new
+            {
+                items,
+                moods = MoodNames,
+                members = ordered.Select(u => new { userId = u, name = names.GetValueOrDefault(u, "?") }).ToList(),
+            });
         });
 
         c.MapPut("/mood", (MoodReq req, AppDbContext db, [FromServices] CoupleScope couple, HttpContext ctx) =>
@@ -78,8 +86,9 @@ public static class CoupleApi
         });
 
         // ==================== 排便（点一下记一次，双方互见） ====================
-        c.MapGet("/poops", (string? month, AppDbContext db, [FromServices] CoupleScope couple) =>
+        c.MapGet("/poops", (string? month, AppDbContext db, [FromServices] CoupleScope couple, HttpContext ctx) =>
         {
+            var meId = ApiKit.MeId(ctx);
             var uids = couple.MemberUids();
             var (from, to) = MonthRange(month);
             var rows = db.PoopLogs.Where(x => uids.Contains(x.UserId) && x.At >= from && x.At < to)
@@ -94,7 +103,13 @@ public static class CoupleApi
                 at = r.At.AddHours(8).ToString("yyyy-MM-dd HH:mm"),   // 显示北京时间（SiteClock 口径）
                 note = r.Note,
             }).ToList();
-            return ApiKit.Ok(new { items });
+            // members 固定顺序（自己在前）——日历行归属固定（2026-11-02 站主定）
+            var ordered = uids.OrderBy(x => x == meId ? 0 : 1).ToList();
+            return ApiKit.Ok(new
+            {
+                items,
+                members = ordered.Select(u => new { userId = u, name = names.GetValueOrDefault(u, "?") }).ToList(),
+            });
         });
 
         c.MapPost("/poop", (PoopReq req, AppDbContext db, [FromServices] CoupleScope couple, HttpContext ctx) =>

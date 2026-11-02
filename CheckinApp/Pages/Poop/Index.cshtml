@@ -75,7 +75,7 @@
                                 @foreach (var m in Model.Members)
                                 {
                                     var c = Model.DayCounts.GetValueOrDefault((m.Uid, d));
-                                    <div style="height:34px;line-height:34px;">
+                                    <div style="height:52px;line-height:52px;">
                                         @if (c > 0)
                                         {
                                             <span title="@m.Name @c 次" style="display:inline-flex;align-items:center;gap:3px;font-weight:700;color:#6B8E5A;">

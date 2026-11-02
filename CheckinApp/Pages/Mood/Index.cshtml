@@ -63,7 +63,7 @@
                             var dateVal = first.ToString("yyyy-MM") + "-" + d.ToString("00");
                             var isFuture = DateTime.Parse(dateVal) > today;
                             <td style="padding:5px 2px;text-align:center;vertical-align:top;border-radius:12px;background:@(isFuture ? "transparent" : "#FFFDF8");border:1.5px dashed @(isFuture ? "#EADFCB" : "#F0E2C8");@(isFuture ? "opacity:.35;" : "")">
-                                <div class="mini" style="font-weight:700;">@d</div>
+                                <div class="mini" style="font-weight:700;font-size:13px;">@d</div>
                                 @foreach (var m in Model.Members)
                                 {
                                     var key = (m.Uid, d);
@@ -78,11 +78,11 @@
                                            onclick="document.getElementById('sv-date').value='@dateVal';document.getElementById('sv-owner').value='@m.Uid';document.getElementById('sv-has').value='@(has ? "1" : "0")';document.getElementById('save-form').style.display='block';return false;">
                                             @if (has)
                                             {
-                                                @Html.Raw(CheckinApp.Ui.MoodStickers.Svg(mv, m == Model.Members.First(), 34))
+                                                @Html.Raw(CheckinApp.Ui.MoodStickers.Svg(mv, m == Model.Members.First(), 46))
                                             }
                                             else
                                             {
-                                                <div style="height:34px;line-height:34px;opacity:.22;font-size:15px;">＋</div>
+                                                <div style="height:52px;line-height:52px;opacity:.22;font-size:15px;">＋</div>
                                             }
                                         </a>
                                     }
