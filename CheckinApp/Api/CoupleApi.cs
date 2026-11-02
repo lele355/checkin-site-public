@@ -59,7 +59,7 @@ public static class CoupleApi
             row.Note = ApiKit.Cut(req.Note, 200);
             row.UpdatedAt = DateTime.UtcNow;
             db.SaveChanges();
-            return ApiKit.Ok();
+            return ApiKit.Ok(new { id = row.Id });   // 必须带 data（App unwrap 的 Unit as T 会炸，2026-11-02 修）
         });
 
         // ==================== 排便（点一下记一次，双方互见） ====================
@@ -174,7 +174,7 @@ public static class CoupleApi
             r.Answer = ApiKit.Cut(req.Content, 500);
             r.AnsweredAt = DateTime.UtcNow;
             db.SaveChanges();
-            return ApiKit.Ok();
+            return ApiKit.Ok(new { id = r.Id });   // 必须带 data（App unwrap 的 Unit as T 会炸）
         });
 
         c.MapDelete("/question/{id:int}", (int id, AppDbContext db, [FromServices] CoupleScope couple) =>
