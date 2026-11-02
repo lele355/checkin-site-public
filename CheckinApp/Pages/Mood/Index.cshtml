@@ -23,9 +23,16 @@
     </div>
 </div>
 
-<div class="card">
-    <div class="group-head">@first.ToString("yyyy年M月") · 双方心情（上：@Model.Members.FirstOrDefault().Name ／ 下：@(Model.Members.Count > 1 ? Model.Members[1].Name : "—")）</div>
-    <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+<div class="card" style="background:linear-gradient(180deg,#FFF9F0 0%,#FFFFFF 120px);">
+    @* 贴纸装饰（示意图风：小鸟/星星点缀） *@
+    <div style="font-size:20px;position:relative;height:26px;">
+        <span style="position:absolute;left:4%;">⭐</span>
+        <span style="position:absolute;left:22%;top:4px;">🐣</span>
+        <span style="position:absolute;right:24%;">☁️</span>
+        <span style="position:absolute;right:5%;top:2px;">🦀</span>
+    </div>
+    <div class="group-head" style="text-align:center;font-size:16px;">@first.ToString("yyyy年M月") <span class="mini">· 上：@Model.Members.FirstOrDefault().Name ／ 下：@(Model.Members.Count > 1 ? Model.Members[1].Name : "—")</span></div>
+    <table style="width:100%;border-collapse:separate;border-spacing:4px;table-layout:fixed;">
         <thead>
             <tr>
                 @foreach (var d in new[] { "一", "二", "三", "四", "五", "六", "日" })
@@ -48,28 +55,35 @@
                         var idx = w * 7 + col;
                         if (idx < offset || day > daysInMonth)
                         {
-                            <td style="padding:4px 2px;"></td>
+                            <td style="padding:2px;"></td>
                         }
                         else
                         {
                             var d = day;
                             var dateVal = first.ToString("yyyy-MM") + "-" + d.ToString("00");
                             var isFuture = DateTime.Parse(dateVal) > today;
-                            <td style="padding:4px 2px;text-align:center;vertical-align:top;border:1px solid var(--line,#eee);border-radius:8px;@(isFuture ? "opacity:.35;" : "")">
-                                <div class="mini">@d</div>
+                            <td style="padding:5px 2px;text-align:center;vertical-align:top;border-radius:12px;background:@(isFuture ? "transparent" : "#FFFDF8");border:1.5px dashed @(isFuture ? "#EADFCB" : "#F0E2C8");@(isFuture ? "opacity:.35;" : "")">
+                                <div class="mini" style="font-weight:700;">@d</div>
                                 @foreach (var m in Model.Members)
                                 {
                                     var key = (m.Uid, d);
                                     var has = Model.MoodMap.TryGetValue(key, out var mv);
                                     if (isFuture)
                                     {
-                                        <div style="font-size:17px;line-height:1.25;opacity:.25;">·</div>
+                                        <div style="height:34px;"></div>
                                     }
                                     else
                                     {
-                                        <a href="#" style="text-decoration:none;"
+                                        <a href="#" style="text-decoration:none;display:block;"
                                            onclick="document.getElementById('sv-date').value='@dateVal';document.getElementById('sv-owner').value='@m.Uid';document.getElementById('sv-has').value='@(has ? "1" : "0")';document.getElementById('save-form').style.display='block';return false;">
-                                            <div style="font-size:17px;line-height:1.25;opacity:@(has ? "1" : ".25");">@(has ? moods[mv - 1] : "·")</div>
+                                            @if (has)
+                                            {
+                                                @Html.Raw(CheckinApp.Ui.MoodStickers.Svg(mv, m == Model.Members.First(), 34))
+                                            }
+                                            else
+                                            {
+                                                <div style="height:34px;line-height:34px;opacity:.22;font-size:15px;">＋</div>
+                                            }
                                         </a>
                                     }
                                 }

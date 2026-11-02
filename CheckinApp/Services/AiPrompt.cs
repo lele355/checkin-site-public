@@ -48,6 +48,9 @@ public static class AiPrompt
         4. checkin_habit — 习惯打卡：habit_id(整数，必填，从数据摘要的习惯清单里选), date?(yyyy-MM-dd), note?
         5. create_anniversary — 新增纪念日：title(必填), date(yyyy-MM-dd，必填), repeat_yearly?, note?
         6. create_courses — 批量导入课程表：courses(数组，必填，每项含 name/weekday/start_period/end_period 必填，teacher/location/weeks/category 可选), semester_start?(yyyy-MM-dd)
+        7. create_period — 记录经期：start_date(yyyy-MM-dd，必填，只能今天或过去), end_date?(可后补), note?, user_id?(情侣互见可给对方记)
+        8. couple_summary — 查询情侣月度总结：action?("query"查询最新总结，固定不用传)
+        9. query_records — 查询记录数据（回答用户关于自己/情侣数据的问题）：module(schedule日程/memo备忘/expense记账/habits打卡/anniversary纪念日/mood心情/poop排便/questions提问/period经期), days?(最近N天，默认30)
 
         备用方案（仅当无法发起工具调用时）：在回复末尾输出一个 ```actions 代码块，
         内容是 JSON 数组，每个元素一条建议，字段与工具参数一致再加 type 字段：
@@ -148,7 +151,39 @@ public static class AiPrompt
                 sb.AppendLine($"  {a.Date:yyyy-MM-dd} {a.Title}{(a.RepeatYearly ? "（每年重复）" : "")}");
         }
 
+        // 情侣域数据（2026-11-02 站主定：AI 能回答全部个人/情侣数据问题；双方互见）
+        var coupleUids = db.Users
+            .Where(u => u.IsActive && u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"))
+            .Select(u => u.Id).ToList();
+        if (coupleUids.Count > 1)
+        {
+            var names = db.Users.Where(u => coupleUids.Contains(u.Id)).ToDictionary(u => u.Id, u => u.DisplayName);
+            var mn = new[] { "开心", "平淡", "难过", "生气", "困", "害羞" };
+            var today0 = now.Date;
+            var moods2 = db.MoodLogs.Where(x => coupleUids.Contains(x.UserId) && x.Date >= today0.AddDays(-1))
+                .OrderByDescending(x => x.Date).Take(4).ToList();
+            if (moods2.Count > 0)
+            {
+                sb.AppendLine("情侣心情（近两天）：");
+                foreach (var m in moods2)
+                    sb.AppendLine($"  {m.Date:MM-dd} {names.GetValueOrDefault(m.UserId, "?")}：{mn[Math.Clamp(m.Mood, 1, 6) - 1]}");
+            }
+            var poopWeek = db.PoopLogs.Count(x => coupleUids.Contains(x.UserId) && x.At >= today0.AddDays(-7));
+            var unanswered = db.CoupleQuestions.Count(x => coupleUids.Contains(x.FromUserId) && x.Answer == null);
+            sb.AppendLine($"情侣近况：本周排便共 {poopWeek} 次；未答提问 {unanswered} 条。");
+            var lastSummary = db.CoupleMonthlySummaries
+                .OrderByDescending(x => x.Month).ThenByDescending(x => x.GeneratedAt).FirstOrDefault();
+            if (lastSummary is not null)
+                sb.AppendLine($"最新月度总结（{lastSummary.Month:yyyy年M月}）：{Cut(lastSummary.Content, 60)}");
+        }
+
         return sb.ToString();
+    }
+
+    private static string Cut(string? s, int n)
+    {
+        s ??= "";
+        return s.Length <= n ? s : s[..n] + "…";
     }
 
     private static string WeekName(int weekday) => weekday switch

@@ -27,6 +27,7 @@ public static class NavCatalog
         new("expense",     "记账",   "wallet",   "/Expenses",    "expense.use",    GroupLife, true),
         // ---- 情侣大类（couples.view 门控，双方数据互见）----
         new("couples",     "情侣空间","couple",  "/Couples",     "couples.view",   GroupLove, true),
+        new("lovenotes",   "小纸条", "note",     "/LoveNotes",   "couples.view",   GroupLove, true),
         new("mood",        "心情",   "smile",    "/Mood",        "couples.view",   GroupLove, true),
         new("poop",        "排便",   "poop",     "/Poop",        "couples.view",   GroupLove, true),
         new("questions",   "提问",   "chat",     "/Questions",   "couples.view",   GroupLove, true),

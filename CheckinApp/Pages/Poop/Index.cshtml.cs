@@ -23,6 +23,10 @@ public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : P
     public int PartnerCount { get; private set; }
     public string MonthLabel { get; private set; } = "";
 
+    // 日历视图（2026-11-02 站主定：类心情日历，显示当日次数）
+    public DateTime MonthStart { get; private set; }
+    public Dictionary<(int Uid, int Day), int> DayCounts { get; private set; } = new();
+
     [BindProperty] public int SaveOwner { get; set; }
 
     public void OnGet(string? month)
@@ -31,6 +35,7 @@ public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : P
         var from = DateTime.Today.AddDays(1 - DateTime.Today.Day);
         if (!string.IsNullOrWhiteSpace(month) && DateTime.TryParse(month + "-01", out var m)) from = m.Date;
         MonthLabel = from.ToString("yyyy年M月");
+        MonthStart = from;
         var to = from.AddMonths(1);
 
         var uids = _couple.MemberUids();
@@ -45,6 +50,11 @@ public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : P
         MyCount = Rows.Count(x => x.R.UserId == uid);
         var pu = uids.FirstOrDefault(x => x != uid);
         PartnerCount = Rows.Count(x => x.R.UserId == pu);
+
+        // 按日计数（北京时间日期分组）
+        DayCounts = Rows
+            .GroupBy(x => (x.R.UserId, Day: x.R.At.AddHours(8).Day))
+            .ToDictionary(g => g.Key, g => g.Count());
     }
 
     public IActionResult OnPostTap()

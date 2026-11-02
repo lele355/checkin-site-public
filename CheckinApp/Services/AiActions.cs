@@ -25,6 +25,46 @@ public static class AiTools
             type = "function",
             function = new
             {
+                name = "query_records",
+                description = "查询用户的记录数据（日程/备忘/记账/打卡/纪念日/心情/排便/提问/经期）。用户问任何关于自己或情侣记录的问题（有什么、多少次、最近、统计）时用它。",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        module = new { type = "string", description = "模块：schedule日程/memo备忘/expense记账/habits打卡/anniversary纪念日/mood心情/poop排便/questions提问/period经期" },
+                        days = new { type = "integer", description = "看最近 N 天，默认 30" },
+                    },
+                    required = new[] { "module" },
+                },
+            },
+        },
+        new
+        {
+            type = "function",
+            function = new
+            {
+                name = "create_period",
+                description = "记录一次经期（月经/例假/大姨妈）。用户提到记经期、经期开始/结束时用它。可给自己或对方记（情侣互见）。",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        start_date = new { type = "string", description = "开始日期 yyyy-MM-dd，必填（只能今天或过去）" },
+                        end_date = new { type = "string", description = "结束日期 yyyy-MM-dd，可后补，可选" },
+                        note = new { type = "string", description = "备注，可选" },
+                        user_id = new { type = "integer", description = "归属人 UserId（情侣互见可给对方记），可选默认自己" },
+                    },
+                    required = new[] { "start_date" },
+                },
+            },
+        },
+        new
+        {
+            type = "function",
+            function = new
+            {
                 name = "couple_summary",
                 description = "查询情侣月度总结（AI 生成的当月记录回顾）。用户问情侣月度总结、这个月怎么样、月度回顾、最近的总结时用它。",
                 parameters = new
@@ -221,7 +261,8 @@ public static class AiTools
 /// AI 建议单（解析式）的解析与执行器。
 ///
 /// 三道围栏（缺一不可）：
-///  ① 动作白名单：只认菜单里的 5 种动作，其它（用户管理/权限/经期/情侣空间等禁区）一律拒绝；
+///  ① 动作白名单：只认菜单里的动作，其它（用户管理/权限等禁区）一律拒绝；
+///     （2026-11-02 站主解锁：经期 create_period、情侣月度总结 couple_summary 入菜单）
 ///  ② UserId 围栏：所有写入的归属都来自登录态 CurrentUser，AI 给的 JSON 里没有任何属主字段能绕过；
 ///  ③ 确认后写库：解析出的建议只是「待确认卡片」，只有用户点「确认执行」的 POST 才落库。
 /// </summary>
@@ -290,6 +331,8 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
     /// <summary>动作白名单（菜单制）：不在这里的一律拒绝 —— 这就是「禁区」的硬围栏。</summary>
     private static readonly Dictionary<string, string> RequiredPerm = new()
     {
+        ["query_records"]     = "workbench.view",   // 总闸；执行内再按模块校验
+        ["create_period"]     = "period.use",
         ["couple_summary"]    = "couples.view",
         ["create_schedule"]   = "schedule.use",
         ["create_memo"]       = "memo.use",
@@ -302,6 +345,8 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
     /// <summary>动作 → 中文名（确认卡展示用）</summary>
     public static readonly Dictionary<string, string> ActionLabels = new()
     {
+        ["query_records"]      = "查询记录",
+        ["create_period"]      = "记录经期",
         ["couple_summary"]     = "情侣月度总结",
         ["create_schedule"]    = "新建日程",
         ["create_memo"]        = "新建备忘",
@@ -331,6 +376,8 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
 
         return type switch
         {
+            "query_records"      => QueryRecords(uid, act),
+            "create_period"      => CreatePeriod(uid, act),
             "couple_summary"     => CoupleSummary(uid, act),
             "create_schedule"    => CreateSchedule(uid, act),
             "create_memo"        => CreateMemo(uid, act),
@@ -344,6 +391,102 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
 
     // ---------- 5 个白名单动作：每个都先校验字段再落库，属主一律取登录态 ----------
 
+    /// <summary>查询记录（2026-11-02 站主定：AI 助手能回答全部个人/情侣数据问题）。情侣域模块双方互见。</summary>
+    private AiActionResult QueryRecords(int uid, JsonElement a)
+    {
+        var module = Str(a, "module", 20);
+        var days = int.TryParse(Str(a, "days", 4), out var dd) ? Math.Clamp(dd, 1, 365) : 30;
+        var since = DateTime.UtcNow.AddDays(-days);
+
+        // 情侣域成员（心情/排便/提问/经期双方互见）
+        var coupleUids = db.Users
+            .Where(u => u.IsActive && u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"))
+            .Select(u => u.Id).ToList();
+
+        switch (module)
+        {
+            case "schedule":
+            {
+                var rows = db.Schedules.Where(x => x.UserId == uid && x.StartAt >= since)
+                    .OrderBy(x => x.StartAt).Take(15).ToList();
+                var head = $"最近 {days} 天日程共 {db.Schedules.Count(x => x.UserId == uid && x.StartAt >= since)} 条：\n";
+                var body = string.Join("\n", rows.Select(x => $"- {SiteClock.ToLocal(x.StartAt):M月d日 HH:mm} {x.Title}"));
+                return new(true, head + body);
+            }
+            case "memo":
+            {
+                var rows = db.Memos.Where(x => x.UserId == uid && x.CreatedAt >= since)
+                    .OrderByDescending(x => x.CreatedAt).Take(15).ToList();
+                return new(true, $"最近 {days} 天备忘 {rows.Count} 条：\n" +
+                    string.Join("\n", rows.Select(x => $"- {x.Title}：{Cut(x.Content, 40)}")));
+            }
+            case "expense":
+            {
+                var rows = db.Expenses.Where(x => x.UserId == uid && x.OccurDate >= since.Date).ToList();
+                var outSum = rows.Where(x => x.Type == "out").Sum(x => x.Amount);
+                var inSum = rows.Where(x => x.Type == "in").Sum(x => x.Amount);
+                var top = rows.GroupBy(x => x.Category).OrderByDescending(g => g.Sum(x => x.Amount)).Take(5)
+                    .Select(g => $"{g.Key} {g.Sum(x => x.Amount):0.##}").ToList();
+                return new(true, $"最近 {days} 天记账 {rows.Count} 笔：支出 {outSum:0.##} / 收入 {inSum:0.##}；大头：{string.Join("、", top)}");
+            }
+            case "habits":
+            {
+                var rows = db.HabitCheckins.Where(x => x.UserId == uid && x.CheckinDate >= since.Date).ToList();
+                var per = rows.GroupBy(x => x.HabitId).Select(g => {
+                    var name = db.Habits.FirstOrDefault(h => h.Id == g.Key)?.Name ?? "?";
+                    return $"{name} {g.Count()} 次";
+                }).ToList();
+                return new(true, $"最近 {days} 天打卡共 {rows.Count} 次：{string.Join("、", per)}");
+            }
+            case "anniversary":
+            {
+                var rows = db.Anniversaries.Where(x => x.UserId == uid).OrderBy(x => x.Date).Take(15).ToList();
+                return new(true, $"纪念日 {rows.Count} 个：\n" +
+                    string.Join("\n", rows.Select(x => $"- {x.Date:yyyy年M月d日} {x.Title}{(x.RepeatYearly ? "（每年）" : "")}")));
+            }
+            case "mood":
+            {
+                var rows = db.MoodLogs.Where(x => coupleUids.Contains(x.UserId) && x.Date >= since.Date)
+                    .OrderByDescending(x => x.Date).Take(20).ToList();
+                var names = db.Users.Where(u => coupleUids.Contains(u.Id)).ToDictionary(u => u.Id, u => u.DisplayName);
+                var mn = new[] { "开心", "平淡", "难过", "生气", "困", "害羞" };
+                return new(true, $"最近 {days} 天心情记录（双方）：\n" +
+                    string.Join("\n", rows.Select(x => $"- {x.Date:M月d日} {names.GetValueOrDefault(x.UserId, "?")}：{mn[Math.Clamp(x.Mood, 1, 6) - 1]}{(x.Note == "" ? "" : $"（{x.Note}）")}")));
+            }
+            case "poop":
+            {
+                var rows = db.PoopLogs.Where(x => coupleUids.Contains(x.UserId) && x.At >= since).ToList();
+                var names = db.Users.Where(u => coupleUids.Contains(u.Id)).ToDictionary(u => u.Id, u => u.DisplayName);
+                var per = rows.GroupBy(x => x.UserId).Select(g => $"{names.GetValueOrDefault(g.Key, "?")} {g.Count()} 次").ToList();
+                return new(true, $"最近 {days} 天排便共 {rows.Count} 次：{string.Join("、", per)}");
+            }
+            case "questions":
+            {
+                var rows = db.CoupleQuestions.Where(x => coupleUids.Contains(x.FromUserId) && x.CreatedAt >= since)
+                    .OrderByDescending(x => x.CreatedAt).Take(15).ToList();
+                var unanswered = db.CoupleQuestions.Count(x => coupleUids.Contains(x.FromUserId) && x.Answer == null);
+                return new(true, $"最近 {days} 天提问 {rows.Count} 条（未答共 {unanswered}）：\n" +
+                    string.Join("\n", rows.Select(x => $"- {x.Content}{(x.Answer is null ? "（未答）" : $" → {Cut(x.Answer, 30)}")}")));
+            }
+            case "period":
+            {
+                var rows = db.PeriodRecords.Where(x => coupleUids.Contains(x.UserId) && x.StartDate >= since.Date)
+                    .OrderByDescending(x => x.StartDate).Take(10).ToList();
+                var names = db.Users.Where(u => coupleUids.Contains(u.Id)).ToDictionary(u => u.Id, u => u.DisplayName);
+                return new(true, $"最近 {days} 天经期记录：\n" +
+                    string.Join("\n", rows.Select(x => $"- {names.GetValueOrDefault(x.UserId, "?")} {x.StartDate:M月d日起}{(x.EndDate is DateTime e ? $" ~ {e:M月d日}" : "（进行中）")}")));
+            }
+            default:
+                return new(false, "不支持的模块（schedule/memo/expense/habits/anniversary/mood/poop/questions/period）");
+        }
+    }
+
+    private static string Cut(string? s, int n)
+    {
+        s ??= "";
+        return s.Length <= n ? s : s[..n] + "…";
+    }
+
     /// <summary>情侣月度总结（2026-11-02 站主规划）：查询最新总结（生成走每日定时 + 页面按钮）。</summary>
     private AiActionResult CoupleSummary(int uid, JsonElement a)
     {
@@ -353,6 +496,42 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         if (row is null) return new(false, "还没有月度总结（每天会自动生成，也可以到情侣空间手动生成一份）");
         var kind = row.IsFinal ? "当月定稿" : $"截至本月 {row.ScopeDays} 天的阶段总结";
         return new(true, $"【{row.Month:yyyy年M月} · {kind}】\n{row.Content}");
+    }
+
+    /// <summary>记录经期（2026-11-02 站主解锁 AI 禁区）：情侣互见可给对方记；只能记今天及过去。</summary>
+    private AiActionResult CreatePeriod(int uid, JsonElement a)
+    {
+        var startStr = Str(a, "start_date", 12);
+        if (!DateTime.TryParse(startStr, out var start)) return new(false, "经期缺少开始日期（yyyy-MM-dd）");
+        if (start.Date > DateTime.Today) return new(false, "不能给未来记经期");
+        DateTime? end = null;
+        var endStr = Str(a, "end_date", 12);
+        if (endStr != "" && DateTime.TryParse(endStr, out var e0))
+        {
+            if (e0.Date < start.Date) return new(false, "结束日期不能早于开始日期");
+            end = e0.Date;
+        }
+        // 归属：情侣域内可给对方记（红线：情侣互见边界）
+        var owner = uid;
+        var ownerRaw = Str(a, "user_id", 8);
+        if (ownerRaw != "" && int.TryParse(ownerRaw, out var ow))
+        {
+            var isMember = db.Users.Any(u => u.Id == ow && u.IsActive &&
+                u.Role.RolePermissions.Any(rp => rp.Permission.Code == "couples.view"));
+            if (!isMember) return new(false, "只能为自己或对方记录");
+            owner = ow;
+        }
+        db.PeriodRecords.Add(new Models.PeriodRecord
+        {
+            UserId = owner,
+            StartDate = start.Date,
+            EndDate = end,
+            Note = Str(a, "note", 200),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        db.SaveChanges();
+        return new(true, $"经期已记下（{start:M月d日}起{(end is null ? "，结束后可补录" : $" ~ {end:M月d日}")}）");
     }
 
     private AiActionResult CreateSchedule(int uid, JsonElement a)

@@ -4,30 +4,39 @@
 @{
     ViewData["Title"] = "情侣空间";
 }
-<div class="card couples-hero">
+<div class="card couples-hero" style="padding:16px 16px 18px;">
     <div class="mini" style="letter-spacing:2px;">💕 @Model.Setting.Title</div>
-    <div class="couples-days">
-        <span class="num">@Model.DaysTogether</span>
+    <div class="couples-days" style="margin:4px 0;">
+        <span class="num" style="font-size:42px;">@Model.DaysTogether</span>
         <span class="unit">天</span>
     </div>
     <div class="hint">从 @Model.Setting.StartDate.ToString("yyyy年M月d日") 起，一直在一起。</div>
     @if (Model.NextAnniversary is var na && na is not null)
     {
-        <div class="chip" style="margin-top:10px;background:var(--accent-soft);color:var(--accent-strong);">
+        <div class="chip" style="margin-top:8px;background:var(--accent-soft);color:var(--accent-strong);">
             距「@na.Value.Title」还有 @na.Value.DaysLeft 天
         </div>
     }
 </div>
 
-@* 情侣大类快捷入口（2026-11-02 站主规划） *@
+@* 今日心情（2026-11-02 站主定：原小纸条位置） *@
 <div class="card">
-    <div class="group-head">情侣功能</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <a class="chip" style="text-decoration:none;padding:10px 16px;" href="/Period">🌸 经期</a>
-        <span class="chip" style="padding:10px 16px;opacity:.5;">😊 心情（即将上线）</span>
-        <span class="chip" style="padding:10px 16px;opacity:.5;">💩 排便（即将上线）</span>
-        <span class="chip" style="padding:10px 16px;opacity:.5;">❓ 提问（即将上线）</span>
-        <span class="chip" style="padding:10px 16px;opacity:.5;">📊 月度总结（即将上线）</span>
+    <div class="group-head">今日心情 <a class="mini" style="float:right;text-decoration:none;" href="/Mood">日历 →</a></div>
+    <div style="display:flex;gap:22px;align-items:center;">
+        @foreach (var tm in Model.TodayMoods)
+        {
+            <div style="text-align:center;">
+                @if (tm.Mood is int m)
+                {
+                    @Html.Raw(CheckinApp.Ui.MoodStickers.Svg(m, tm.Round, 52))
+                }
+                else
+                {
+                    <a href="/Mood" style="text-decoration:none;display:block;width:52px;height:52px;line-height:52px;border:2px dashed #EADFCB;border-radius:14px;color:#C9B08A;font-size:22px;">＋</a>
+                }
+                <div class="mini" style="margin-top:4px;">@tm.Name</div>
+            </div>
+        }
     </div>
 </div>
 
@@ -59,46 +68,13 @@
     </div>
 }
 
-<div class="card">
-    <div class="page-head">
-        <h2>小纸条</h2>
-    </div>
-
-    @if (Model.Error is string err)
-    {
-        <div class="msg error">@err</div>
-    }
-
-    <form method="post" asp-page-handler="Note" class="inline-form">
-        <input asp-for="NoteContent" placeholder="写点什么给对方…" autocomplete="off" />
-        <button class="btn" type="submit">送出</button>
-    </form>
-
-    <div class="stack" style="margin-top:16px;">
-        @foreach (var n in Model.Notes)
-        {
-            <div class="row-item" style="display:flex;align-items:flex-start;gap:10px;">
-                <div style="flex-shrink:0;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--accent-strong);">
-                    @(string.IsNullOrEmpty(n.FromUser?.DisplayName) ? "?" : n.FromUser!.DisplayName.Substring(0, 1))
-                </div>
-                <div style="flex:1;min-width:0;">
-                    <div class="mini">@n.FromUser?.DisplayName · @CheckinApp.Services.SiteClock.ToLocal(n.CreatedAt).ToString("M月d日 HH:mm")</div>
-                    <div style="white-space:pre-wrap;margin-top:2px;">@n.Content</div>
-                </div>
-                @if (n.FromUserId == Me.UserId)
-                {
-                    <form method="post" asp-page-handler="DeleteNote">
-                        <input type="hidden" name="id" value="@n.Id" />
-                        <button class="mini" type="submit" style="border:none;background:none;cursor:pointer;color:var(--text-muted);">删除</button>
-                    </form>
-                }
-            </div>
-        }
-        @if (Model.Notes.Count == 0)
-        {
-            <div class="empty"><span class="big">💌</span>还没有小纸条</div>
-        }
-    </div>
+@* 小纸条已独立成页（2026-11-02 站主定），这里留快捷入口 *@
+<div class="card" style="padding:12px 16px;">
+    <a href="/LoveNotes" style="text-decoration:none;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">💌</span>
+        <span style="font-weight:600;">小纸条</span>
+        <span class="mini" style="margin-left:auto;">写一张 →</span>
+    </a>
 </div>
 
 <div class="card">

@@ -32,6 +32,10 @@ public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : P
     public record PeriodPeek(string Name, DateTime? Next, int DaysLeft, bool Enough);
     public List<PeriodPeek> PeriodPeeks { get; private set; } = [];
 
+    // 今日心情（2026-11-02 站主定：原小纸条位置放这个）
+    public record MoodPeek(string Name, int Uid, int? Mood, bool Round);
+    public List<MoodPeek> TodayMoods { get; private set; } = [];
+
     public void OnGet()
     {
         Load();
@@ -88,6 +92,17 @@ public class IndexModel(AppDbContext db, CurrentUser me, CoupleScope couple) : P
             {
                 PeriodPeeks.Add(new PeriodPeek(names.GetValueOrDefault(u, "?"), null, 0, false));
             }
+        }
+
+        // 今日心情（贴纸速览 + 快捷记录）
+        var todayMoods = _db.MoodLogs.Where(x => uids.Contains(x.UserId) && x.Date == today)
+            .ToDictionary(x => x.UserId, x => x.Mood);
+        var first = true;
+        foreach (var u in uids)
+        {
+            TodayMoods.Add(new MoodPeek(names.GetValueOrDefault(u, "?"), u,
+                todayMoods.TryGetValue(u, out var m) ? m : null, first));
+            first = false;
         }
     }
 

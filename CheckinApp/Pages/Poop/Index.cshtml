@@ -2,6 +2,10 @@
 @model CheckinApp.Pages.Poop.IndexModel
 @{
     ViewData["Title"] = "排便记录";
+    var firstM = Model.MonthStart;
+    var daysInM = DateTime.DaysInMonth(firstM.Year, firstM.Month);
+    var offM = ((int)firstM.DayOfWeek + 6) % 7;
+    var todayM = DateTime.Today;
 }
 
 <div class="page-head">
@@ -29,6 +33,70 @@
         <button class="btn" type="submit" style="font-size:18px;padding:14px 34px;border-radius:16px;">💩 记一次</button>
     </form>
     <div class="mini" style="margin-top:10px;">本月：@Model.Members.FirstOrDefault().Name @Model.MyCount 次 @if (Model.Members.Count > 1) { <text>· @Model.Members[1].Name @Model.PartnerCount 次</text> }</div>
+</div>
+
+@* 日历视图（类心情日历：表情位置显示当日次数，2026-11-02 站主定） *@
+<div class="card" style="background:linear-gradient(180deg,#F6FBF4 0%,#FFFFFF 120px);">
+    <div class="group-head" style="text-align:center;font-size:16px;">
+        <a href="?month=@firstM.AddMonths(-1).ToString("yyyy-MM")" style="text-decoration:none;">←</a>
+        @firstM.ToString("yyyy年M月")
+        <a href="?month=@firstM.AddMonths(1).ToString("yyyy-MM")" style="text-decoration:none;">→</a>
+        <span class="mini">· 上：@Model.Members.FirstOrDefault().Name ／ 下：@(Model.Members.Count > 1 ? Model.Members[1].Name : "—")</span>
+    </div>
+    <table style="width:100%;border-collapse:separate;border-spacing:4px;table-layout:fixed;">
+        <thead>
+            <tr>
+                @foreach (var d in new[] { "一", "二", "三", "四", "五", "六", "日" })
+                {
+                    <th class="mini" style="padding:4px 0;text-align:center;">@d</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @{
+                var dayM = 1;
+                var rowsM = (offM + daysInM + 6) / 7;
+            }
+            @for (var w = 0; w < rowsM; w++)
+            {
+                <tr>
+                    @for (var col = 0; col < 7; col++)
+                    {
+                        var idx = w * 7 + col;
+                        if (idx < offM || dayM > daysInM)
+                        {
+                            <td style="padding:2px;"></td>
+                        }
+                        else
+                        {
+                            var d = dayM;
+                            <td style="padding:5px 2px;text-align:center;vertical-align:top;border-radius:12px;background:#FCFEFA;border:1.5px dashed #DDE8D4;">
+                                <div class="mini" style="font-weight:700;">@d</div>
+                                @foreach (var m in Model.Members)
+                                {
+                                    var c = Model.DayCounts.GetValueOrDefault((m.Uid, d));
+                                    <div style="height:34px;line-height:34px;">
+                                        @if (c > 0)
+                                        {
+                                            <span title="@m.Name @c 次" style="display:inline-flex;align-items:center;gap:3px;font-weight:700;color:#6B8E5A;">
+                                                <svg width="20" height="20" viewBox="0 0 24 24"><path d="M6 20c0-2.6 2-3.6 4.4-3.6S14.8 17.4 14.8 20" fill="none" stroke="#8B6914" stroke-width="2" stroke-linecap="round"/><path d="M7.2 16.6c0-2.2 1.4-3 3.6-3s3.6.8 3.6 3" fill="none" stroke="#8B6914" stroke-width="2" stroke-linecap="round"/><path d="M8.4 13.6c0-1.8 1-2.5 2.8-2.5s2.8.7 2.8 2.5" fill="none" stroke="#8B6914" stroke-width="2" stroke-linecap="round"/></svg>
+                                                ×@c
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span style="opacity:.18;">·</span>
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            dayM++;
+                        }
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
 </div>
 
 @* 列表 *@

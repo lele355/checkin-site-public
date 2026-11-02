@@ -1,0 +1,49 @@
+@page
+@model CheckinApp.Pages.LoveNotes.IndexModel
+@{
+    ViewData["Title"] = "小纸条";
+}
+
+<div class="page-head">
+    <h1>小纸条</h1>
+    <div class="mini">双方可见 · 只能删自己的</div>
+</div>
+
+<div class="card">
+    <div class="group-head">写张小纸条</div>
+    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input asp-for="NoteContent" placeholder="想对 TA 说…" maxlength="500" style="flex:1;min-width:220px;" />
+        <button class="btn" type="submit">送出 💌</button>
+    </form>
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="mini" style="color:#c62828;margin-top:8px;">@Model.Error</div>
+    }
+</div>
+
+<div class="card">
+    <div class="group-head">纸条盒</div>
+    @if (Model.Notes.Count == 0)
+    {
+        <div class="empty"><span class="big">💌</span>还没有小纸条</div>
+    }
+    else
+    {
+        <div class="stack">
+            @foreach (var n in Model.Notes)
+            {
+                <div class="row-item">
+                    <div class="mini">@n.FromUser?.DisplayName · @n.CreatedAt.AddHours(8).ToString("M月d日 HH:mm")</div>
+                    <div style="margin-top:4px;white-space:pre-wrap;">@n.Content</div>
+                    @if (Model.User.Identity?.Name == n.FromUser?.Username)
+                    {
+                        <form method="post" asp-page-handler="Delete" data-confirm style="margin-top:6px;">
+                            <input type="hidden" name="id" value="@n.Id" />
+                            <button class="btn ghost" type="submit" style="font-size:11px;">删</button>
+                        </form>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
