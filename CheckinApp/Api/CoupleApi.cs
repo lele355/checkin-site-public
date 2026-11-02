@@ -19,7 +19,8 @@ public static class CoupleApi
 
     public static void MapCoupleApi(this IEndpointRouteBuilder g)
     {
-        var c = g.MapGroup("/couple").RequireAuthorization("perm:couples.view");
+        // 注意：必须挂 /api/v1 前缀（2026-11-02 修：直接挂 /couple 会让 App 调 /api/v1/couple/* 404）
+        var c = g.MapGroup("/api/v1/couple").RequireAuthorization("perm:couples.view");
 
         // ==================== 心情（每人每日一行 upsert，双方互见） ====================
         c.MapGet("/moods", (string? month, AppDbContext db, [FromServices] CoupleScope couple) =>
