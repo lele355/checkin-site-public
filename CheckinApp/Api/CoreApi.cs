@@ -344,6 +344,7 @@ public static class CoreApi
                 .Select(m => new
                 {
                     id = m.Id, title = m.Title, content = m.Content, pinned = m.Pinned,
+                    done = m.Done,   // 【修 2026-11-03】漏了 done 字段——App 永远显示未完成/不归类（站主报"点完成=置顶"的真凶）
                     createdAt = ApiKit.StampUtc(m.CreatedAt), updatedAt = ApiKit.StampUtc(m.UpdatedAt),
                 }).ToList();
             return ApiKit.Ok(new { items });
@@ -389,14 +390,13 @@ public static class CoreApi
             return ApiKit.Ok(new { pinned = m.Pinned });
         });
 
-        // 完成/取消完成（2026-11-03 站主定：备忘加完成按钮）
+        // 完成/取消完成（2026-11-03 站主定：备忘加完成按钮）——纯标记，不更新 UpdatedAt（避免"像置顶一样跳顶"）
         mc.MapPost("/{id:int}/done", (int id, AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
             var m = db.Memos.FirstOrDefault(x => x.Id == id && x.UserId == uid)
                     ?? throw new ApiBadRequest("便签不存在或已删除");
             m.Done = !m.Done;
-            m.UpdatedAt = DateTime.UtcNow;
             db.SaveChanges();
             return ApiKit.Ok(new { done = m.Done });
         });
