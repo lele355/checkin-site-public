@@ -40,10 +40,10 @@ else
                     <div style="padding:8px 14px 4px;font-size:12px;font-weight:700;color:var(--text-sub);">✓ 已完成</div>
                 }
                 <div class="memo-row" data-search="@((m.Title + " " + m.Content).ToLowerInvariant())">
-                    <form method="post" asp-page-handler="ToggleDone" class="pin-form">
+                    <form method="post" asp-page-handler="ToggleDone" class="done-form">
                         <input type="hidden" name="id" value="@m.Id" />
                         <input type="hidden" name="view" value="list" />
-                        <button type="submit" class="pin-btn@(m.Done ? " on" : "")" title="@(m.Done ? "取消完成" : "标记完成")" aria-label="@(m.Done ? "取消完成" : "标记完成")">@Html.Raw(Icons.Svg("check", 15))</button>
+                        <button type="submit" class="done-btn@(m.Done ? " on" : "")" title="@(m.Done ? "取消完成" : "标记完成")" aria-label="@(m.Done ? "取消完成" : "标记完成")">@Html.Raw(Icons.Svg("check", 15))</button>
                     </form>
                     <form method="post" asp-page-handler="TogglePin" class="pin-form" data-ajax="pin">
                         <input type="hidden" name="id" value="@m.Id" />
@@ -78,10 +78,10 @@ else
                 <div class="memo-card-head">
                     <div class="mc-title">@m.Title</div>
                     <div style="display:flex;gap:2px;">
-                        <form method="post" asp-page-handler="ToggleDone" class="pin-form">
+                        <form method="post" asp-page-handler="ToggleDone" class="done-form">
                             <input type="hidden" name="id" value="@m.Id" />
                             <input type="hidden" name="view" value="grid" />
-                            <button type="submit" class="pin-btn@(m.Done ? " on" : "")" title="@(m.Done ? "取消完成" : "标记完成")" aria-label="@(m.Done ? "取消完成" : "标记完成")">@Html.Raw(Icons.Svg("check", 15))</button>
+                            <button type="submit" class="done-btn@(m.Done ? " on" : "")" title="@(m.Done ? "取消完成" : "标记完成")" aria-label="@(m.Done ? "取消完成" : "标记完成")">@Html.Raw(Icons.Svg("check", 15))</button>
                         </form>
                         <form method="post" asp-page-handler="TogglePin" class="pin-form" data-ajax="pin">
                             <input type="hidden" name="id" value="@m.Id" />

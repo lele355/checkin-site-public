@@ -40,7 +40,11 @@
         <div class="stack">
             @foreach (var q in Model.Items)
             {
-                <div class="row-item">
+                @* 点条目弹窗删除（2026-11-03 站主定：小纸条同款，二次确认）——隐藏 form + 冒泡提交（条目内 Answer form 不能嵌套） *@
+                <form method="post" asp-page-handler="Delete" data-confirm id="qdel-@q.Id" style="display:none;">
+                    <input type="hidden" name="id" value="@q.Id" />
+                </form>
+                <div class="row-item" style="cursor:pointer;" onclick="document.getElementById('qdel-@q.Id').requestSubmit()">
                     <div class="mini">@q.From → @q.To · @q.AskedAt</div>
                     <div style="font-weight:600;margin:4px 0;">@q.Content</div>
                     @if (q.Answer is not null)
@@ -49,7 +53,7 @@
                     }
                     else if (q.MineToAnswer)
                     {
-                        <form method="post" asp-page-handler="Answer" style="display:flex;gap:8px;margin-top:6px;">
+                        <form method="post" asp-page-handler="Answer" style="display:flex;gap:8px;margin-top:6px;" onclick="event.stopPropagation()">
                             <input type="hidden" asp-for="AnswerId" value="@q.Id" />
                             <input asp-for="AnswerContent" placeholder="写下你的回答…" maxlength="500" style="flex:1;" />
                             <button class="btn ghost" type="submit">回答</button>
@@ -59,10 +63,6 @@
                     {
                         <div class="mini">等 @q.To 回答…</div>
                     }
-                    <form method="post" asp-page-handler="Delete" data-confirm style="margin-top:6px;">
-                        <input type="hidden" name="id" value="@q.Id" />
-                        <button class="btn ghost" type="submit" style="font-size:11px;">删</button>
-                    </form>
                 </div>
             }
         </div>

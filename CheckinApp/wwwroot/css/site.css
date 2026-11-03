@@ -2556,3 +2556,9 @@ html.is-native main.content { -webkit-overflow-scrolling: touch; }
 
 
 
+
+/* 备忘完成按钮（2026-11-03 站主定：与图钉区分——绿勾系，激活绿圈） */
+.done-btn { border:none;background:none;cursor:pointer;padding:5px;border-radius:8px;color:var(--text-sub);line-height:0;transition:all .15s; }
+.done-btn:hover { background:rgba(34,160,90,.12); color:#22a05a; }
+.done-btn:active { transform:scale(.9); }
+.done-btn.on { color:#22a05a; background:rgba(34,160,90,.18); }
