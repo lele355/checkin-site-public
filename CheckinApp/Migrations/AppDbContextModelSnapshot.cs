@@ -855,6 +855,9 @@ namespace CheckinApp.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("Done")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("Pinned")
                         .HasColumnType("INTEGER");
 

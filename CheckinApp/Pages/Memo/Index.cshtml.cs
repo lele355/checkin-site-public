@@ -22,9 +22,11 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     {
         View = view == "list" ? "list" : "grid";
         if (_me.UserId is not int uid) return;
+        // 2026-11-03 站主定：未完成在前、已完成在后（分组显示）；组内置顶优先
         Memos = _db.Memos
             .Where(m => m.UserId == uid)
-            .OrderByDescending(m => m.Pinned)
+            .OrderBy(m => m.Done)
+            .ThenByDescending(m => m.Pinned)
             .ThenByDescending(m => m.UpdatedAt)
             .ToList();
     }
@@ -40,6 +42,17 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         // 免刷新（fetch）提交回 JSON，前端就地翻图钉 + FLIP 滑动动画；普通提交走 PRG
         if (Request.Headers["X-Requested-With"] == "fetch")
             return new JsonResult(new { ok = true, pinned = memo.Pinned });
+        return RedirectToPage(new { view = view == "list" ? "list" : "grid" });
+    }
+
+    /// <summary>完成/取消完成（2026-11-03 站主定：备忘加完成按钮）。</summary>
+    public IActionResult OnPostToggleDone(int id, string? view)
+    {
+        if (_me.UserId is not int uid) return RedirectToPage("/Login");
+        var memo = _db.Memos.FirstOrDefault(m => m.Id == id && m.UserId == uid);
+        if (memo is null) return NotFound();
+        memo.Done = !memo.Done;
+        _db.SaveChanges();
         return RedirectToPage(new { view = view == "list" ? "list" : "grid" });
     }
 }

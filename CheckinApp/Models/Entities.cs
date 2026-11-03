@@ -153,6 +153,8 @@ public class MemoItem
     public string Content { get; set; } = "";
     /// <summary>置顶：true 时排在便签墙最前 + 工作台首页展示</summary>
     public bool Pinned { get; set; }
+    /// <summary>已完成（2026-11-03 站主定：备忘加完成按钮，归纳已完成/未完成）</summary>
+    public bool Done { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

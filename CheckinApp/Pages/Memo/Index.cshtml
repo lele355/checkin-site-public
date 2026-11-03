@@ -30,15 +30,27 @@ else
 {
     <div class="card" style="padding:0;overflow:hidden;">
         <div class="memo-rows" id="memoRows">
+            @{ var doneShown = false; }
             @foreach (var m in Model.Memos)
             {
+                @* 分组标题（2026-11-03 站主定：归纳已完成/未完成） *@
+                if (m.Done && !doneShown)
+                {
+                    doneShown = true;
+                    <div style="padding:8px 14px 4px;font-size:12px;font-weight:700;color:var(--text-sub);">✓ 已完成</div>
+                }
                 <div class="memo-row" data-search="@((m.Title + " " + m.Content).ToLowerInvariant())">
+                    <form method="post" asp-page-handler="ToggleDone" class="pin-form">
+                        <input type="hidden" name="id" value="@m.Id" />
+                        <input type="hidden" name="view" value="list" />
+                        <button type="submit" class="pin-btn@(m.Done ? " on" : "")" title="@(m.Done ? "取消完成" : "标记完成")" aria-label="@(m.Done ? "取消完成" : "标记完成")">@Html.Raw(Icons.Svg("check", 15))</button>
+                    </form>
                     <form method="post" asp-page-handler="TogglePin" class="pin-form" data-ajax="pin">
                         <input type="hidden" name="id" value="@m.Id" />
                         <input type="hidden" name="view" value="list" />
                         <button type="submit" class="pin-btn@(m.Pinned ? " on" : "")" title="@(m.Pinned ? "取消置顶" : "置顶")" aria-label="@(m.Pinned ? "取消置顶" : "置顶")">@Html.Raw(Icons.Svg("pin", 15))</button>
                     </form>
-                    <a class="mr-link" href="/Memo/Edit/@m.Id">
+                    <a class="mr-link" href="/Memo/Edit/@m.Id" style="@(m.Done ? "opacity:.55;" : "")">
                         <div class="mr-title">@m.Title</div>
                         @if (!string.IsNullOrWhiteSpace(m.Content))
                         {
@@ -54,16 +66,29 @@ else
 else
 {
     <div class="grid-cards" id="memoGrid">
+        @{ var doneShownG = false; }
         @foreach (var m in Model.Memos)
         {
-            <div class="card memo-card" data-search="@((m.Title + " " + m.Content).ToLowerInvariant())" style="margin-bottom:0;display:flex;flex-direction:column;gap:8px;">
+            if (m.Done && !doneShownG)
+            {
+                doneShownG = true;
+                <div style="grid-column:1/-1;padding:6px 2px 0;font-size:12px;font-weight:700;color:var(--text-sub);">✓ 已完成</div>
+            }
+            <div class="card memo-card" data-search="@((m.Title + " " + m.Content).ToLowerInvariant())" style="margin-bottom:0;display:flex;flex-direction:column;gap:8px;@(m.Done ? "opacity:.55;" : "")">
                 <div class="memo-card-head">
                     <div class="mc-title">@m.Title</div>
-                    <form method="post" asp-page-handler="TogglePin" class="pin-form" data-ajax="pin">
-                        <input type="hidden" name="id" value="@m.Id" />
-                        <input type="hidden" name="view" value="grid" />
-                        <button type="submit" class="pin-btn@(m.Pinned ? " on" : "")" title="@(m.Pinned ? "取消置顶" : "置顶")" aria-label="@(m.Pinned ? "取消置顶" : "置顶")">@Html.Raw(Icons.Svg("pin", 15))</button>
-                    </form>
+                    <div style="display:flex;gap:2px;">
+                        <form method="post" asp-page-handler="ToggleDone" class="pin-form">
+                            <input type="hidden" name="id" value="@m.Id" />
+                            <input type="hidden" name="view" value="grid" />
+                            <button type="submit" class="pin-btn@(m.Done ? " on" : "")" title="@(m.Done ? "取消完成" : "标记完成")" aria-label="@(m.Done ? "取消完成" : "标记完成")">@Html.Raw(Icons.Svg("check", 15))</button>
+                        </form>
+                        <form method="post" asp-page-handler="TogglePin" class="pin-form" data-ajax="pin">
+                            <input type="hidden" name="id" value="@m.Id" />
+                            <input type="hidden" name="view" value="grid" />
+                            <button type="submit" class="pin-btn@(m.Pinned ? " on" : "")" title="@(m.Pinned ? "取消置顶" : "置顶")" aria-label="@(m.Pinned ? "取消置顶" : "置顶")">@Html.Raw(Icons.Svg("pin", 15))</button>
+                        </form>
+                    </div>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(m.Content))
                 {

@@ -389,6 +389,18 @@ public static class CoreApi
             return ApiKit.Ok(new { pinned = m.Pinned });
         });
 
+        // 完成/取消完成（2026-11-03 站主定：备忘加完成按钮）
+        mc.MapPost("/{id:int}/done", (int id, AppDbContext db, HttpContext ctx) =>
+        {
+            var uid = ApiKit.MeId(ctx);
+            var m = db.Memos.FirstOrDefault(x => x.Id == id && x.UserId == uid)
+                    ?? throw new ApiBadRequest("便签不存在或已删除");
+            m.Done = !m.Done;
+            m.UpdatedAt = DateTime.UtcNow;
+            db.SaveChanges();
+            return ApiKit.Ok(new { done = m.Done });
+        });
+
         mc.MapDelete("/{id:int}", (int id, AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
