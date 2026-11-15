@@ -15,7 +15,6 @@ public static class GameViews
         var engine = GameEngines.Get(r.GameKey);
         var evs = GameEvents.Parse(r.MovesJson);
         var mySide = MySide(r, uid);
-        var isLudo = r.GameKey == "ludo";
         var iAmHost = r.HostUserId == uid;
         var oppSeen = iAmHost ? r.GuestSeenAt : r.HostSeenAt;
         var oppName = iAmHost ? r.Guest?.DisplayName ?? "" : r.Host?.DisplayName ?? "";
@@ -53,25 +52,6 @@ public static class GameViews
             }
         }
 
-        // 飞行棋多人：players[]（每座 side/color/name/isAi/isMe/active/usedMs/online）
-        object? players = null;
-        if (isLudo)
-        {
-            var seats = LudoSeats.Get(r);
-            players = seats.Select(seat => new
-            {
-                seat = seat.Seat,
-                side = seat.Side,
-                color = seat.Color,
-                name = seat.IsAi ? "AI" : seat.Name,
-                isAi = seat.IsAi,
-                isMe = seat.Uid == uid,
-                active = seat.Active,
-                usedMs = LudoSeats.UsedMsOf(r, seat.Side),
-                online = seat.IsAi || (seat.SeenAt is not null && (now - seat.SeenAt.Value).TotalSeconds < 20),
-            }).ToList();
-        }
-
         return new
         {
             id = r.Id,
@@ -95,9 +75,7 @@ public static class GameViews
             totalTimeoutSec = r.TotalTimeoutSec,
             moveRemainMs = GameClock.MoveRemainMs(r, now),
             myRemainMs = GameClock.RemainMs(r, mySide, now),
-            oppRemainMs = isLudo && LudoSeats.Count(r) > 2
-                ? (long?)null
-                : GameClock.RemainMs(r, mySide == 0 ? 0 : engine.Other(mySide), now),
+            oppRemainMs = GameClock.RemainMs(r, mySide == 0 ? 0 : engine.Other(mySide), now),
             hostUsedMs = r.HostUsedMs,
             guestUsedMs = r.GuestUsedMs,
             // 兼容投影（旧客户端读这几个字段）
@@ -109,8 +87,7 @@ public static class GameViews
             opponentName = isAi ? "AI" : oppName,
             opponentOnline = isAi || (oppSeen is not null && (now - oppSeen.Value).TotalSeconds < 20),
             myTurn = r.Status == "playing" && mySide != 0 && r.Turn == mySide,
-            canJoin = r.Status == "waiting" && mySide == 0 && (isLudo || (r.GuestUserId is null && r.AiLevel == 0)),
-            players,
+            canJoin = r.Status == "waiting" && mySide == 0 && r.GuestUserId is null && r.AiLevel == 0,
             rebuild,
             state,
             createdAt = ApiKit.StampUtc(r.CreatedAt),
@@ -118,11 +95,9 @@ public static class GameViews
         };
     }
 
-    /// <summary>我在这一局执哪一方（飞行棋按座位 uid 映射；其余 host/guest）</summary>
+    /// <summary>我在这一局执哪一方（房主执 hostSide，客人执另一方）</summary>
     public static int MySide(GameRoom r, int uid)
     {
-        if (r.GameKey == "ludo")
-            return LudoSeats.ByUid(r, uid)?.Side ?? 0;
         return r.HostUserId == uid ? r.HostSide
             : r.GuestUserId == uid ? GameEngines.Get(r.GameKey).Other(r.HostSide)
             : 0;

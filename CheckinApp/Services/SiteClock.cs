@@ -106,4 +106,27 @@ public static class SiteClock
 
     /// <summary>「10月26日 周一」</summary>
     public static string MonthDayWeek(DateTime d) => $"{d:M月d日} {WeekdayCn(d)}";
+
+    // ==================== 记账发生时间（精确到分钟） ====================
+    //
+    // 【口径】Expenses.OccurDate 存的是「本地墙钟的某一天某一刻」，精确到分钟：
+    // 写库前一律 ToMinute() 把秒和 tick 清零，于是库里、接口、导出、AI 看到的
+    // 都是同一档精度（yyyy-MM-dd HH:mm），不会出现「接口到分、库里到 tick」的两套数。
+    //
+    // 【老数据】2.12 之前的账目全是 00:00（那时只记日期）。00:00 一律当作
+    // 「没记具体时刻」—— 显示时只写日期，不然 100 多笔老账全飘着假的 00:00。
+
+    /// <summary>截断到分钟（秒与 tick 清零），Kind 保持不变</summary>
+    public static DateTime ToMinute(DateTime d) =>
+        new(d.Year, d.Month, d.Day, d.Hour, d.Minute, 0, d.Kind);
+
+    /// <summary>「2026-10-26 12:30」—— 给 input[type=datetime-local] 的 value 用</summary>
+    public static string IsoMinute(DateTime d) => d.ToString("yyyy-MM-ddTHH:mm");
+
+    /// <summary>这一笔是否记了具体时刻（00:00 = 老数据，只知道日期）</summary>
+    public static bool HasMinute(DateTime d) => d.TimeOfDay != TimeSpan.Zero;
+
+    /// <summary>「10月26日」/「10月26日 12:30」—— 列表里给人看的时间文案</summary>
+    public static string MinuteLabel(DateTime d) =>
+        HasMinute(d) ? d.ToString("M月d日 HH:mm") : d.ToString("M月d日");
 }

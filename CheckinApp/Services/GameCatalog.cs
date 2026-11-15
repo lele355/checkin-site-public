@@ -24,10 +24,10 @@ public static class GameCatalog
         new("reversi", "黑白棋", "双人对战 · 终局子多者胜", 2, 2, true, true),
         new("jungle", "斗兽棋", "双人对战 · 入对方兽穴胜", 2, 2, true, true),
         new("xiangqi", "象棋", "双人对战 · 将死对方胜", 2, 2, true, true),
-        new("ludo", "飞行棋", "双人对战 · 骰子起飞", 2, 2, true, true),
         new("armychess", "军旗", "双人对战 · 明棋暗棋翻棋", 2, 2, true, true),
         new("fish", "大鱼吃小鱼", "单机 · 吃小鱼变大", 1, 1, true, Solo: true, MaxScore: 1_000_000),
         new("melon", "合成大西瓜", "单机 · 合成冲击大西瓜", 1, 1, true, Solo: true, MaxScore: 1_000_000),
+        new("minesweeper", "扫雷", "单机 · 初级中级高级", 1, 1, true, Solo: true, MaxScore: 9_999_999),
     ];
 
     public static GameInfo? Find(string key) =>

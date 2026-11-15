@@ -41,16 +41,28 @@ public static class AiPrompt
           （星期/节次对不上），又白烧 token。所有信息只准放一次：放工具参数里。
 
         【工具就是你的全部手段】
-        6 个工具，一次最多调 3 个（整张课表算 1 个）：
+        10 个工具，一次最多调 3 个（整张课表算 1 个）：
         1. create_schedule — 新建日程：title(必填), start_at(yyyy-MM-dd HH:mm 或 yyyy-MM-dd), end_at?, all_day?, description?
         2. create_memo — 新建备忘：title(必填), content?, pinned?
-        3. create_expense — 记账：amount(数字，必填), direction("out"支出/"in"收入，必填), category?(餐饮/交通/学习/娱乐/日用/其他), occur_date?(yyyy-MM-dd), note?
+        3. create_expense — 记账：amount(数字，必填), direction("out"支出/"in"收入，必填), category?(餐饮/交通/学习/娱乐/日用/其他), occur_date?(发生时间，精确到分钟 yyyy-MM-dd HH:mm；用户只说「中午/刚才」就按摘要里的「现在」推一个时刻，只有明确说「昨天/上周」而没给点数才只写日期), note?
         4. checkin_habit — 习惯打卡：habit_id(整数，必填，从数据摘要的习惯清单里选), date?(yyyy-MM-dd), note?
         5. create_anniversary — 新增纪念日：title(必填), date(yyyy-MM-dd，必填), repeat_yearly?, note?
         6. create_courses — 批量导入课程表：courses(数组，必填，每项含 name/weekday/start_period/end_period 必填，teacher/location/weeks/category 可选), semester_start?(yyyy-MM-dd)
         7. create_period — 记录经期：start_date(yyyy-MM-dd，必填，只能今天或过去), end_date?(可后补), note?, user_id?(情侣互见可给对方记)
         8. couple_summary — 查询情侣月度总结：action?("query"查询最新总结，固定不用传)
-        9. query_records — 查询记录数据（回答用户关于自己/情侣数据的问题）：module(schedule日程/memo备忘/expense记账/habits打卡/anniversary纪念日/mood心情/poop排便/questions提问/period经期), days?(最近N天，默认30)
+        9. query_records — 查询记录数据（回答用户关于自己/情侣数据的问题）：module(schedule日程/memo备忘/expense记账/habits打卡/anniversary纪念日/mood心情/poop排便/questions提问/period经期), days?(最近N天，默认30；问「一共」可给 3650), keyword?(按备注/分类/记账条目名过滤，返回带 #id)
+        10. merge_expenses — 把几笔已有的账合并成一个记账条目：name(条目名，必填), ids(账目 id 数组，至少2个，来自 query_records 的 #id)
+
+        【记账条目（合并）是什么】
+        用户可以把几笔同类小账收进一个「条目」（如「超市购物」下面挂 3 笔）。
+        条目**只是名字**：没有分类、没有时间、没有金额，金额永远是里面那几笔的和。
+        所以：
+        - 用户问「超市购物花了多少 / 早饭一共多少」→ 先 query_records(module=expense, keyword="超市购物", days=3650)，
+          不要自己翻摘要猜；返回的是明细合计，直接念数字。
+        - 用户说「把这几笔合并成超市购物 / 把上周超市那几笔并起来」→ 先 query_records 拿到 #id，
+          再 merge_expenses(name, ids[])。ids 必须来自查询结果，绝不能编。
+        - 记账条目和「分类」不是一回事：分类是每笔账自己的属性，条目是跨分类的归拢。别混淆。
+        - 查询结果里某笔若带（条目：xx），说明它已经在某个条目里了，不能再被合并。
 
         备用方案（仅当无法发起工具调用时）：在回复末尾输出一个 ```actions 代码块，
         内容是 JSON 数组，每个元素一条建议，字段与工具参数一致再加 type 字段：
@@ -75,9 +87,10 @@ public static class AiPrompt
     /// <summary>用户数据摘要：让 AI 知道今天几号、有哪些习惯可打卡（轻量注入，敏感模块不进摘要）</summary>
     public static string BuildDataSummary(AppDbContext db, int uid)
     {
-        var now = DateTime.Now;
+        var now = SiteClock.Now;
         var sb = new StringBuilder();
-        sb.AppendLine($"【数据摘要】今天是 {now:yyyy-MM-dd} 星期{"一二三四五六日"[(int)now.DayOfWeek == 0 ? 6 : (int)now.DayOfWeek - 1]}。");
+        // 连「现在几点」一起给：记账要精确到分钟，AI 得知道「刚才/中午」落成哪个时刻
+        sb.AppendLine($"【数据摘要】今天是 {now:yyyy-MM-dd} 星期{"一二三四五六日"[(int)now.DayOfWeek == 0 ? 6 : (int)now.DayOfWeek - 1]}，现在 {now:HH:mm}。");
 
         var habits = db.Habits.Where(h => h.UserId == uid).OrderBy(h => h.Id).ToList();
         if (habits.Count > 0)
@@ -136,6 +149,23 @@ public static class AiPrompt
             var outp = sums.FirstOrDefault(x => x.Type == "out")?.Sum ?? 0m;
             var inp = sums.FirstOrDefault(x => x.Type == "in")?.Sum ?? 0m;
             sb.AppendLine($"本月记账（{now:MM} 月）：支出 ¥{outp:0.##}，收入 ¥{inp:0.##}，结余 ¥{inp - outp:0.##}");
+        }
+
+        // 本月记账条目（合并容器）：只列名字和当月笔数/支出合计。
+        // 有了这一行，用户说「超市购物花了多少」即使不查库也能立刻答；问其它月份再走 query_records。
+        var monthGroups = db.Expenses.AsNoTracking()
+            .Where(e => e.UserId == uid && e.GroupId != null && e.OccurDate >= monthStart)
+            .GroupBy(e => e.GroupId!.Value)
+            .Select(g => new { Id = g.Key, N = g.Count(), Out = g.Where(x => x.Type == "out").Sum(x => x.Amount) })
+            .ToList();
+        if (monthGroups.Count > 0)
+        {
+            var gname = db.ExpenseGroups.AsNoTracking().Where(g => g.UserId == uid)
+                .ToDictionary(g => g.Id, g => g.Name);
+            var lines = monthGroups.Take(8)
+                .Where(g => gname.ContainsKey(g.Id))
+                .Select(g => $"{gname[g.Id]} {g.N} 笔 ¥{g.Out:0.##}");
+            if (lines.Any()) sb.AppendLine($"本月记账条目：{string.Join("；", lines)}");
         }
 
         // 近期纪念日：只给原日期和是否每年重复，倒计时让 AI 自己按今天算
@@ -206,13 +236,25 @@ public static class AiPrompt
                                  (S("end_at") != "" ? $" ~ {S("end_at")}" : ""),
             "create_memo" => $"{S("title")}" + (S("content") != "" ? $"：{S("content")}" : ""),
             "create_expense" => $"{(S("direction") == "in" ? "收入" : "支出")} ¥{S("amount")}　{S("category")}" +
+                                // 发生时间到分钟：AI 传了时刻就一起显示，只给日期就只显示日期
+                                (S("occur_date").Length > 10 ? $"　{S("occur_date")}" : "") +
                                 (S("note") != "" ? $"（{S("note")}）" : ""),
+            "merge_expenses" => $"合并成条目「{S("name")}」：" + SummarizeIds(a),
             "checkin_habit" => $"习惯打卡：{S("habit_id")}" + (S("date") != "" ? $"　{S("date")}" : "（今天）"),
             "create_anniversary" => $"{S("title")}　{S("date")}" +
                                     (S("repeat_yearly") == "true" ? "（每年重复）" : ""),
             "create_courses" => SummarizeCourses(a),
             _ => ""
         };
+    }
+
+    /// <summary>merge_expenses 的卡片摘要：「3 笔」</summary>
+    private static string SummarizeIds(JsonElement a)
+    {
+        if (a.ValueKind == JsonValueKind.Object && a.TryGetProperty("ids", out var arr)
+            && arr.ValueKind == JsonValueKind.Array)
+            return $"{arr.GetArrayLength()} 笔";
+        return "";
     }
 
     /// <summary>课程导入的卡片摘要：「N 条：课名A、课名B 等」+ 顺带设学期开始日时补一句</summary>

@@ -33,7 +33,8 @@ public static class AiTools
                     properties = new
                     {
                         module = new { type = "string", description = "模块：schedule日程/memo备忘/expense记账/habits打卡/anniversary纪念日/mood心情/poop排便/questions提问/period经期" },
-                        days = new { type = "integer", description = "看最近 N 天，默认 30" },
+                        days = new { type = "integer", description = "看最近 N 天，默认 30；问「总共/一共/从来」这类可放大到 3650" },
+                        keyword = new { type = "string", description = "按备注/分类/记账条目名过滤，如「超市购物」「午饭」。问某类或某个条目的花了多少时传它，返回时会带每条账的 #id" },
                     },
                     required = new[] { "module" },
                 },
@@ -135,10 +136,34 @@ public static class AiTools
                         amount = new { type = "number", description = "金额（正数），必填" },
                         direction = new { type = "string", description = "收支方向：out=支出 / in=收入，必填", @enum = new[] { "out", "in" } },
                         category = new { type = "string", description = "分类：餐饮/交通/学习/娱乐/日用/其他，可选" },
-                        occur_date = new { type = "string", description = "发生日期 yyyy-MM-dd，可选，默认今天" },
+                        occur_date = new { type = "string", description = "发生时间，精确到分钟：yyyy-MM-dd HH:mm（只写 yyyy-MM-dd 会记成当天 00:00），可选，默认此刻" },
                         note = new { type = "string", description = "备注，可选" },
                     },
                     required = new[] { "amount", "direction" },
+                },
+            },
+        },
+        new
+        {
+            type = "function",
+            function = new
+            {
+                name = "merge_expenses",
+                description = "把几笔已有的账合并成一个记账条目（如「超市购物」「早饭」）。条目只是名字，下面挂的那几笔账各自的分类/时间/金额都不变。ids 用 query_records 查出来的 #id。",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        name = new { type = "string", description = "条目名（如「超市购物」），必填，≤20 字" },
+                        ids = new
+                        {
+                            type = "array",
+                            description = "要合并的账目 id，至少 2 个，来自 query_records 返回的 #id",
+                            items = new { type = "integer" },
+                        },
+                    },
+                    required = new[] { "name", "ids" },
                 },
             },
         },
@@ -337,6 +362,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         ["create_schedule"]   = "schedule.use",
         ["create_memo"]       = "memo.use",
         ["create_expense"]    = "expense.use",
+        ["merge_expenses"]    = "expense.use",
         ["checkin_habit"]     = "habits.use",
         ["create_anniversary"] = "anniversary.use",
         ["create_courses"]    = "courses.use",
@@ -351,6 +377,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         ["create_schedule"]    = "新建日程",
         ["create_memo"]        = "新建备忘",
         ["create_expense"]     = "记一笔账",
+        ["merge_expenses"]     = "合并成记账条目",
         ["checkin_habit"]      = "习惯打卡",
         ["create_anniversary"] = "新增纪念日",
         ["create_courses"]     = "导入课程表",
@@ -382,6 +409,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
             "create_schedule"    => CreateSchedule(uid, act),
             "create_memo"        => CreateMemo(uid, act),
             "create_expense"     => CreateExpense(uid, act),
+            "merge_expenses"     => MergeExpenses(uid, act),
             "checkin_habit"      => CheckinHabit(uid, act),
             "create_anniversary" => CreateAnniversary(uid, act),
             "create_courses"     => CreateCourses(uid, act),
@@ -395,7 +423,8 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
     private AiActionResult QueryRecords(int uid, JsonElement a)
     {
         var module = Str(a, "module", 20);
-        var days = int.TryParse(Str(a, "days", 4), out var dd) ? Math.Clamp(dd, 1, 365) : 30;
+        var days = int.TryParse(Str(a, "days", 4), out var dd) ? Math.Clamp(dd, 1, 3650) : 30;
+        var keyword = Str(a, "keyword", 30).Trim();
         var since = DateTime.UtcNow.AddDays(-days);
 
         // 情侣域成员（心情/排便/提问/经期双方互见）
@@ -422,12 +451,43 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
             }
             case "expense":
             {
-                var rows = db.Expenses.Where(x => x.UserId == uid && x.OccurDate >= since.Date).ToList();
-                var outSum = rows.Where(x => x.Type == "out").Sum(x => x.Amount);
-                var inSum = rows.Where(x => x.Type == "in").Sum(x => x.Amount);
-                var top = rows.GroupBy(x => x.Category).OrderByDescending(g => g.Sum(x => x.Amount)).Take(5)
+                var all = db.Expenses.Where(x => x.UserId == uid && x.OccurDate >= since.Date).ToList();
+
+                // 带 keyword = 找某一类 / 某一个条目：按备注、分类、条目名三处命中，
+                // 并把每条账的 #id 一起给出去（要合并成条目时 AI 得拿得到 id）
+                if (keyword.Length > 0)
+                {
+                    var gids = db.ExpenseGroups.Where(g => g.UserId == uid && g.Name.Contains(keyword))
+                        .Select(g => g.Id).ToList();
+                    var hit = all.Where(x => x.Note.Contains(keyword) || x.Category.Contains(keyword)
+                                             || (x.GroupId != null && gids.Contains(x.GroupId.Value)))
+                        .OrderByDescending(x => x.OccurDate).ThenByDescending(x => x.Id).ToList();
+                    if (hit.Count == 0)
+                        return new(true, $"最近 {days} 天没有和「{keyword}」相关的账。");
+
+                    var ho = hit.Where(x => x.Type == "out").Sum(x => x.Amount);
+                    var hi = hit.Where(x => x.Type == "in").Sum(x => x.Amount);
+                    var nameOf = db.ExpenseGroups.Where(g => g.UserId == uid)
+                        .ToDictionary(g => g.Id, g => g.Name);
+                    var lines = hit.Take(15).Select(x =>
+                        $"- #{x.Id} {x.OccurDate:M月d日 HH:mm} {x.Category} ¥{x.Amount:0.##}" +
+                        $"{(string.IsNullOrWhiteSpace(x.Note) ? "" : " " + Cut(x.Note, 30))}" +
+                        $"{(x.GroupId is int gid && nameOf.TryGetValue(gid, out var gn) ? $"（条目：{gn}）" : "")}");
+                    var more = hit.Count > 15 ? $"\n（还有 {hit.Count - 15} 笔未列出）" : "";
+                    return new(true, $"最近 {days} 天「{keyword}」相关 {hit.Count} 笔：支出 ¥{ho:0.##} / 收入 ¥{hi:0.##}\n"
+                                     + string.Join("\n", lines) + more);
+                }
+
+                var outSum = all.Where(x => x.Type == "out").Sum(x => x.Amount);
+                var inSum = all.Where(x => x.Type == "in").Sum(x => x.Amount);
+                var top = all.GroupBy(x => x.Category).OrderByDescending(g => g.Sum(x => x.Amount)).Take(5)
                     .Select(g => $"{g.Key} {g.Sum(x => x.Amount):0.##}").ToList();
-                return new(true, $"最近 {days} 天记账 {rows.Count} 笔：支出 {outSum:0.##} / 收入 {inSum:0.##}；大头：{string.Join("、", top)}");
+                // 顺手给最近 5 笔的 id：用户接着说「把这几笔合并成 xx」时 AI 才有据可依
+                var recent = all.OrderByDescending(x => x.OccurDate).ThenByDescending(x => x.Id).Take(5)
+                    .Select(x => $"- #{x.Id} {x.OccurDate:M月d日 HH:mm} {x.Category} ¥{x.Amount:0.##}"
+                                 + (string.IsNullOrWhiteSpace(x.Note) ? "" : " " + Cut(x.Note, 20)));
+                return new(true, $"最近 {days} 天记账 {all.Count} 笔：支出 {outSum:0.##} / 收入 {inSum:0.##}；大头：{string.Join("、", top)}"
+                                 + (all.Count > 0 ? "\n最近几笔：\n" + string.Join("\n", recent) : ""));
             }
             case "habits":
             {
@@ -582,7 +642,8 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         var type = Str(a, "direction", 4) switch { "in" => "in", "out" => "out", _ => "" };
         if (type == "") return new(false, "收支方向不对（out=支出 / in=收入）");
 
-        var occur = Date(a, "occur_date", out var d) ? d : DateTime.Now.Date;
+        // 没给时间就按「此刻」；给了也只留到分钟（与网页/App/导出同一档精度）
+        var occur = SiteClock.ToMinute(Date(a, "occur_date", out var d) ? d : SiteClock.Now);
 
         db.Expenses.Add(new ExpenseItem
         {
@@ -594,7 +655,43 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
             Note = Str(a, "note", 200),
         });
         db.SaveChanges();
-        return new(true, $"已记账：{(type == "out" ? "支出" : "收入")} ¥{amount:0.##}");
+        return new(true, $"已记账：{(type == "out" ? "支出" : "收入")} ¥{amount:0.##}（{SiteClock.MinuteLabel(occur)}）");
+    }
+
+    /// <summary>
+    /// 把几笔已有的账合并成一个条目。语义与 App/网页完全一致：
+    /// 条目只是名字，账本身的分类/时间/金额都不动，统计口径不变。
+    /// </summary>
+    private AiActionResult MergeExpenses(int uid, JsonElement a)
+    {
+        var name = Cut(Str(a, "name", 40), 20).Trim();
+        if (name.Length == 0) return new(false, "条目名不能为空（如「超市购物」）");
+
+        var ids = new List<int>();
+        if (a.ValueKind == JsonValueKind.Object && a.TryGetProperty("ids", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var el in arr.EnumerateArray())
+            {
+                var raw = el.ValueKind == JsonValueKind.Number ? el.ToString() : (el.GetString() ?? "");
+                if (int.TryParse(raw, out var id) && id > 0 && !ids.Contains(id)) ids.Add(id);
+            }
+        }
+        if (ids.Count < 2) return new(false, "至少 2 笔账才能合并成一个条目");
+
+        var rows = db.Expenses.Where(x => x.UserId == uid && ids.Contains(x.Id)).ToList();
+        if (rows.Count != ids.Count) return new(false, "有账目不存在或不属于你");
+        if (rows.Any(x => x.GroupId is not null)) return new(false, "有账目已经属于别的条目了，先把它移出来");
+
+        var now = DateTime.UtcNow;
+        var grp = new ExpenseGroup { UserId = uid, Name = name, CreatedAt = now, UpdatedAt = now };
+        db.ExpenseGroups.Add(grp);
+        db.SaveChanges();
+        foreach (var r in rows) { r.GroupId = grp.Id; r.UpdatedAt = now; }
+        db.SaveChanges();
+
+        var outSum = rows.Where(x => x.Type == "out").Sum(x => x.Amount);
+        var inSum = rows.Where(x => x.Type == "in").Sum(x => x.Amount);
+        return new(true, $"已合并成条目「{name}」：{rows.Count} 笔，支出 ¥{outSum:0.##} / 收入 ¥{inSum:0.##}");
     }
 
     private AiActionResult CheckinHabit(int uid, JsonElement a)
@@ -772,7 +869,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         };
     }
 
-    /// <summary>日期解析：yyyy-MM-dd HH:mm / yyyy-MM-dd 优先，兜底通用解析；限 2000~2100 年防脏值</summary>
+    /// <summary>日期解析：yyyy-MM-dd HH:mm / yyyy-MM-ddTHH:mm / yyyy-MM-dd 优先，兜底通用解析；限 2000~2100 年防脏值</summary>
     private static bool Date(JsonElement a, string name, out DateTime result)
     {
         result = default;
@@ -780,7 +877,7 @@ public class AiActionExecutor(AppDbContext db, CurrentUser me)
         var s = (v.ValueKind == JsonValueKind.String ? v.GetString() : v.ToString())?.Trim() ?? "";
         if (s == "") return false;
 
-        string[] fmts = ["yyyy-MM-dd HH:mm", "yyyy-MM-dd", "yyyy/M/d H:mm", "yyyy/M/d"];
+        string[] fmts = ["yyyy-MM-dd HH:mm", "yyyy-MM-ddTHH:mm", "yyyy-MM-dd", "yyyy/M/d H:mm", "yyyy/M/d"];
         if (!DateTime.TryParseExact(s, fmts, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
             && !DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
             return false;

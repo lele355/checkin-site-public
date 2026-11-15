@@ -314,6 +314,9 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
   max-width: 100%; height: auto; touch-action: none;
 }
 .gm-solo-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* 扫雷难度开关：三颗小按钮，选中态用主色填充 */
+.gm-solo-levels .btn { min-height: 34px; padding: 0 14px; font-size: .85rem; }
+.gm-solo-levels .btn.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .gm-solo-bar > span {
   font-weight: 700; font-size: 1.2rem; min-width: 60px;
   color: var(--text);
@@ -368,11 +371,6 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
     .gm-actions form { flex: 1 1 100%; display: block; }
     .gm-actions .btn { width: 100%; }
 
-    /* 飞行棋人数/AI 表单：column 方向，子项按自然高度堆叠、宽度撑满（不能用 flex-basis:100%，那是高度） */
-    .gm-ludo-form { flex-direction: column; align-items: stretch !important; gap: 8px; }
-    .gm-ludo-form .field,
-    .gm-ludo-form .chip,
-    .gm-ludo-form .btn { flex: 0 0 auto !important; width: 100%; box-sizing: border-box; }
 
     /* 房间码加入：输入独占一行，加入按钮全宽 */
     .gm-join-form { flex-wrap: wrap; }
@@ -396,15 +394,14 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
     .gm-solo canvas { max-height: 70vh; }
 }
 
-/* 横屏：四款棋类（象棋/斗兽棋/军旗/飞行棋）左右分栏 —— 棋盘左、状态+操作右。
+/* 横屏：三款棋类（象棋/斗兽棋/军旗）左右分栏 —— 棋盘左、状态+操作右。
    高棋盘横屏时按视口高度限高，绝不裁切。用 grid 区域布局，竖屏 DOM 顺序不变。 */
 @media (orientation: landscape) and (max-height: 560px) {
     .gm-board { max-width: min(520px, 88vh); }
 
     .gm-card[data-gamekey="xiangqi"],
     .gm-card[data-gamekey="jungle"],
-    .gm-card[data-gamekey="armychess"],
-    .gm-card[data-gamekey="ludo"] {
+    .gm-card[data-gamekey="armychess"] {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(200px, 34%);
         grid-template-rows: auto auto 1fr;
@@ -417,30 +414,25 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
     }
     .gm-card[data-gamekey="xiangqi"]  > .page-head,
     .gm-card[data-gamekey="jungle"]   > .page-head,
-    .gm-card[data-gamekey="armychess"]> .page-head,
-    .gm-card[data-gamekey="ludo"]     > .page-head { grid-area: head; }
+    .gm-card[data-gamekey="armychess"]> .page-head { grid-area: head; }
 
     .gm-card[data-gamekey="xiangqi"]  > .gm-board-wrap,
     .gm-card[data-gamekey="jungle"]   > .gm-board-wrap,
-    .gm-card[data-gamekey="armychess"]> .gm-board-wrap,
-    .gm-card[data-gamekey="ludo"]     > .gm-board-wrap { grid-area: board; align-self: start; }
+    .gm-card[data-gamekey="armychess"]> .gm-board-wrap { grid-area: board; align-self: start; }
 
     .gm-card[data-gamekey="xiangqi"]  > .gm-status,
     .gm-card[data-gamekey="jungle"]   > .gm-status,
-    .gm-card[data-gamekey="armychess"]> .gm-status,
-    .gm-card[data-gamekey="ludo"]     > .gm-status { grid-area: status; margin-top: 0; }
+    .gm-card[data-gamekey="armychess"]> .gm-status { grid-area: status; margin-top: 0; }
 
     .gm-card[data-gamekey="xiangqi"]  > .gm-actions,
     .gm-card[data-gamekey="jungle"]   > .gm-actions,
-    .gm-card[data-gamekey="armychess"]> .gm-actions,
-    .gm-card[data-gamekey="ludo"]     > .gm-actions { grid-area: actions; margin-top: 0; flex-direction: column; }
+    .gm-card[data-gamekey="armychess"]> .gm-actions { grid-area: actions; margin-top: 0; flex-direction: column; }
     .gm-card[data-gamekey="xiangqi"]  > .gm-actions .btn,
     .gm-card[data-gamekey="jungle"]   > .gm-actions .btn,
-    .gm-card[data-gamekey="armychess"]> .gm-actions .btn,
-    .gm-card[data-gamekey="ludo"]     > .gm-actions .btn { width: 100%; }
+    .gm-card[data-gamekey="armychess"]> .gm-actions .btn { width: 100%; }
 }
 
-/* 横屏（T05-1）：页头压单行 + 四款高棋盘按可用高度反算，首屏完整不裁切 */
+/* 横屏（T05-1）：页头压单行 + 三款高棋盘按可用高度反算，首屏完整不裁切 */
 @media (orientation: landscape) and (max-height: 560px) {
     .gm-card { padding: 6px 12px !important; }
     .gm-card > .page-head { padding: 4px 8px !important; margin: 0 0 4px !important; }
@@ -450,8 +442,7 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
 
     .gm-card[data-gamekey="xiangqi"] .gm-board,
     .gm-card[data-gamekey="jungle"] .gm-board,
-    .gm-card[data-gamekey="armychess"] .gm-board,
-    .gm-card[data-gamekey="ludo"] .gm-board {
+    .gm-card[data-gamekey="armychess"] .gm-board {
         width: auto !important;
         height: calc(100dvh - 142px) !important;
         max-height: calc(100dvh - 142px) !important;
@@ -459,6 +450,5 @@ a.gm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
     }
     .gm-card[data-gamekey="xiangqi"] > .gm-board-wrap,
     .gm-card[data-gamekey="jungle"] > .gm-board-wrap,
-    .gm-card[data-gamekey="armychess"] > .gm-board-wrap,
-    .gm-card[data-gamekey="ludo"] > .gm-board-wrap { overflow: hidden; align-items: flex-start; padding: 0 !important; }
+    .gm-card[data-gamekey="armychess"] > .gm-board-wrap { overflow: hidden; align-items: flex-start; padding: 0 !important; }
 }

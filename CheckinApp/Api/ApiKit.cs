@@ -35,6 +35,10 @@ internal static class ApiKit
     public static string? DN(DateTime? d) => d?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     public static string T(DateTime d) => d.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
     public static string? TN(DateTime? d) => d?.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+
+    /// <summary>「2026-10-26 12:30」—— 空格分隔的分钟精度。给 CSV / 人能直接读的导出行用
+    /// （Excel 认得出「日期 时间」这一种，认不出带 T 的 ISO 写法）。</summary>
+    public static string Minute(DateTime d) => d.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
     public static string Stamp(DateTime d) => d.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
 
     /// <summary>

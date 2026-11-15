@@ -193,6 +193,23 @@ document.addEventListener('page:load', initViewSwitch);   // 无刷新换主区�
         row.removeAttribute('style');
       }
     });
+
+    // ③ 浮动标签（2026-11-12）：有 label 的字段把 label 坐进输入框，样式见 site.css 的 .field.float
+    var TXT = /^(text|number|tel|url|email|password|search)$/;
+    var ALWAYS = /^(date|time|datetime-local)$/;
+    Array.prototype.forEach.call(scope.querySelectorAll('.field'), function (f) {
+      if (f.classList.contains('float')) return;
+      var lab = f.querySelector(':scope > label');
+      if (!lab || lab.querySelector('input, select, textarea')) return;   // 开关型/复合 label 不参与
+      var ctl = f.querySelector(':scope > input:not([type=hidden]), :scope > textarea, :scope > select');
+      if (!ctl) return;
+      var isText = ctl.tagName === 'TEXTAREA' || (ctl.tagName === 'INPUT' && TXT.test(ctl.type));
+      var isAlways = ctl.tagName === 'SELECT' || (ctl.tagName === 'INPUT' && ALWAYS.test(ctl.type));
+      if (!isText && !isAlways) return;
+      // 没有 placeholder 就补一个空格：:placeholder-shown 需要它才能区分「空/有值」
+      if (isText && ctl.tagName === 'INPUT' && !ctl.getAttribute('placeholder')) ctl.setAttribute('placeholder', ' ');
+      f.classList.add('float');
+    });
   };
   window.enhanceForms(document);
 })();

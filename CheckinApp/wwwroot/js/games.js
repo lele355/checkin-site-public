@@ -25,7 +25,6 @@
     reversi: window.ReversiBoard,
     jungle: window.JungleBoard,
     xiangqi: window.XiangqiBoard,
-    ludo: window.LudoBoard,
     armychess: window.ArmyChessBoard,
   };
   var renderer = RENDERERS[gameKey];
@@ -105,13 +104,6 @@
         }
         txt += ' · 黑 ' + (state.state.black || 0) + ' 白 ' + (state.state.white || 0);
       }
-      // 飞行棋：骰点 + 掷/选机状态（状态事实）
-      if (gameKey === 'ludo' && state.state) {
-        if (state.state.lastRoll) txt += ' · 骰子 ' + state.state.lastRoll;
-        if (state.myTurn && state.status === 'playing') {
-          txt += state.state.needRoll ? ' · 掷骰子' : ' · 选一架飞机';
-        }
-      }
       // 翻棋：阵营状态 + 执色 + 二选一（状态事实）
       if (gameKey === 'armychess' && state.state && state.state.mode === 'fanqi' && state.status === 'playing') {
         txt += state.state.settled ? ' · 翻子或走子' : ' · 阵营未定';
@@ -122,13 +114,6 @@
     // 布阵按钮条：仅布阵期且自己未部署时出现
     var bar = document.getElementById('gmSetupBar');
     if (bar) bar.hidden = !deployActive;
-    // 飞行棋掷骰按钮条：轮到我且这一手还没掷
-    var ludoBar = document.getElementById('gmLudoBar');
-    if (ludoBar) {
-      var needRoll = !!(state.myTurn && state.status === 'playing'
-        && state.state && state.state.needRoll);
-      ludoBar.hidden = !needRoll;
-    }
     // 重建换房握手（走查表 §3）：对方请求 → 同意/拒绝；换房完成 → 跳新房
     updateRebuildBar(state);
   }
@@ -202,7 +187,7 @@
     return s.myTurn ? '轮到你' : '等对手落子';
   }
 
-  // 点击模式：两段式（象棋/斗兽棋/军旗）/ 单点落子（五子棋/黑白棋）/ 不响应棋盘点击（飞行棋走按钮）
+  // 点击模式：两段式（象棋/斗兽棋/军旗）/ 单点落子（五子棋/黑白棋）
   function boardClickMode() {
     if (gameKey === 'xiangqi' || gameKey === 'jungle' || gameKey === 'armychess') return 'two';
     if (gameKey === 'gomoku' || gameKey === 'reversi') return 'point';
@@ -247,7 +232,7 @@
     }).catch(function () {});
   }
 
-  // 点击：算到 SVG viewBox 坐标 → 飞行棋点机 / 网格坐标 → 布阵/两段式/单点分发
+  // 点击：算到 SVG viewBox 坐标 → 网格坐标 → 布阵/两段式/单点分发
   svg.addEventListener('click', function (e) {
     var rect = svg.getBoundingClientRect();
     var vb = svg.viewBox && svg.viewBox.baseVal;
@@ -255,16 +240,6 @@
     var vh = vb && vb.height ? vb.height : 640;
     var x = (e.clientX - rect.left) / rect.width * vw;
     var y = (e.clientY - rect.top) / rect.height * vh;
-
-    // 飞行棋：点 ✈ 走子（movable 内才发 {p}），不走网格换算
-    if (gameKey === 'ludo') {
-      if (!state.myTurn || state.status !== 'playing') return;
-      var lst = (state.state && state.state.movable) || [];
-      if (!lst.length) return;
-      var pi = window.LudoBoard.pieceAt(x, y);
-      if (pi >= 0 && lst.indexOf(pi) >= 0) sendMove({ p: pi });
-      return;
-    }
 
     var g = window.GameBoards.hit(lastGeom, x, y);
     if (!g) return;
@@ -369,16 +344,6 @@
     }, function () { });
   };
 
-  // 飞行棋：掷骰（Play.cshtml 按钮条调）
-  window.__gmLudoRoll = function () {
-    fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id + '/roll', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-      credentials: 'same-origin',
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j && j.ok && j.data) apply(j.data);
-    }, function () { });
-  };
 
   function sendMove(move) {
     fetch('/api/v1/games/' + gameKey + '/rooms/' + state.id + '/move', {
@@ -406,7 +371,6 @@
     state.moveRemainMs = data.moveRemainMs;
     state.myRemainMs = data.myRemainMs;
     state.oppRemainMs = data.oppRemainMs;
-    state.players = data.players;     // 飞行棋多座（D4-BUG-1 同类风险，一并补）
     state.rebuild = data.rebuild;     // 重建换房握手（D4-BUG-1：漏拷对手端按钮永远不出现）
     startAnim(prevPieces, data.state);
     // 单点落子动画（任务二尾巴）：五子棋/黑白棋新着回弹 + 翻子

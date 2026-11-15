@@ -339,6 +339,62 @@ button { font: inherit; color: inherit; }
 .field input::placeholder, .field textarea::placeholder { color: var(--text-weak); }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
 
+/* ---------- 浮动标签（2026-11-12 站主定） ----------
+   有 label 的表单字段：label 坐进输入框里当提示，聚焦或有值时才上浮到边框上。
+   由 site.js 的 enhanceForms 自动打 .float —— 只对文本类控件 / select / 日期时间生效；
+   开关型字段的 label 里包着 input，不参与。没有 placeholder 的输入框会被补一个空格，
+   这样 :placeholder-shown 才能可靠地区分「空」和「有值」。
+
+   为什么用 :has()：现有 DOM 是 label 在前、控件在后，CSS 没有「向前选兄弟」的能力；
+   :has() 站内已在用（开关行样式），不是新依赖。 */
+.field.float > label {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  font-size: .92rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-weak);
+  pointer-events: none;
+  z-index: 1;
+  transition: top var(--dur) var(--easing), transform var(--dur) var(--easing),
+              font-size var(--dur) var(--easing), color var(--dur) var(--easing),
+              background var(--dur) var(--easing), padding var(--dur) var(--easing);
+}
+/* 多行输入：空态时 label 贴在内容区顶部，不跟着高度居中 */
+.field.float:has(> textarea) > label { top: 14px; transform: none; }
+
+/* 上浮态：聚焦 / 有值 / 恒有值的控件（select 与日期时间控件永远有值） */
+.field.float:has(> input:focus) > label,
+.field.float:has(> textarea:focus) > label,
+.field.float:has(> input:not(:placeholder-shown)) > label,
+.field.float:has(> textarea:not(:placeholder-shown)) > label,
+.field.float:has(> select) > label,
+.field.float:has(> input[type="date"]) > label,
+.field.float:has(> input[type="time"]) > label,
+.field.float:has(> input[type="datetime-local"]) > label {
+  top: -7px;
+  transform: none;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text-sub);
+  background: var(--card);
+  padding: 0 5px;
+  border-radius: 4px;
+}
+.field.float:has(> input:focus) > label,
+.field.float:has(> textarea:focus) > label,
+.field.float:has(> select:focus) > label { color: var(--accent); }
+
+/* 示例文案只在聚焦时出现，避免和框内的 label 叠在一起 */
+.field.float > input::placeholder,
+.field.float > textarea::placeholder { opacity: 0; transition: opacity var(--dur) var(--easing); }
+.field.float > input:focus::placeholder,
+.field.float > textarea:focus::placeholder { opacity: 1; }
+
 /* 单行输入条（留言/小纸条）：输入框套同一套皮肤，跟按钮同高，不再用浏览器原生样式 */
 .inline-form { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
 .inline-form > input:not([type=hidden]) {
@@ -506,6 +562,42 @@ button { font: inherit; color: inherit; }
   transition: background var(--dur) var(--easing);
 }
 .row-item:hover { background: var(--card-soft); }
+
+/* ---------- 记账条目（把几笔合成一个「条目」） ----------
+   条目本身没有分类/时间/金额，所以行首不是分类字，而是一个同尺寸的图标块；
+   展开后明细缩进一级、字号小一档 —— 一眼看出是「一坨账」而不是一笔账。 */
+.chip-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; border-radius: 8px;
+}
+.exp-group > summary { list-style: none; cursor: pointer; }
+.exp-group > summary::-webkit-details-marker { display: none; }
+.exp-group > summary::marker { content: ""; }
+.exp-caret {
+  display: inline-flex; color: var(--text-weak);
+  transition: transform var(--dur) var(--easing);
+}
+.exp-group[open] .exp-caret { transform: rotate(180deg); }
+.exp-group-body { background: var(--card-soft); border-top: 1px solid var(--border); }
+.exp-child { padding: 10px 16px 10px 44px; border-top: 0; font-size: .92rem; }
+.exp-child + .exp-child { border-top: 1px solid var(--border); }
+.exp-group-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 16px 14px 44px; }
+
+/* 整理模式（勾几笔合成条目）：只有未分组的那几行能选，条目行暂时置灰 */
+.exp-pick { display: none; width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--accent); }
+body.picking .exp-pick { display: inline-block; }
+body.picking .exp-single { cursor: pointer; }
+body.picking .exp-single a { pointer-events: none; opacity: .3; }
+body.picking .exp-group { opacity: .4; pointer-events: none; }
+.pick-bar { display: none; }
+body.picking .pick-bar {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  position: sticky; bottom: 14px; margin-top: 12px; padding: 12px 14px;
+  border-radius: var(--radius-pop, 14px);
+  background: var(--card); border: 1px solid var(--border-strong);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+}
+body.picking .pick-bar input[name="name"] { flex: 1; min-width: 140px; }
 
 /* 数据表格 */
 .table { width: 100%; border-collapse: collapse; font-size: .9rem; min-width: 560px; }

@@ -39,16 +39,11 @@ public static class GameClock
         var now = at ?? DateTime.UtcNow;
         var elapsed = ElapsedMs(room, now);
         var loser = room.Turn;                                   // 该走不走的人输
-        var used = room.GameKey == "ludo" ? LudoSeats.UsedMsOf(room, loser)
-                 : loser == 1 ? room.HostUsedMs : room.GuestUsedMs;
+        var used = loser == 1 ? room.HostUsedMs : room.GuestUsedMs;
 
         var moveOver = room.MoveTimeoutSec > 0 && elapsed > room.MoveTimeoutSec * 1000L;
         var totalOver = room.TotalTimeoutSec > 0 && used + elapsed > room.TotalTimeoutSec * 1000L;
         if (!moveOver && !totalOver) return false;
-
-        // 飞行棋多人（N>2）：超时 = 该座出局，其余继续；只剩 1 active 则它胜
-        if (room.GameKey == "ludo" && LudoSeats.Count(room) > 2)
-            return EnforceLudoMultiTimeout(db, room, loser, now);
 
         var rev = room.Revision;
         var winner = GomokuRules.Other(loser);
@@ -66,43 +61,12 @@ public static class GameClock
         return rows > 0;
     }
 
-    /// <summary>飞行棋多人超时：该座出局，跳过轮转；只剩 1 active 该座胜</summary>
-    private static bool EnforceLudoMultiTimeout(AppDbContext db, GameRoom room, int loser, DateTime now)
-    {
-        var seats = LudoSeats.MarkInactive(room, loser);
-        var seatsJson = LudoSeats.Store(seats);
-        var rev = room.Revision;
-
-        // 重新算 active
-        var activeSides = seats.Where(s => s.Active).Select(s => s.Side).ToList();
-        var soleActive = activeSides.Count == 1 ? activeSides[0] : 0;
-        var over = activeSides.Count <= 1;
-        var nextTurn = over ? room.Turn : LudoSeats.NextActive(room, loser);
-
-        var rows = db.GameRooms
-            .Where(x => x.Id == room.Id && x.Revision == rev)
-            .ExecuteUpdate(s => s
-                .SetProperty(x => x.SeatsJson, seatsJson)
-                .SetProperty(x => x.Status, over ? "finished" : "playing")
-                .SetProperty(x => x.Winner, soleActive)
-                .SetProperty(x => x.ResultReason, over ? TimeoutReason : "")
-                .SetProperty(x => x.Turn, nextTurn)
-                .SetProperty(x => x.TurnStartedAt, over ? room.TurnStartedAt : (DateTime?)now)
-                .SetProperty(x => x.Revision, rev + 1)
-                .SetProperty(x => x.UpdatedAt, now)
-                .SetProperty(x => x.FinishedAt, over ? now : room.FinishedAt));
-
-        db.ChangeTracker.Clear();
-        return rows > 0;
-    }
-
     /// <summary>某一方的总用时剩余（毫秒）；null = 不限</summary>
     public static long? RemainMs(GameRoom r, int side, DateTime now)
     {
         if (side is not (>= 1 and <= 4)) return null;
         if (r.TotalTimeoutSec <= 0) return null;
-        var used = r.GameKey == "ludo" ? LudoSeats.UsedMsOf(r, side)
-                 : side == 1 ? r.HostUsedMs : r.GuestUsedMs;
+        var used = side == 1 ? r.HostUsedMs : r.GuestUsedMs;
         var running = r.Status == "playing" && r.Turn == side ? ElapsedMs(r, now) : 0;
         return Math.Max(0, r.TotalTimeoutSec * 1000L - used - running);
     }

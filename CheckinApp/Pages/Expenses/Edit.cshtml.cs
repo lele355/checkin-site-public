@@ -17,7 +17,8 @@ public class EditModel(AppDbContext db, CurrentUser me) : PageModel
     [BindProperty] public decimal Amount { get; set; }
     [BindProperty] public string Type { get; set; } = "out";
     [BindProperty] public string Category { get; set; } = "其他";
-    [BindProperty] public DateTime OccurDate { get; set; } = DateTime.Today;
+    /// <summary>发生时间（精确到分钟）</summary>
+    [BindProperty] public DateTime OccurDate { get; set; } = SiteClock.Now;
     [BindProperty] public string Note { get; set; } = "";
     public string? Error { get; private set; }
 
@@ -60,7 +61,7 @@ public class EditModel(AppDbContext db, CurrentUser me) : PageModel
         x.Amount = decimal.Round(Amount, 2);
         x.Type = Type;
         x.Category = string.IsNullOrWhiteSpace(Category) ? "其他" : Category.Trim();
-        x.OccurDate = OccurDate.Date;
+        x.OccurDate = SiteClock.ToMinute(OccurDate);
         x.Note = Note?.Trim() ?? "";
         x.UpdatedAt = DateTime.UtcNow;
         _db.SaveChanges();

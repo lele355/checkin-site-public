@@ -209,14 +209,14 @@ public class GameSettingsModel(AppDbContext db, CurrentUser me) : PageModel
     private void ApplyItemVisibility(string key)
     {
         // 走查表 §2.1：每款只显示真的能生效的项（0.2：不显示的项一个字都不出现）
-        ShowTapConfirm = key is "gomoku" or "jungle" or "xiangqi" or "armychess" or "reversi" or "ludo";
+        ShowTapConfirm = key is "gomoku" or "jungle" or "xiangqi" or "armychess" or "reversi";
         ShowCoord = key is "gomoku" or "jungle" or "xiangqi" or "reversi";
-        ShowLastMark = key is "gomoku" or "jungle" or "xiangqi" or "armychess" or "reversi" or "ludo";
-        ShowSound = key is "fish" or "melon";             // 有音效的游戏才显示（melon M13 落地即通）
+        ShowLastMark = key is "gomoku" or "jungle" or "xiangqi" or "armychess" or "reversi";
+        ShowSound = key is "fish" or "melon" or "minesweeper";             // 有音效的游戏才显示（melon M13 落地即通）
         ShowSize = key is "gomoku" or "reversi";          // 可变盘面两款（档位不同，SizeOptionsArr 分流）
         ShowForbidden = key == "gomoku";
         ShowMode = key == "armychess";
-        ShowTimers = key is "gomoku" or "jungle" or "xiangqi" or "armychess" or "reversi" or "ludo";
+        ShowTimers = key is "gomoku" or "jungle" or "xiangqi" or "armychess" or "reversi";
         HasItems = ShowTapConfirm || ShowCoord || ShowLastMark || ShowSound
             || ShowSize || ShowForbidden || ShowMode || ShowTimers;
     }

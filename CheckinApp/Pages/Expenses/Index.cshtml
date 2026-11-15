@@ -6,21 +6,52 @@
     var next = Model.Month.AddMonths(1).ToString("yyyy-MM");
     var v = Model.View;
 }
+@if (TempData["Ok"] is string okMsg)
+{
+    <div class="msg ok">@okMsg</div>
+}
+@if (TempData["Err"] is string errMsg)
+{
+    <div class="msg error">@errMsg</div>
+}
 <div class="card">
     <div class="page-head">
         <h2>
-            <a href="?m=@prev&view=@v" class="mini" style="text-decoration:none;">←</a>
-            @Model.Month.ToString("yyyy年M月")
-            <a href="?m=@next&view=@v" class="mini" style="text-decoration:none;">→</a>
+            @if (Model.Searching)
+            {
+                <span>搜索「@Model.Query」</span>
+            }
+            else
+            {
+                <a href="?m=@prev&view=@v" class="mini" style="text-decoration:none;">←</a>
+                @Model.Month.ToString("yyyy年M月")
+                <a href="?m=@next&view=@v" class="mini" style="text-decoration:none;">→</a>
+            }
         </h2>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <div class="view-switch" data-viewkey="expenses">
-                <button type="button" class="vs-btn@(v == "list" ? " on" : "")" data-view="list" title="明细视图">@Html.Raw(Icons.Svg("list", 15))<span>明细</span></button>
-                <button type="button" class="vs-btn@(v == "month" ? " on" : "")" data-view="month" title="月度汇总">@Html.Raw(Icons.Svg("grid", 15))<span>月度</span></button>
-            </div>
+            @if (!Model.Searching)
+            {
+                <div class="view-switch" data-viewkey="expenses">
+                    <button type="button" class="vs-btn@(v == "list" ? " on" : "")" data-view="list" title="明细视图">@Html.Raw(Icons.Svg("list", 15))<span>明细</span></button>
+                    <button type="button" class="vs-btn@(v == "month" ? " on" : "")" data-view="month" title="月度汇总">@Html.Raw(Icons.Svg("grid", 15))<span>月度</span></button>
+                </div>
+            }
+            @if (!Model.Searching && v == "list" && Model.Rows.Count(r => !r.IsGroup) >= 2)
+            {
+                <button class="btn secondary" type="button" id="pickStart" title="勾几笔合成一个条目">整理</button>
+            }
             <a class="btn" href="/Expenses/New">@Html.Raw(Icons.Svg("plus", 16)) 记一笔</a>
         </div>
     </div>
+
+    <form method="get" class="inline-form" style="margin-bottom:14px;">
+        <input name="q" value="@Model.Query" placeholder="搜备注或分类" autocomplete="off" />
+        @if (Model.Searching)
+        {
+            <a class="btn secondary" href="/Expenses">清除</a>
+        }
+        <button class="btn" type="submit">搜索</button>
+    </form>
 
     <div class="stat-row">
         <div class="stat-box">
@@ -87,28 +118,160 @@
         }
     </div>
 }
-else if (Model.Items.Count == 0)
+else if (Model.Rows.Count == 0)
 {
-    <div class="card"><div class="empty"><span class="big">💰</span>本月还没有账目</div></div>
+    <div class="card"><div class="empty"><span class="big">💰</span>@(Model.Searching ? "没有匹配的账目" : "本月还没有账目")</div></div>
 }
 else
 {
     <div class="card">
         <div class="stack">
-            @foreach (var x in Model.Items)
+            @foreach (var row in Model.Rows)
             {
-                <div class="row-item" style="display:flex;align-items:center;gap:12px;">
-                    <div class="chip" style="flex-shrink:0;">@x.Category</div>
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-weight:600;">@(string.IsNullOrWhiteSpace(x.Note) ? x.Category : x.Note)</div>
-                        <div class="mini">@x.OccurDate.ToString("M月d日")</div>
+                if (row.IsGroup)
+                {
+                    <details class="exp-group" data-group="@row.GroupId">
+                        <summary class="row-item">
+                            <div class="chip chip-icon" style="flex-shrink:0;">@Html.Raw(Icons.Svg("list", 13))</div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-weight:600;">@row.Name</div>
+                                <div class="mini">
+                                    @row.Items.Count 笔 · 最近 @row.LatestText
+                                    @if (row.OtherCount > 0)
+                                    {
+                                        <text> · 其它月份还有 @row.OtherCount 笔</text>
+                                    }
+                                </div>
+                            </div>
+                            <div style="font-weight:700;text-align:right;white-space:nowrap;">
+                                @if (row.TotalOut > 0)
+                                {
+                                    <span style="color:#e24b4a;">-¥@row.TotalOut.ToString("0.##")</span>
+                                }
+                                @if (row.TotalOut > 0 && row.TotalIn > 0)
+                                {
+                                    <text> </text>
+                                }
+                                @if (row.TotalIn > 0)
+                                {
+                                    <span style="color:#639922;">+¥@row.TotalIn.ToString("0.##")</span>
+                                }
+                            </div>
+                            <span class="exp-caret">@Html.Raw(Icons.Svg("chevron-down", 15))</span>
+                        </summary>
+                        <div class="exp-group-body">
+                            @foreach (var x in row.Items)
+                            {
+                                <div class="row-item exp-child">
+                                    <div class="chip" style="flex-shrink:0;">@x.Category</div>
+                                    <div style="flex:1;min-width:0;">
+                                        <div>@(string.IsNullOrWhiteSpace(x.Note) ? x.Category : x.Note)</div>
+                                        <div class="mini">@SiteClock.MinuteLabel(x.OccurDate)</div>
+                                    </div>
+                                    <div style="font-weight:600;color:@(x.Type == "out" ? "#e24b4a" : "#639922");">
+                                        @(x.Type == "out" ? "-" : "+")¥@x.Amount.ToString("0.##")
+                                    </div>
+                                    <a class="mini" href="/Expenses/Edit/@x.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
+                                </div>
+                            }
+                            <div class="exp-group-actions">
+                                <form method="post" asp-page-handler="Rename" class="inline-form" style="margin:0;">
+                                    <input type="hidden" name="groupId" value="@row.GroupId" />
+                                    <input type="hidden" name="m" value="@Model.Month.ToString("yyyy-MM")" />
+                                    <input name="name" value="@row.Name" maxlength="20" style="width:140px;" />
+                                    <button class="btn secondary" type="submit">改名</button>
+                                </form>
+                                <form method="post" asp-page-handler="Dissolve" data-confirm="解散后这几笔账都还在，只是不再归在这个条目下" style="margin:0;">
+                                    <input type="hidden" name="groupId" value="@row.GroupId" />
+                                    <input type="hidden" name="m" value="@Model.Month.ToString("yyyy-MM")" />
+                                    <button class="btn secondary" type="submit">解散条目</button>
+                                </form>
+                            </div>
+                        </div>
+                    </details>
+                }
+                else
+                {
+                    var x = row.Items[0];
+                    <div class="row-item exp-single" data-pick data-id="@x.Id"
+                         data-note="@(string.IsNullOrWhiteSpace(x.Note) ? x.Category : x.Note)">
+                        <input class="exp-pick" type="checkbox" name="ids" value="@x.Id" form="pickForm" />
+                        <div class="chip" style="flex-shrink:0;">@x.Category</div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:600;">@(string.IsNullOrWhiteSpace(x.Note) ? x.Category : x.Note)</div>
+                            <div class="mini">@SiteClock.MinuteLabel(x.OccurDate)</div>
+                        </div>
+                        <div style="font-weight:700;color:@(x.Type == "out" ? "#e24b4a" : "#639922");">
+                            @(x.Type == "out" ? "-" : "+")¥@x.Amount.ToString("0.##")
+                        </div>
+                        <a class="mini" href="/Expenses/Edit/@x.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
                     </div>
-                    <div style="font-weight:700;color:@(x.Type == "out" ? "#e24b4a" : "#639922");">
-                        @(x.Type == "out" ? "-" : "+")¥@x.Amount.ToString("0.##")
-                    </div>
-                    <a class="mini" href="/Expenses/Edit/@x.Id">@Html.Raw(Icons.Svg("pencil", 14)) 编辑</a>
-                </div>
+                }
             }
         </div>
     </div>
+
+    @if (!Model.Searching)
+    {
+        <form method="post" asp-page-handler="Merge" id="pickForm" class="pick-bar">
+            <input type="hidden" name="m" value="@Model.Month.ToString("yyyy-MM")" />
+            <span class="mini" id="pickCount">已选 0 笔</span>
+            <input name="name" maxlength="20" placeholder="条目名，如：超市购物" />
+            <button class="btn" type="submit">合并</button>
+            <button class="btn secondary" type="button" id="pickCancel">取消</button>
+        </form>
+    }
+}
+
+@section Scripts {
+    <script>
+        // 整理（多选合并）：点「整理」进 picking 模式，点行 = 勾选（不动编辑链接），
+        // 提交前本地先挡一道，省一次来回。条目行在 picking 模式下置灰不可选。
+        (function () {
+            var form = document.getElementById('pickForm');
+            if (!form) return;
+            var countEl = document.getElementById('pickCount');
+            var nameEl = form.querySelector('input[name="name"]');
+            // 注意：勾选框在列表里，靠 form="pickForm" 关联，
+            // 它们**不是** form 的后代 —— 必须从 document 上找，不能 form.querySelectorAll。
+            var boxes = function () { return document.querySelectorAll('.exp-pick'); };
+
+            function picked() { return document.querySelectorAll('.exp-pick:checked').length; }
+            function refresh() { countEl.textContent = '已选 ' + picked() + ' 笔'; }
+            function setPicking(on) {
+                document.body.classList.toggle('picking', on);
+                if (!on) {
+                    boxes().forEach(function (c) { c.checked = false; });
+                    nameEl.value = '';
+                    refresh();
+                }
+            }
+
+            var start = document.getElementById('pickStart');
+            var cancel = document.getElementById('pickCancel');
+            if (start) start.addEventListener('click', function () { setPicking(true); });
+            if (cancel) cancel.addEventListener('click', function () { setPicking(false); });
+
+            document.querySelectorAll('.exp-single[data-pick]').forEach(function (row) {
+                row.addEventListener('click', function (e) {
+                    if (!document.body.classList.contains('picking')) return;
+                    if (e.target.tagName === 'INPUT') return;
+                    e.preventDefault();
+                    var cb = row.querySelector('.exp-pick');
+                    cb.checked = !cb.checked;
+                    // 名字没填过就预填第一笔的备注（没备注就用分类），用户随时能改
+                    if (cb.checked && !nameEl.value.trim()) nameEl.value = row.dataset.note || '';
+                    refresh();
+                });
+            });
+
+            form.addEventListener('submit', function (e) {
+                if (picked() < 2) { e.preventDefault(); if (window.toast) window.toast('至少选 2 笔才能合并', 'error'); return; }
+                if (!nameEl.value.trim()) { e.preventDefault(); if (window.toast) window.toast('给这个条目起个名字吧', 'error'); }
+            });
+
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setPicking(false); });
+            refresh();
+        })();
+    </script>
 }

@@ -32,13 +32,6 @@
         </div>
     }
 
-    @if (Model.GameKey == "ludo")
-    {
-        <div class="gm-actions" id="gmLudoBar" hidden>
-            <button class="btn" type="button" onclick="if(window.__gmLudoRoll)window.__gmLudoRoll()">掷骰子</button>
-        </div>
-    }
-
     <div class="gm-actions">
         @if (dto.canJoin)
         {
@@ -92,7 +85,6 @@
     <script src="~/js/boards/reversi.js" asp-append-version="true"></script>
     <script src="~/js/boards/jungle.js" asp-append-version="true"></script>
     <script src="~/js/boards/xiangqi.js" asp-append-version="true"></script>
-    <script src="~/js/boards/ludo.js" asp-append-version="true"></script>
     <script src="~/js/boards/armychess.js" asp-append-version="true"></script>
     <script src="~/js/games.js" asp-append-version="true"></script>
 }

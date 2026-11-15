@@ -39,6 +39,8 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         if (_me.UserId is not int uid) return RedirectToPage("/Login");
 
         // AsNoTracking：导出用纯只读快照，不接 EF 关系修复（否则已跟踪的 User 会带密码哈希溜进 JSON）
+        var gnames = _db.ExpenseGroups.AsNoTracking().Where(g => g.UserId == uid)
+            .ToDictionary(g => g.Id, g => g.Name);
         var data = new
         {
             exportedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -49,7 +51,18 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
             habitCheckins = _db.HabitCheckins.AsNoTracking().Where(x => x.UserId == uid).ToList(),
             courses = _db.Courses.AsNoTracking().Where(x => x.UserId == uid).ToList(),
             anniversaries = _db.Anniversaries.AsNoTracking().Where(x => x.UserId == uid).ToList(),
-            expenses = _db.Expenses.AsNoTracking().Where(x => x.UserId == uid).ToList(),
+            expenses = _db.Expenses.AsNoTracking().Where(x => x.UserId == uid).ToList()
+                .Select(x => new
+                {
+                    x.Id, x.UserId, x.Amount, x.Type, x.Category, x.Note,
+                    // 发生时间只到分钟（与接口、App、CSV 同一档精度），其余时间戳保留原样
+                    OccurDate = SiteClock.IsoMinute(x.OccurDate),
+                    // 所属条目（合并容器）：空 = 未分组。备份里保留组名，换库后也能还原归属
+                    ExpenseGroupName = x.GroupId is int gid ? gnames.GetValueOrDefault(gid, "") : "",
+                    x.CreatedAt, x.UpdatedAt,
+                }).ToList(),
+            expenseGroups = _db.ExpenseGroups.AsNoTracking().Where(g => g.UserId == uid)
+                .ToList().Select(g => new { g.Id, g.Name, g.CreatedAt }).ToList(),
             periodRecords = _db.PeriodRecords.AsNoTracking().Where(x => x.UserId == uid).ToList(),
             myBoardMessages = _db.BoardMessages.AsNoTracking().Where(x => x.UserId == uid).ToList(),
             myLoveNotes = _db.LoveNotes.AsNoTracking().Where(x => x.FromUserId == uid).ToList(),
@@ -63,6 +76,8 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     {
         if (!_me.Has("admin.users")) return Forbid();
 
+        // 全站备份跨所有用户：先把组名一次查成字典，避免每笔账回查一次
+        var allGroupNames = _db.ExpenseGroups.AsNoTracking().ToDictionary(g => g.Id, g => g.Name);
         var data = new
         {
             exportedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -81,7 +96,16 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
             coupleSettings = _db.CoupleSettings.AsNoTracking().ToList(),
             loveNotes = _db.LoveNotes.AsNoTracking().ToList(),
             boardMessages = _db.BoardMessages.AsNoTracking().ToList(),
-            expenses = _db.Expenses.AsNoTracking().ToList(),
+            expenses = _db.Expenses.AsNoTracking().ToList()
+                .Select(x => new
+                {
+                    x.Id, x.UserId, x.Amount, x.Type, x.Category, x.Note,
+                    OccurDate = SiteClock.IsoMinute(x.OccurDate),
+                    // 全站备份跨用户，组名按 GroupId 现查（组数量很少，逐个查可接受）
+                    ExpenseGroupName = x.GroupId is int gid ? allGroupNames.GetValueOrDefault(gid, "") : "",
+                    x.CreatedAt, x.UpdatedAt,
+                }).ToList(),
+            expenseGroups = _db.ExpenseGroups.AsNoTracking().ToList(),
             periodRecords = _db.PeriodRecords.AsNoTracking().ToList(),
         };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(data, JsonOpt);

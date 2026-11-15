@@ -17,7 +17,6 @@ public static class GameEngines
         "reversi" => ReversiEngine.Instance,
         "jungle" => JungleEngine.Instance,
         "xiangqi" => XiangqiEngine.Instance,
-        "ludo" => LudoEngine.Instance,
         "armychess" => ArmyChessEngine.Instance,
         _ => throw new ApiBadRequest("没有这个游戏的规则引擎"),
     };
@@ -33,7 +32,7 @@ public interface IGameEngine
     object BuildState(IReadOnlyList<GameEvent> evs, GameRoom r, int mySide, bool finished);
     int Other(int side);
     string SideName(int side);
-    /// <summary>下一手该谁走：默认两人互换；飞行棋按座位轮转（跳过出局座）</summary>
+    /// <summary>下一手该谁走：默认两人互换</summary>
     int NextTurn(int side, GameRoom r) => Other(side);
     /// <summary>
     /// 该 side 的全部合法着（可直接喂 ValidateMove 的请求体）。
@@ -42,8 +41,6 @@ public interface IGameEngine
     IReadOnlyList<JsonElement>? AllMoves(IReadOnlyList<GameEvent> evs, GameRoom r, int side) => null;
     /// <summary>AI 思考（可为 null 表示不支持 AI）</summary>
     JsonElement? Think(IReadOnlyList<GameEvent> evs, int side, int level, GameRoom r);
-    /// <summary>骰子（飞行棋用；其它游戏返回 null）</summary>
-    GameEvent? ValidateRoll(IReadOnlyList<GameEvent> evs, GameRoom r, int side) => null;
 }
 
 /// <summary>五子棋引擎适配器</summary>
@@ -284,29 +281,6 @@ internal sealed class XiangqiEngine : IGameEngine
             .ToList();
     public JsonElement? Think(IReadOnlyList<GameEvent> evs, int side, int level, GameRoom r) =>
         Ai.XiangqiAi.Think(evs, side, level, r);
-}
-
-/// <summary>飞行棋引擎适配器</summary>
-internal sealed class LudoEngine : IGameEngine
-{
-    public static readonly LudoEngine Instance = new();
-    public string GameKey => "ludo";
-
-    public List<GameEvent> InitialEvents(GameRoom r) => LudoRules.InitialEvents(r);
-    public GameEvent ValidateMove(IReadOnlyList<GameEvent> evs, GameRoom r, int side, JsonElement req) =>
-        LudoRules.ValidateMove(evs, r, side, req);
-    public (int winner, string reason, bool over) Judge(IReadOnlyList<GameEvent> evs, GameRoom r) =>
-        LudoRules.Judge(evs, r);
-    public object BuildState(IReadOnlyList<GameEvent> evs, GameRoom r, int mySide, bool finished) =>
-        LudoRules.BuildState(evs, r, mySide, finished);
-    public int Other(int side) => LudoRules.Other(side);
-    public string SideName(int side) => LudoRules.SideName(side);
-    public int NextTurn(int side, GameRoom r) => LudoSeats.NextActive(r, side);
-    public JsonElement? Think(IReadOnlyList<GameEvent> evs, int side, int level, GameRoom r) =>
-        Ai.LudoAi.Think(evs, side, level, r);
-
-    public GameEvent? ValidateRoll(IReadOnlyList<GameEvent> evs, GameRoom r, int side) =>
-        LudoRules.ValidateRoll(evs, r, side);
 }
 
 /// <summary>军旗引擎适配器（含战斗判定）</summary>

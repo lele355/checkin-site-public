@@ -329,6 +329,8 @@ public static class SocialApi
         {
             var uid = ApiKit.MeId(ctx);
             var user = db.Users.First(u => u.Id == uid);
+            // 条目名 → 导出时贴在每笔账后面（条目只是标签，导出的主体仍是明细）
+            var gnames = db.ExpenseGroups.Where(gr => gr.UserId == uid).ToDictionary(gr => gr.Id, gr => gr.Name);
 
             var payload = new
             {
@@ -349,7 +351,19 @@ public static class SocialApi
                 courses = db.Courses.Where(x => x.UserId == uid).ToList()
                     .Select(x => new { x.Name, x.Teacher, x.Location, x.Weekday, x.StartPeriod, x.EndPeriod, x.WeeksText, x.Category }),
                 expenses = db.Expenses.Where(x => x.UserId == uid).OrderBy(x => x.OccurDate).ToList()
-                    .Select(x => new { x.Amount, x.Type, x.Category, occurDate = ApiKit.D(x.OccurDate), x.Note }),
+                    .Select(x => new
+                    {
+                        x.Amount, x.Type, x.Category, occurDate = ApiKit.T(x.OccurDate), x.Note,
+                        groupName = x.GroupId is int gid ? gnames.GetValueOrDefault(gid, "") : "",
+                    }),
+                // 条目清单（名字 + 笔数）：明细里的 groupName 已经够还原归属，这里给个总览
+                expenseGroups = db.ExpenseGroups.Where(gr => gr.UserId == uid).ToList()
+                    .Select(gr => new
+                    {
+                        gr.Name,
+                        count = db.Expenses.Count(x => x.UserId == uid && x.GroupId == gr.Id),
+                        createdAt = ApiKit.StampUtc(gr.CreatedAt),
+                    }),
                 anniversaries = db.Anniversaries.Where(x => x.UserId == uid).ToList()
                     .Select(x => new { x.Title, date = ApiKit.D(x.Date), x.RepeatYearly, x.Note }),
                 period = db.PeriodRecords.Where(x => x.UserId == uid).ToList()
@@ -375,9 +389,10 @@ public static class SocialApi
         {
             var uid = ApiKit.MeId(ctx);
             var sb = new StringBuilder();
-            sb.AppendLine("日期,方向,分类,金额,备注");
+            var gnames = db.ExpenseGroups.Where(gr => gr.UserId == uid).ToDictionary(gr => gr.Id, gr => gr.Name);
+            sb.AppendLine("日期时间,方向,分类,金额,备注,条目");
             foreach (var x in db.Expenses.Where(x => x.UserId == uid).OrderBy(x => x.OccurDate))
-                sb.AppendLine($"{ApiKit.D(x.OccurDate)},{(x.Type == "in" ? "收入" : "支出")},{Csv(x.Category)},{x.Amount},{Csv(x.Note)}");
+                sb.AppendLine($"{ApiKit.Minute(x.OccurDate)},{(x.Type == "in" ? "收入" : "支出")},{Csv(x.Category)},{x.Amount},{Csv(x.Note)},{Csv(x.GroupId is int gid ? gnames.GetValueOrDefault(gid, "") : "")}");
             return ApiKit.Ok(new
             {
                 filename = $"记账-{DateTime.Now:yyyyMMdd}.csv",

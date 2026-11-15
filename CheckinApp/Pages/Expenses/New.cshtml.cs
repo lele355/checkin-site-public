@@ -16,7 +16,8 @@ public class NewModel(AppDbContext db, CurrentUser me) : PageModel
     [BindProperty] public decimal Amount { get; set; }
     [BindProperty] public string Type { get; set; } = "out";
     [BindProperty] public string Category { get; set; } = "其他";
-    [BindProperty] public DateTime OccurDate { get; set; } = DateTime.Today;
+    /// <summary>发生时间（精确到分钟）；默认「此刻」——记账多数是当场记，别让人每次改时间</summary>
+    [BindProperty] public DateTime OccurDate { get; set; } = SiteClock.Now;
     [BindProperty] public string Note { get; set; } = "";
     public string? Error { get; private set; }
 
@@ -39,7 +40,7 @@ public class NewModel(AppDbContext db, CurrentUser me) : PageModel
             Amount = decimal.Round(Amount, 2),
             Type = Type,
             Category = string.IsNullOrWhiteSpace(Category) ? "其他" : Category.Trim(),
-            OccurDate = OccurDate.Date,
+            OccurDate = SiteClock.ToMinute(OccurDate),
             Note = Note?.Trim() ?? "",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

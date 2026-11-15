@@ -300,6 +300,26 @@ public class BoardMessage
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+/// <summary>
+/// 记账条目（合并容器）—— 把若干笔明细收进一个「名字」里，例如「超市购物」下面挂 3 笔。
+///
+/// 【为什么单独一张表，而不是给 Expenses 加 ParentId 做自引用】
+/// 容器本身没有分类、没有发生时间、没有金额 —— 它不是一笔账。用自引用就得伪造
+/// Amount=0 / Category="" 的假行，之后每个统计、导出、AI 摘要都要额外排除它，
+/// 漏一处就把账算错。单独建表则相反：组是纯标签，**金额永远只从明细求和**，
+/// 所有既有统计代码一行都不用改。
+/// </summary>
+public class ExpenseGroup
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    /// <summary>条目名（如「超市购物」/「早饭」），≤20 字，仅作展示</summary>
+    public string Name { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
 /// <summary>记账流水 —— Type: out=支出 / in=收入；Amount 恒为正数。</summary>
 public class ExpenseItem
 {
@@ -315,6 +335,12 @@ public class ExpenseItem
     /// <summary>发生日期</summary>
     public DateTime OccurDate { get; set; }
     public string Note { get; set; } = "";
+    /// <summary>
+    /// 所属条目（合并容器）。null = 未分组 —— 老数据全部是 null，
+    /// 渲染时走「普通一笔」分支，与合并功能上线前完全一致。
+    /// </summary>
+    public int? GroupId { get; set; }
+    public ExpenseGroup? Group { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
@@ -561,13 +587,6 @@ public class GameRoom
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? FinishedAt { get; set; }
-
-    /// <summary>
-    /// 飞行棋专属：座位唯一真相（2/3/4 座 JSON 数组），其余五款恒 null 不读不写。
-    /// 读到 null 时按 Host/Guest 懒回填 2 座（存量 2 人局零漂移）。
-    /// 结构：[{seat,side,color,uid|null=AI,isAi,usedMs,seenAt,active}]，seat0=房主。
-    /// </summary>
-    public string? SeatsJson { get; set; }
 }
 
 /// <summary>

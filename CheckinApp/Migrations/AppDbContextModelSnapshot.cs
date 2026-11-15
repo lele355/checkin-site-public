@@ -493,6 +493,32 @@ namespace CheckinApp.Migrations
                     b.ToTable("EmailMessages");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.ExpenseGroup", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Name");
+
+                    b.ToTable("ExpenseGroups");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.ExpenseItem", b =>
                 {
                     b.Property<int>("Id")
@@ -508,6 +534,9 @@ namespace CheckinApp.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Note")
                         .IsRequired()
@@ -527,6 +556,8 @@ namespace CheckinApp.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("GroupId");
 
                     b.HasIndex("UserId", "OccurDate");
 
@@ -596,9 +627,6 @@ namespace CheckinApp.Migrations
 
                     b.Property<int>("Revision")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("SeatsJson")
-                        .HasColumnType("TEXT");
 
                     b.Property<int>("Size")
                         .HasColumnType("INTEGER");
@@ -1376,13 +1404,31 @@ namespace CheckinApp.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("CheckinApp.Models.ExpenseItem", b =>
+            modelBuilder.Entity("CheckinApp.Models.ExpenseGroup", b =>
                 {
                     b.HasOne("CheckinApp.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.ExpenseItem", b =>
+                {
+                    b.HasOne("CheckinApp.Models.ExpenseGroup", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
 
                     b.Navigation("User");
                 });

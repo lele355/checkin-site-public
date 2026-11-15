@@ -35,8 +35,8 @@
             </select>
         </div>
         <div class="field">
-            <label>日期</label>
-            <input asp-for="OccurDate" type="date" required />
+            <label>时间</label>
+            <input asp-for="OccurDate" type="datetime-local" step="60" asp-format="{0:yyyy-MM-ddTHH:mm}" required />
         </div>
         <div class="field">
             <label>备注</label>

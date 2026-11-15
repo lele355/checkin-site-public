@@ -22,6 +22,7 @@ public partial class AppDbContext : DbContext
     public DbSet<LoveNote> LoveNotes => Set<LoveNote>();
     public DbSet<BoardMessage> BoardMessages => Set<BoardMessage>();
     public DbSet<ExpenseItem> Expenses => Set<ExpenseItem>();
+    public DbSet<ExpenseGroup> ExpenseGroups => Set<ExpenseGroup>();
     public DbSet<PeriodRecord> PeriodRecords => Set<PeriodRecord>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<AiMessage> AiMessages => Set<AiMessage>();
@@ -162,6 +163,16 @@ public partial class AppDbContext : DbContext
         {
             // 记账按月查流水：(UserId, OccurDate) 复合索引
             e.HasIndex(x => new { x.UserId, x.OccurDate });
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            // 条目只是标签：解散条目时明细必须留着（SetNull），绝不能跟着删账
+            e.HasOne(x => x.Group).WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => x.GroupId);
+        });
+
+        m.Entity<ExpenseGroup>(e =>
+        {
+            // 组名查重 / 搜索命中组名都要按人扫
+            e.HasIndex(x => new { x.UserId, x.Name });
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 

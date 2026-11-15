@@ -15,8 +15,21 @@
 
     <div class="gm-solo" data-game-key="@Model.GameKey" data-max-score="@Model.MaxScore">
         <canvas id="soloCanvas" width="360" height="480" tabindex="0"></canvas>
+        @if (Model.GameKey == "minesweeper")
+        {
+            <div class="gm-solo-bar gm-solo-levels">
+                <button type="button" class="btn secondary on" data-ms-level="1">初级</button>
+                <button type="button" class="btn secondary" data-ms-level="2">中级</button>
+                <button type="button" class="btn secondary" data-ms-level="3">高级</button>
+                <button type="button" class="btn secondary" id="msFlagBtn">插旗</button>
+            </div>
+        }
         <div class="gm-solo-bar">
             <span id="soloScore">0</span>
+            @if (Model.GameKey == "minesweeper")
+            {
+                <span id="soloTime" class="gm-solo-best">00:00</span>
+            }
             <span id="soloBest" class="gm-solo-best">最高 0</span>
             <button class="btn" id="soloRestart" type="button">重开</button>
             <button class="btn secondary" id="soloLeaderboard" type="button">排行榜</button>
@@ -37,6 +50,10 @@
         @* P3-2：测试钩子开关恒注入显式极性（Debug=true/Release=false）——视图与静态同版滚动升级不断链 *@
     <script>window.__QA_HOOKS__ = @(CheckinApp.Ui.QaHooks.Enabled ? "true" : "false");</script>
     <script src="~/js/solo/melon-core.js" asp-append-version="true"></script>
+    }
+    @if (Model.GameKey == "minesweeper") {
+    <script>window.__QA_HOOKS__ = @(CheckinApp.Ui.QaHooks.Enabled ? "true" : "false");</script>
+    <script src="~/js/solo/minesweeper-core.js" asp-append-version="true"></script>
     }
     <script src="~/js/solo/@(Model.GameKey).js" asp-append-version="true"></script>
     <script>
