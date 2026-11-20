@@ -162,7 +162,15 @@ public static class LifeApi
                 : new DateTime(SiteClock.Today.Year, SiteClock.Today.Month, 1);
             var next = month.AddMonths(1);
 
-            // 搜索：跨全部月份按备注/分类/条目名模糊匹配（不受当前月份限制）；不搜索就按月取
+            // 自定义时间范围（App 筛选用）：给了合法 from+to 就按范围取，与月份模式互斥。
+            // 两个日期都按「含当天」理解（to 当天 23:59:59 的账也要）。
+            var rangeFrom = ApiKit.ParseDate(ApiKit.StrQ(ctx, "from"));
+            var rangeTo = ApiKit.ParseDate(ApiKit.StrQ(ctx, "to"));
+            var isRange = rangeFrom is not null && rangeTo is not null && rangeTo >= rangeFrom;
+            var filterFrom = isRange ? rangeFrom!.Value : month;
+            var filterTo = isRange ? rangeTo!.Value.AddDays(1) : next;
+
+            // 搜索：跨全部月份按备注/分类/条目名模糊匹配（不受当前月份/范围限制）；不搜索就按期取
             var hitGroupIds = searching
                 ? db.ExpenseGroups.AsNoTracking()
                     .Where(gr => gr.UserId == uid && gr.Name.Contains(q))
@@ -176,7 +184,7 @@ public static class LifeApi
                     .OrderByDescending(x => x.OccurDate).ThenByDescending(x => x.Id)
                     .Take(200)
                     .ToList()
-                : db.Expenses.Where(x => x.UserId == uid && x.OccurDate >= month && x.OccurDate < next)
+                : db.Expenses.Where(x => x.UserId == uid && x.OccurDate >= filterFrom && x.OccurDate < filterTo)
                     .OrderByDescending(x => x.OccurDate).ThenByDescending(x => x.Id).ToList();
 
             // 条目（合并容器）名称：只有当月明细涉及的组才查，一次查完不做 N+1
@@ -271,6 +279,9 @@ public static class LifeApi
             return ApiKit.Ok(new
             {
                 month = month.ToString("yyyy-MM"),
+                // 范围模式（App 筛选）：不传就还是按月。App 拿它确认服务端理解的区间。
+                from = isRange ? filterFrom.ToString("yyyy-MM-dd") : "",
+                to = isRange ? filterTo.AddDays(-1).ToString("yyyy-MM-dd") : "",
                 q,
                 searching,
                 items,

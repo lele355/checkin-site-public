@@ -324,52 +324,152 @@ public static class SocialApi
             });
         }).RequireAuthorization("perm:reminders.use");
 
-        // ==================== 导出（全量 JSON，App 侧存文件/分享） ====================
+        // ==================== 导出（JSON，App 侧存文件/分享） ====================
+        //
+        // 可选筛选：?modules=expenses,habits&from=2026-01-01&to=2026-06-30
+        //   · modules 不传 = 全部模块（老 App 什么都不传，行为与以前完全一致）
+        //   · from/to 不传 = 不限时间；两个日期都按「含当天」理解
+        //   · 模块键：schedules/memos/habits/courses/expenses/anniversaries/period/board
         g.MapGet("/export/all", (AppDbContext db, HttpContext ctx) =>
         {
             var uid = ApiKit.MeId(ctx);
             var user = db.Users.First(u => u.Id == uid);
-            // 条目名 → 导出时贴在每笔账后面（条目只是标签，导出的主体仍是明细）
-            var gnames = db.ExpenseGroups.Where(gr => gr.UserId == uid).ToDictionary(gr => gr.Id, gr => gr.Name);
+
+            var want = (ApiKit.StrQ(ctx, "modules") ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            bool Want(string key) => want.Count == 0 || want.Contains(key);
+
+            var from = ApiKit.ParseDate(ApiKit.StrQ(ctx, "from"));
+            var to = ApiKit.ParseDate(ApiKit.StrQ(ctx, "to"));
+            // 边界一律**预计算成常量**再丢进 LINQ —— EF 表达式树不能引用本地函数。
+            // 两组边界：本地墙钟列（OccurDate/Date/CheckinDate/StartAt/StartDate）用 day*，
+            // UTC 列（CreatedAt）用 utc*，否则范围会错位 8 小时。
+            DateTime? dayFrom = from;
+            DateTime? dayExcl = to?.AddDays(1);
+            DateTime? utcFrom = from is null ? null : TimeZoneInfo.ConvertTimeToUtc(from.Value.Date, SiteClock.Zone);
+            DateTime? utcExcl = to is null ? null : TimeZoneInfo.ConvertTimeToUtc(to.Value.Date.AddDays(1), SiteClock.Zone);
+
+            // 条目名 → 明细贴归属用。勾了记账就一定得有它，否则「合并成条目」这段信息会丢
+            var gnames = Want("expenses")
+                ? db.ExpenseGroups.Where(gr => gr.UserId == uid).ToDictionary(gr => gr.Id, gr => gr.Name)
+                : new Dictionary<int, string>();
+
+            object? schedules = null;
+            if (Want("schedules"))
+                schedules = db.Schedules
+                    .Where(x => x.UserId == uid
+                                && (dayFrom == null || x.StartAt >= dayFrom)
+                                && (dayExcl == null || x.StartAt < dayExcl))
+                    .OrderBy(x => x.StartAt).ToList()
+                    .Select(x => new { x.Title, x.Description, startAt = ApiKit.T(x.StartAt), endAt = ApiKit.TN(x.EndAt), x.AllDay }).ToList();
+
+            object? memos = null;
+            if (Want("memos"))
+                memos = db.Memos
+                    .Where(x => x.UserId == uid
+                                && (utcFrom == null || x.CreatedAt >= utcFrom)
+                                && (utcExcl == null || x.CreatedAt < utcExcl))
+                    .ToList()
+                    .Select(x => new { x.Title, x.Content, x.Pinned, createdAt = ApiKit.StampUtc(x.CreatedAt) }).ToList();
+
+            object? habits = null;
+            if (Want("habits"))
+                habits = db.Habits.Where(x => x.UserId == uid).ToList()
+                    .Select(h => new
+                    {
+                        h.Name, h.Icon,
+                        // 习惯本身没有时间属性 → 不过滤；打卡记录按范围截取
+                        checkins = db.HabitCheckins
+                            .Where(c => c.HabitId == h.Id
+                                        && (dayFrom == null || c.CheckinDate >= dayFrom)
+                                        && (dayExcl == null || c.CheckinDate < dayExcl))
+                            .OrderBy(c => c.CheckinDate).Select(c => ApiKit.D(c.CheckinDate)).ToList(),
+                    }).ToList();
+
+            object? courses = null;
+            if (Want("courses"))
+                courses = db.Courses.Where(x => x.UserId == uid).ToList()
+                    .Select(x => new { x.Name, x.Teacher, x.Location, x.Weekday, x.StartPeriod, x.EndPeriod, x.WeeksText, x.Category }).ToList();
+
+            object? expenses = null;
+            object? expenseGroups = null;
+            if (Want("expenses"))
+            {
+                expenses = db.Expenses
+                    .Where(x => x.UserId == uid
+                                && (dayFrom == null || x.OccurDate >= dayFrom)
+                                && (dayExcl == null || x.OccurDate < dayExcl))
+                    .OrderBy(x => x.OccurDate).ToList()
+                    .Select(x => new
+                    {
+                        x.Amount, x.Type, x.Category, occurDate = ApiKit.T(x.OccurDate), x.Note,
+                        groupName = x.GroupId is int gid ? gnames.GetValueOrDefault(gid, "") : "",
+                    }).ToList();
+
+                // 【不能丢】条目定义永远全量跟着出去：条目本身没有时间，按时间一过滤它就没了，
+                // 明细里的 groupName 就成了孤儿 —— 恢复时建不出这个组，等于合并白做。
+                // count = 范围内几笔，total = 全部几笔，两个都给，恢复端自己拿捏。
+                expenseGroups = db.ExpenseGroups.Where(gr => gr.UserId == uid).ToList()
+                    .Select(gr => new
+                    {
+                        gr.Name,
+                        count = db.Expenses.Count(x => x.UserId == uid && x.GroupId == gr.Id
+                                                       && (dayFrom == null || x.OccurDate >= dayFrom)
+                                                       && (dayExcl == null || x.OccurDate < dayExcl)),
+                        total = db.Expenses.Count(x => x.UserId == uid && x.GroupId == gr.Id),
+                        createdAt = ApiKit.StampUtc(gr.CreatedAt),
+                    }).ToList();
+            }
+
+            object? anniversaries = null;
+            if (Want("anniversaries"))
+                anniversaries = db.Anniversaries
+                    .Where(x => x.UserId == uid
+                                && (dayFrom == null || x.Date >= dayFrom)
+                                && (dayExcl == null || x.Date < dayExcl))
+                    .ToList()
+                    .Select(x => new { x.Title, date = ApiKit.D(x.Date), x.RepeatYearly, x.Note }).ToList();
+
+            object? period = null;
+            if (Want("period"))
+                period = db.PeriodRecords
+                    .Where(x => x.UserId == uid
+                                && (dayFrom == null || x.StartDate >= dayFrom)
+                                && (dayExcl == null || x.StartDate < dayExcl))
+                    .ToList()
+                    .Select(x => new { startDate = ApiKit.D(x.StartDate), endDate = ApiKit.DN(x.EndDate), x.Note }).ToList();
+
+            object? board = null;
+            if (Want("board"))
+                board = db.BoardMessages
+                    .Where(x => x.UserId == uid
+                                && (utcFrom == null || x.CreatedAt >= utcFrom)
+                                && (utcExcl == null || x.CreatedAt < utcExcl))
+                    .ToList()
+                    .Select(x => new { x.Content, createdAt = ApiKit.StampUtc(x.CreatedAt) }).ToList();
 
             var payload = new
             {
                 exportedAt = ApiKit.Stamp(DateTime.Now),
                 app = "日常管理",
+                // 这次导出到底导了什么，文件里写清楚（恢复/对账时一眼看明白）
+                scope = new
+                {
+                    modules = want.Count == 0 ? "all" : string.Join(",", want.OrderBy(x => x)),
+                    from = from is null ? "" : from.Value.ToString("yyyy-MM-dd"),
+                    to = to is null ? "" : to.Value.ToString("yyyy-MM-dd"),
+                },
                 user = new { user.Username, user.DisplayName, user.Email },
-                schedules = db.Schedules.Where(x => x.UserId == uid).OrderBy(x => x.StartAt).ToList()
-                    .Select(x => new { x.Title, x.Description, startAt = ApiKit.T(x.StartAt), endAt = ApiKit.TN(x.EndAt), x.AllDay }),
-                memos = db.Memos.Where(x => x.UserId == uid).ToList()
-                    .Select(x => new { x.Title, x.Content, x.Pinned, createdAt = ApiKit.StampUtc(x.CreatedAt) }),
-                habits = db.Habits.Where(x => x.UserId == uid).ToList()
-                    .Select(h => new
-                    {
-                        h.Name, h.Icon,
-                        checkins = db.HabitCheckins.Where(c => c.HabitId == h.Id)
-                            .OrderBy(c => c.CheckinDate).Select(c => ApiKit.D(c.CheckinDate)).ToList(),
-                    }),
-                courses = db.Courses.Where(x => x.UserId == uid).ToList()
-                    .Select(x => new { x.Name, x.Teacher, x.Location, x.Weekday, x.StartPeriod, x.EndPeriod, x.WeeksText, x.Category }),
-                expenses = db.Expenses.Where(x => x.UserId == uid).OrderBy(x => x.OccurDate).ToList()
-                    .Select(x => new
-                    {
-                        x.Amount, x.Type, x.Category, occurDate = ApiKit.T(x.OccurDate), x.Note,
-                        groupName = x.GroupId is int gid ? gnames.GetValueOrDefault(gid, "") : "",
-                    }),
-                // 条目清单（名字 + 笔数）：明细里的 groupName 已经够还原归属，这里给个总览
-                expenseGroups = db.ExpenseGroups.Where(gr => gr.UserId == uid).ToList()
-                    .Select(gr => new
-                    {
-                        gr.Name,
-                        count = db.Expenses.Count(x => x.UserId == uid && x.GroupId == gr.Id),
-                        createdAt = ApiKit.StampUtc(gr.CreatedAt),
-                    }),
-                anniversaries = db.Anniversaries.Where(x => x.UserId == uid).ToList()
-                    .Select(x => new { x.Title, date = ApiKit.D(x.Date), x.RepeatYearly, x.Note }),
-                period = db.PeriodRecords.Where(x => x.UserId == uid).ToList()
-                    .Select(x => new { startDate = ApiKit.D(x.StartDate), endDate = ApiKit.DN(x.EndDate), x.Note }),
-                board = db.BoardMessages.Where(x => x.UserId == uid).ToList()
-                    .Select(x => new { x.Content, createdAt = ApiKit.StampUtc(x.CreatedAt) }),
+                schedules,
+                memos,
+                habits,
+                courses,
+                expenses,
+                expenseGroups,
+                anniversaries,
+                period,
+                board,
             };
 
             var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
