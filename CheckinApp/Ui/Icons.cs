@@ -33,6 +33,8 @@ public static class Icons
         ["poop"] = """<path d="M7 21c0-3 2-4.2 5-4.2s5 1.2 5 4.2"/><path d="M8 16.5c0-2.6 1.6-3.6 4-3.6s4 1 4 3.6"/><path d="M9 12.8c0-2 1-2.8 3-2.8s3 .8 3 2.8"/><circle cx="10.2" cy="19" r="0.6" fill="currentColor" stroke="none"/><circle cx="13.8" cy="19" r="0.6" fill="currentColor" stroke="none"/>""",
         ["bell"] = """<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>""",
         ["chart"] = """<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>""",
+        // 饼图（Lucide pie-chart）：记账分类饼状视图用
+        ["pie-chart"] = """<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>""",
         ["download"] = """<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>""",
         // 小游戏（Lucide gamepad-2）：左边十字键 + 右边两个按键
         ["gamepad"] = """<path d="M6 11h4"/><path d="M8 9v4"/><path d="M15 12h.01"/><path d="M18 10h.01"/><rect x="2" y="6" width="20" height="12" rx="2"/>""",
