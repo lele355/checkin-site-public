@@ -70,7 +70,10 @@ public static class CoreApi
             }
 
             // ---- 课程 ----
+            // 口径（2026-11-21 站主定）：当日只显示「当前时间点及之后」的课（含正在上的），
+            // 当日没有了就顺延找「接下来最近有课的那一天」，并带日期标签。
             var todayCourses = new List<object>();
+            var coursesLabel = "";   // 空 = 今天；非空 = 其它日期（如 "11月23日 周一"）
             var currentWeek = 0;
             var semesterConfigured = false;
             if (has("courses.use"))
@@ -82,11 +85,42 @@ public static class CoreApi
                 var sem = SemesterService.Current(db, uid);
                 var semStart = sem.StartDate;
                 currentWeek = Math.Max(1, (int)((today - semStart).TotalDays / 7) + 1);
-                var weekday = ((int)today.DayOfWeek + 6) % 7 + 1;
                 var periods = CoursesConfig.Load(db);
-                foreach (var c in db.Courses.Where(c => c.UserId == uid && c.SemesterId == sem.Id && c.Weekday == weekday)
-                             .ToList().Where(c => Weeks.Includes(c.WeeksText, currentWeek))
-                             .OrderBy(c => c.StartPeriod).Take(6))
+                var all = db.Courses.Where(c => c.UserId == uid && c.SemesterId == sem.Id).ToList();
+                var weekNames = new[] { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
+
+                // 某天的课（按该天的周次/星期算）
+                List<CheckinApp.Models.Course> CoursesOf(DateTime d)
+                {
+                    var wd = ((int)d.DayOfWeek + 6) % 7 + 1;
+                    var wk = Math.Max(1, (int)((d - semStart).TotalDays / 7) + 1);
+                    return all.Where(c => c.Weekday == wd && Weeks.Includes(c.WeeksText, wk))
+                        .OrderBy(c => c.StartPeriod).ToList();
+                }
+
+                // 该节次的下课时刻（没有时段配置时宽松放行）
+                bool NotFinished(CheckinApp.Models.Course c)
+                {
+                    if (periods.Count == 0) return true;
+                    var e = Math.Clamp(Math.Max(c.EndPeriod, c.StartPeriod), 1, periods.Count) - 1;
+                    return !TimeSpan.TryParse(periods[e].End, out var end) || end >= SiteClock.Now.TimeOfDay;
+                }
+
+                var list = CoursesOf(today).Where(NotFinished).Take(6).ToList();
+                if (list.Count == 0)
+                {
+                    // 顺延找最近有课的一天（最多往后 7 天）
+                    for (var off = 1; off <= 7; off++)
+                    {
+                        var d = today.AddDays(off);
+                        var next = CoursesOf(d);
+                        if (next.Count == 0) continue;
+                        list = next.Take(6).ToList();
+                        coursesLabel = $"{d:M月d日} {weekNames[((int)d.DayOfWeek + 6) % 7]}";
+                        break;
+                    }
+                }
+                foreach (var c in list)
                 {
                     todayCourses.Add(new
                     {
@@ -223,6 +257,7 @@ public static class CoreApi
                 nextAnniv,
                 reminderCount,
                 todayCourses,
+                coursesLabel,
                 currentWeek,
                 semesterConfigured,
                 mails,

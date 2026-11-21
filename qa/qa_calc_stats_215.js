@@ -81,6 +81,15 @@ print(json.dumps(rows, ensure_ascii=False))
         T('stats 新字段 maxMonthIn', typeof d.maxMonthIn === 'number');
         T('stats counts 补全（expenses/anniversaries）', d.counts && 'expenses' in d.counts && 'anniversaries' in d.counts);
 
+        // ---------- 2.16 补强：科学计算器键位 / 课程卡口径 ----------
+        r = await get('/Calculator');
+        T('科学键位齐全（82MS 对齐）', ['nPr', 'nCr', 'txt: V ', 'DEG', 'Ans', 'sinh', 'cbrt', 'EXP'].every(k => r.body.includes(k)));
+        T('网页引擎支持开方/排列/组合/倒数', ['nthRoot', 'perm', 'comb', "'r'"].every(k => r.body.includes(k)));
+
+        const res2 = await fetch(BASE + '/api/v1/dashboard', { headers: { Authorization: 'Bearer ' + raw } });
+        const js2 = await res2.json();
+        T('dashboard 带 coursesLabel 字段', res2.status === 200 && js2.ok && 'coursesLabel' in (js2.data || {}));
+
         // ---------- 导航登记 ----------
         r = await get('/');
         T('侧栏有计算器入口', r.status === 200 && r.body.includes('/Calculator'));

@@ -25,6 +25,8 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     // ---- 2026-10-18 工作台卡片扩充（每张卡片按权限出数据） ----
     /// <summary>今日课程（已按教学周次过滤）+ 作息时段文字</summary>
     public List<(Course Course, string Hours)> TodayCourses { get; set; } = [];
+    /// <summary>课程卡日期标签：空 = 今天；非空 = 最近有课的那天（当日没课顺延，与 App 同口径）</summary>
+    public string CoursesLabel { get; set; } = "";
     public int CurrentWeek { get; set; }
     public bool SemesterConfigured { get; set; }
 
@@ -106,12 +108,41 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
             CurrentWeek = Math.Max(1, (int)((today - sem.StartDate).TotalDays / 7) + 1);
             var weekday = ((int)today.DayOfWeek + 6) % 7 + 1;     // 1=周一 … 7=周日
             var periods = CoursesConfig.Load(_db);                // 节次时间（可自定义）
-            TodayCourses = _db.Courses
-                .Where(c => c.UserId == uid && c.SemesterId == sem.Id && c.Weekday == weekday)
-                .ToList()
-                .Where(c => Weeks.Includes(c.WeeksText, CurrentWeek))
-                .OrderBy(c => c.StartPeriod)
-                .Take(6)
+            var all = _db.Courses
+                .Where(c => c.UserId == uid && c.SemesterId == sem.Id)
+                .ToList();
+
+            // 与 App 同口径（2026-11-21）：当日只显示当前时间点及之后的课（含正在上的），
+            // 当日没有了就顺延找最近有课的一天并带日期标签
+            List<Course> CoursesOf(DateTime d)
+            {
+                var wd = ((int)d.DayOfWeek + 6) % 7 + 1;
+                var wk = Math.Max(1, (int)((d - sem.StartDate).TotalDays / 7) + 1);
+                return all.Where(c => c.Weekday == wd && Weeks.Includes(c.WeeksText, wk))
+                    .OrderBy(c => c.StartPeriod).ToList();
+            }
+            bool NotFinished(Course c)
+            {
+                if (periods.Count == 0) return true;
+                var e = Math.Clamp(Math.Max(c.EndPeriod, c.StartPeriod), 1, periods.Count) - 1;
+                return !TimeSpan.TryParse(periods[e].End, out var end) || end >= DateTime.Now.TimeOfDay;
+            }
+
+            var list = CoursesOf(today).Where(NotFinished).Take(6).ToList();
+            if (list.Count == 0)
+            {
+                var weekNames = new[] { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
+                for (var off = 1; off <= 7; off++)
+                {
+                    var d = today.AddDays(off);
+                    var next = CoursesOf(d);
+                    if (next.Count == 0) continue;
+                    list = next.Take(6).ToList();
+                    CoursesLabel = $"{d:M月d日} {weekNames[((int)d.DayOfWeek + 6) % 7]}";
+                    break;
+                }
+            }
+            TodayCourses = list
                 .Select(c => (c, HoursOf(c.StartPeriod, c.EndPeriod, periods)))
                 .ToList();
         }

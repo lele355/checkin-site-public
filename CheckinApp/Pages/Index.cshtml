@@ -102,14 +102,14 @@
     {
         <div class="card" data-card="courses">
             <button type="button" class="card-pin" data-pin="courses" title="置顶到最上面">@Html.Raw(Icons.Svg("pin", 14))</button>
-            <h2>📚 今日课程</h2>
+            <h2>📚 @(string.IsNullOrEmpty(Model.CoursesLabel) ? "今日课程" : Model.CoursesLabel + " 的课")</h2>
             @if (!Model.SemesterConfigured)
             {
                 <p class="hint">未设置学期起始，周次无法计算 · <a href="/Courses">去设置</a></p>
             }
             else if (Model.TodayCourses.Count == 0)
             {
-                <p class="hint">今天没有课 · <a href="/Courses">本周课表</a></p>
+                <p class="hint">接下来 7 天都没有课 · <a href="/Courses">本周课表</a></p>
             }
             else
             {
