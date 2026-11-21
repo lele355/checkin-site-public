@@ -669,17 +669,46 @@ public static class LifeApi
                 .OrderByDescending(x => x.total).Take(5).ToList();
 
             var startMonth = new DateTime(today.Year, today.Month, 1).AddMonths(-5);
-            var expenses = db.Expenses.Where(x => x.UserId == uid && x.Type == "out" && x.OccurDate >= startMonth)
-                .Select(x => new { x.OccurDate, x.Amount }).ToList();
+            var expenses = db.Expenses.Where(x => x.UserId == uid && x.OccurDate >= startMonth)
+                .Select(x => new { x.OccurDate, x.Amount, x.Type }).ToList();
 
+            // 月度收支（收入/支出双序列，趋势视图用）
             var months = new List<object>();
             decimal maxOut = 0;
+            decimal maxIn = 0;
             for (var m = 0; m < 6; m++)
             {
                 var mo = startMonth.AddMonths(m);
-                var sum = expenses.Where(x => x.OccurDate >= mo && x.OccurDate < mo.AddMonths(1)).Sum(x => x.Amount);
-                if (sum > maxOut) maxOut = sum;
-                months.Add(new { label = $"{mo.Month}月", amount = sum });
+                var nextMo = mo.AddMonths(1);
+                var outSum = expenses.Where(x => x.Type == "out" && x.OccurDate >= mo && x.OccurDate < nextMo).Sum(x => x.Amount);
+                var inSum = expenses.Where(x => x.Type == "in" && x.OccurDate >= mo && x.OccurDate < nextMo).Sum(x => x.Amount);
+                if (outSum > maxOut) maxOut = outSum;
+                if (inSum > maxIn) maxIn = inSum;
+                months.Add(new { label = $"{mo.Month}月", amount = outSum, @in = inSum, @out = outSum });
+            }
+
+            // 本月支出分类分布（饼图视图用，含收入分类之外的支出侧）
+            var monthStart = new DateTime(today.Year, today.Month, 1);
+            var byCategory = db.Expenses
+                .Where(x => x.UserId == uid && x.Type == "out" && x.OccurDate >= monthStart)
+                .GroupBy(x => x.Category)
+                .Select(gr => new { name = gr.Key, amount = gr.Sum(x => x.Amount) })
+                .OrderByDescending(x => x.amount).ToList();
+
+            // 近 30 天每日收支（折线趋势用；与热力图的 daily 不是一回事，别重名）
+            var from30 = today.AddDays(-29);
+            var recent = db.Expenses.Where(x => x.UserId == uid && x.OccurDate >= from30)
+                .Select(x => new { x.OccurDate, x.Amount, x.Type }).ToList();
+            var dailyFlow = new List<object>();
+            for (var d = from30; d <= today; d = d.AddDays(1))
+            {
+                var dayRows = recent.Where(x => x.OccurDate.Date == d);
+                dailyFlow.Add(new
+                {
+                    date = ApiKit.D(d),
+                    @out = dayRows.Where(x => x.Type == "out").Sum(x => x.Amount),
+                    @in = dayRows.Where(x => x.Type == "in").Sum(x => x.Amount),
+                });
             }
 
             return ApiKit.Ok(new
@@ -688,6 +717,9 @@ public static class LifeApi
                 topHabits,
                 months,
                 maxMonthOut = maxOut,
+                maxMonthIn = maxIn,
+                byCategory,
+                daily = dailyFlow,
                 counts = new
                 {
                     schedules = db.Schedules.Count(x => x.UserId == uid),
@@ -695,6 +727,8 @@ public static class LifeApi
                     board = db.BoardMessages.Count(x => x.UserId == uid),
                     courses = db.Courses.Count(x => x.UserId == uid),
                     checkins = db.HabitCheckins.Count(c => c.UserId == uid),
+                    anniversaries = db.Anniversaries.Count(x => x.UserId == uid),
+                    expenses = db.Expenses.Count(x => x.UserId == uid),
                 },
             });
         }).RequireAuthorization("perm:stats.use");

@@ -2,76 +2,204 @@
 @model CheckinApp.Pages.Stats.IndexModel
 @{
     ViewData["Title"] = "统计";
+    var catTotal = Model.ByCategory.Sum(c => c.Amount);
 }
 <div class="card">
     <div class="page-head">
         <h2>统计</h2>
-    </div>
-
-    <div class="stat-chips">
-        <span class="chip">日程 @Model.ScheduleCount</span>
-        <span class="chip">备忘 @Model.MemoCount</span>
-        <span class="chip">课程 @Model.CourseCount</span>
-        <span class="chip">留言 @Model.BoardCount</span>
-        <span class="chip">累计打卡 @Model.CheckinTotal 次</span>
+        <div class="view-switch" data-viewkey="stats">
+            <button type="button" class="vs-btn on" data-view="overview">概览</button>
+            <button type="button" class="vs-btn" data-view="trend">趋势</button>
+            <button type="button" class="vs-btn" data-view="dist">分布</button>
+        </div>
     </div>
 </div>
 
-<div class="card">
-    <h2>🔥 打卡热力图（近 90 天）</h2>
-    <div class="heatmap" role="img" aria-label="近 90 天打卡热力图">
-        @foreach (var (date, count) in Model.Heat)
-        {
-            var level = count == 0 ? 0 : count == 1 ? 1 : count == 2 ? 2 : count <= 4 ? 3 : 4;
-            <span class="heat-cell lv@(level)" title="@date.ToString("M月d日")：@count 次"></span>
-        }
+<!-- 概览 -->
+<div class="stat-view" data-view="overview">
+    <div class="card stat-fold" id="fold-counts">
+        <h2 class="fold-head">🔢 计数总览 <span class="fold-caret">▾</span></h2>
+        <div class="fold-body">
+            <div class="stat-chips">
+                <span class="chip">日程 @Model.ScheduleCount</span>
+                <span class="chip">备忘 @Model.MemoCount</span>
+                <span class="chip">课程 @Model.CourseCount</span>
+                <span class="chip">留言 @Model.BoardCount</span>
+                <span class="chip">累计打卡 @Model.CheckinTotal 次</span>
+            </div>
+        </div>
     </div>
-    <div class="hm-legend">
-        少 <span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv3"></span><span class="heat-cell lv4"></span> 多
-    </div>
-</div>
 
-<div class="card">
-    <h2>🏆 打卡排行</h2>
-    @if (Model.TopHabits.Count == 0)
-    {
-        <p class="hint">还没有打卡数据。</p>
-    }
-    else
-    {
-        <div class="bar-list">
-            @{ var max = Model.TopHabits[0].Total; }
-            @foreach (var (name, icon, total) in Model.TopHabits)
+    <div class="card stat-fold" id="fold-heat">
+        <h2 class="fold-head">🔥 打卡热力图（近 90 天）<span class="fold-caret">▾</span></h2>
+        <div class="fold-body">
+            <div class="heatmap" role="img" aria-label="近 90 天打卡热力图">
+                @foreach (var (date, count) in Model.Heat)
+                {
+                    var level = count == 0 ? 0 : count == 1 ? 1 : count == 2 ? 2 : count <= 4 ? 3 : 4;
+                    <span class="heat-cell lv@(level)" title="@date.ToString("M月d日")：@count 次"></span>
+                }
+            </div>
+            <div class="hm-legend">
+                少 <span class="heat-cell lv0"></span><span class="heat-cell lv1"></span><span class="heat-cell lv2"></span><span class="heat-cell lv3"></span><span class="heat-cell lv4"></span> 多
+            </div>
+        </div>
+    </div>
+
+    <div class="card stat-fold" id="fold-habits">
+        <h2 class="fold-head">🏆 打卡排行<span class="fold-caret">▾</span></h2>
+        <div class="fold-body">
+            @if (Model.TopHabits.Count == 0)
             {
-                <div class="bar-row">
-                    <div class="bar-head">
-                        <span class="bar-label">@icon @name</span><span class="bar-val">@total 次</span>
+                <p class="hint">还没有打卡数据。</p>
+            }
+            else
+            {
+                <div class="bar-list">
+                    @{ var max = Model.TopHabits[0].Total; }
+                    @foreach (var (name, icon, total) in Model.TopHabits)
+                    {
+                        <div class="bar-row">
+                            <div class="bar-head">
+                                <span class="bar-label">@icon @name</span><span class="bar-val">@total 次</span>
+                            </div>
+                            <div class="bar-track"><div class="bar-fill" style="width:@(max == 0 ? 0 : total * 100 / max)%;"></div></div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- 趋势 -->
+<div class="stat-view" data-view="trend" style="display:none;">
+    <div class="card stat-fold" id="fold-month">
+        <h2 class="fold-head">📈 月度收支（近 6 个月）<span class="fold-caret">▾</span></h2>
+        <div class="fold-body">
+            @{
+                var maxFlow = Math.Max(Model.MaxMonthOut, Model.MaxMonthIn);
+                if (maxFlow == 0)
+                {
+                    <p class="hint">还没有记账数据。</p>
+                }
+                else
+                {
+                    <div class="month-bars">
+                        @foreach (var (month, inc, outSum) in Model.MonthFlow)
+                        {
+                            var ho = outSum == 0 ? 3 : (int)Math.Max(6, (double)(outSum / maxFlow) * 110);
+                            var hi = inc == 0 ? 3 : (int)Math.Max(6, (double)(inc / maxFlow) * 110);
+                            <div class="month-bar-col" style="display:flex;gap:3px;align-items:flex-end;justify-content:center;">
+                                <div class="month-bar" style="height:@(ho)px;background:#c0392b;width:10px;"></div>
+                                <div class="month-bar" style="height:@(hi)px;background:#2e7d32;width:10px;"></div>
+                            </div>
+                            <div class="mb-name" style="margin-top:-134px;margin-bottom:112px;">@month</div>
+                        }
                     </div>
-                    <div class="bar-track"><div class="bar-fill" style="width:@(max == 0 ? 0 : total * 100 / max)%;"></div></div>
-                </div>
+                    <p class="hint">■ 支出　■ 收入</p>
+                }
             }
         </div>
-    }
+    </div>
 </div>
 
-<div class="card">
-    <h2>💸 月度支出（近 6 个月）</h2>
-    @if (Model.MaxMonthOut == 0)
-    {
-        <p class="hint">还没有记账数据。</p>
-    }
-    else
-    {
-        <div class="month-bars">
-            @foreach (var (month, outSum) in Model.MonthExpense)
+<!-- 分布 -->
+<div class="stat-view" data-view="dist" style="display:none;">
+    <div class="card stat-fold" id="fold-pie">
+        <h2 class="fold-head">🥧 本月支出分类<span class="fold-caret">▾</span></h2>
+        <div class="fold-body">
+            @if (Model.ByCategory.Count == 0)
             {
-                var h = outSum == 0 ? 3 : (int)Math.Max(6, (double)(outSum / Model.MaxMonthOut) * 120);
-                <div class="month-bar-col">
-                    <div class="mb-val">¥@outSum.ToString("0")</div>
-                    <div class="month-bar" style="height:@(h)px;"></div>
-                    <div class="mb-name">@month</div>
+                <p class="hint">本月还没有支出。</p>
+            }
+            else
+            {
+                var stops = new List<string>();
+                var acc = 0.0;
+                var palette = new[] { "#4f6df5", "#e8833a", "#2e9e6b", "#c0529e", "#d4a017", "#5aa9c9", "#a0522d", "#7c8ba1" };
+                for (var i = 0; i < Model.ByCategory.Count; i++)
+                {
+                    var pct = (double)(Model.ByCategory[i].Amount / catTotal) * 100;
+                    stops.Add($"{palette[i % palette.Length]} {acc:0.##}% {(acc + pct):0.##}%");
+                    acc += pct;
+                }
+                <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+                    <div style="width:150px;height:150px;border-radius:50%;background:conic-gradient(@string.Join(",", stops));"></div>
+                    <div class="bar-list" style="flex:1;min-width:200px;">
+                        @for (var i = 0; i < Model.ByCategory.Count; i++)
+                        {
+                            var (name, amount) = Model.ByCategory[i];
+                            var pct = catTotal == 0 ? 0 : (int)Math.Round((double)(amount / catTotal) * 100);
+                            <div class="bar-row">
+                                <div class="bar-head">
+                                    <span class="bar-label"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:@palette[i % palette.Length];margin-right:6px;"></span>@name</span>
+                                    <span class="bar-val">¥@amount.ToString("0.##")（@pct%）</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 </div>
             }
         </div>
-    }
+    </div>
+
+    <div class="card stat-fold" id="fold-catbar">
+        <h2 class="fold-head">📊 分类排行（本月）<span class="fold-caret">▾</span></h2>
+        <div class="fold-body">
+            @if (Model.ByCategory.Count == 0)
+            {
+                <p class="hint">本月还没有支出。</p>
+            }
+            else
+            {
+                var maxCat = Model.ByCategory[0].Amount;
+                <div class="bar-list">
+                    @foreach (var (name, amount) in Model.ByCategory)
+                    {
+                        <div class="bar-row">
+                            <div class="bar-head">
+                                <span class="bar-label">@name</span><span class="bar-val">¥@amount.ToString("0.##")</span>
+                            </div>
+                            <div class="bar-track"><div class="bar-fill" style="width:@(maxCat == 0 ? 0 : amount * 100 / maxCat)%;"></div></div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
 </div>
+
+<script>
+    (function () {
+        'use strict';
+        // 视图切换
+        document.querySelectorAll('.view-switch[data-viewkey="stats"] .vs-btn').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.querySelectorAll('.view-switch[data-viewkey="stats"] .vs-btn').forEach(function (x) { x.classList.remove('on'); });
+                b.classList.add('on');
+                document.querySelectorAll('.stat-view').forEach(function (v) {
+                    v.style.display = v.dataset.view === b.dataset.view ? '' : 'none';
+                });
+            });
+        });
+        // 模块折叠（localStorage 记忆）
+        document.querySelectorAll('.stat-fold').forEach(function (card) {
+            var head = card.querySelector('.fold-head');
+            var body = card.querySelector('.fold-body');
+            var caret = card.querySelector('.fold-caret');
+            var folded = localStorage.getItem('stats-fold-' + card.id) === '1';
+            function apply() {
+                body.style.display = folded ? 'none' : '';
+                caret.textContent = folded ? '▸' : '▾';
+            }
+            apply();
+            head.style.cursor = 'pointer';
+            head.addEventListener('click', function () {
+                folded = !folded;
+                localStorage.setItem('stats-fold-' + card.id, folded ? '1' : '0');
+                apply();
+            });
+        });
+    })();
+</script>

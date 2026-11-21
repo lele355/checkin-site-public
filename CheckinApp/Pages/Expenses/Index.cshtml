@@ -21,6 +21,10 @@
             {
                 <span>搜索「@Model.Query」</span>
             }
+            else if (Model.RangeTitle.Length > 0)
+            {
+                <span>@Model.RangeTitle</span>
+            }
             else
             {
                 <a href="?m=@prev&view=@v" class="mini" style="text-decoration:none;">←</a>
@@ -46,6 +50,8 @@
 
     <form method="get" class="inline-form" style="margin-bottom:14px;">
         <input name="q" value="@Model.Query" placeholder="搜备注或分类" autocomplete="off" />
+        <input type="date" name="from" title="起始日期" style="width:140px;" />
+        <input type="date" name="to" title="结束日期" style="width:140px;" />
         @if (Model.Searching)
         {
             <a class="btn secondary" href="/Expenses">清除</a>
@@ -56,27 +62,34 @@
     <div class="stat-row">
         <div class="stat-box">
             <div class="mini">支出</div>
-            <div class="stat-num" style="color:#e24b4a;">¥@Model.TotalOut.ToString("0.##")</div>
+            <div class="stat-num" id="tile-out" style="color:#e24b4a;">¥@Model.TotalOut.ToString("0.##")</div>
         </div>
         <div class="stat-box">
             <div class="mini">收入</div>
-            <div class="stat-num" style="color:#639922;">¥@Model.TotalIn.ToString("0.##")</div>
+            <div class="stat-num" id="tile-in" style="color:#639922;">¥@Model.TotalIn.ToString("0.##")</div>
         </div>
         <div class="stat-box">
             <div class="mini">结余</div>
-            <div class="stat-num">¥@((Model.TotalIn - Model.TotalOut).ToString("0.##"))</div>
+            <div class="stat-num" id="tile-bal">¥@((Model.TotalIn - Model.TotalOut).ToString("0.##"))</div>
         </div>
     </div>
 
     @if (v == "list" && Model.ByCategory.Count > 0)
     {
-        <div style="margin-top:12px;">
-            <div class="bar-caption">支出分类</div>
-            <div class="bar-list">
+        <div style="margin-top:12px;" class="exp-cats">
+            <div class="bar-caption">
+                <span>支出分类</span>
+                <span class="mini">
+                    <a href="javascript:void(0)" class="mini exp-pie-toggle">饼图</a>
+                    <a href="javascript:void(0)" class="mini exp-restore" style="display:none;">查看全部</a>
+                    <a href="javascript:void(0)" class="mini exp-fold">收起</a>
+                </span>
+            </div>
+            <div class="bar-list exp-cat-body">
             @foreach (var (cat, sum) in Model.ByCategory)
             {
                 var pct = Model.TotalOut == 0 ? 0 : (int)Math.Round((double)(sum / Model.TotalOut) * 100);
-                <div class="bar-row">
+                <div class="bar-row exp-cat-row" data-cat="@cat" data-amt="@sum.ToString("0.##")" style="cursor:pointer;">
                     <div class="bar-head">
                         <span class="bar-label">@cat</span><span class="bar-val">¥@sum.ToString("0.##")（@pct%）</span>
                     </div>
@@ -84,6 +97,7 @@
                 </div>
             }
             </div>
+            <div class="exp-cat-pie" style="display:none;"></div>
         </div>
     }
 </div>
@@ -162,7 +176,7 @@ else
                         <div class="exp-group-body">
                             @foreach (var x in row.Items)
                             {
-                                <div class="row-item exp-child">
+                                <div class="row-item exp-child" data-cat="@x.Category" data-io="@x.Type" data-amt="@x.Amount.ToString("0.##")">
                                     <div class="chip" style="flex-shrink:0;">@x.Category</div>
                                     <div style="flex:1;min-width:0;">
                                         <div>@(string.IsNullOrWhiteSpace(x.Note) ? x.Category : x.Note)</div>
@@ -194,6 +208,7 @@ else
                 {
                     var x = row.Items[0];
                     <div class="row-item exp-single" data-pick data-id="@x.Id"
+                         data-cat="@x.Category" data-io="@x.Type" data-amt="@x.Amount.ToString("0.##")"
                          data-note="@(string.IsNullOrWhiteSpace(x.Note) ? x.Category : x.Note)">
                         <input class="exp-pick" type="checkbox" name="ids" value="@x.Id" form="pickForm" />
                         <div class="chip" style="flex-shrink:0;">@x.Category</div>
@@ -272,6 +287,113 @@ else
 
             document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setPicking(false); });
             refresh();
+        })();
+
+        // ---------- 分类点选筛选 / 饼图 / 折叠（2.14 同步，纯前端） ----------
+        (function () {
+            var root = document.querySelector('.exp-cats');
+            if (!root) return;
+            var active = null;   // 当前筛选的分类
+            var fmt = function (v) { return (Math.round(v * 100) / 100).toString(); };
+
+            function applyFilter() {
+                var out = 0, inc = 0;
+                document.querySelectorAll('.exp-single').forEach(function (el) {
+                    var show = !active || el.dataset.cat === active;
+                    el.style.display = show ? '' : 'none';
+                    if (show) {
+                        if (el.dataset.io === 'out') out += parseFloat(el.dataset.amt) || 0;
+                        else inc += parseFloat(el.dataset.amt) || 0;
+                    }
+                });
+                // 条目（组）：组内有命中的明细才显示；子行按命中过滤
+                document.querySelectorAll('.exp-group').forEach(function (g) {
+                    var any = false;
+                    g.querySelectorAll('.exp-child').forEach(function (c) {
+                        var show = !active || c.dataset.cat === active;
+                        c.style.display = show ? '' : 'none';
+                        if (show) {
+                            any = true;
+                            if (c.dataset.io === 'out') out += parseFloat(c.dataset.amt) || 0;
+                            else inc += parseFloat(c.dataset.amt) || 0;
+                        }
+                    });
+                    g.style.display = (!active || any) ? '' : 'none';
+                });
+                var tOut = document.getElementById('tile-out');
+                if (tOut) {
+                    tOut.textContent = '¥' + fmt(out);
+                    document.getElementById('tile-in').textContent = '¥' + fmt(inc);
+                    document.getElementById('tile-bal').textContent = '¥' + fmt(inc - out);
+                }
+                root.querySelector('.exp-restore').style.display = active ? '' : 'none';
+                root.querySelectorAll('.exp-cat-row').forEach(function (r) {
+                    r.style.opacity = (!active || r.dataset.cat === active) ? '1' : '.35';
+                });
+                drawPie();
+            }
+
+            root.querySelectorAll('.exp-cat-row').forEach(function (r) {
+                r.addEventListener('click', function () {
+                    active = (active === r.dataset.cat) ? null : r.dataset.cat;
+                    applyFilter();
+                });
+            });
+            root.querySelector('.exp-restore').addEventListener('click', function () {
+                active = null;
+                applyFilter();
+            });
+
+            // 折叠（localStorage 记忆）
+            var foldBtn = root.querySelector('.exp-fold');
+            var body = root.querySelector('.exp-cat-body');
+            var pieBox = root.querySelector('.exp-cat-pie');
+            var folded = localStorage.getItem('exp-cats-fold') === '1';
+            function applyFold() {
+                if (folded) {
+                    body.style.display = 'none';
+                    pieBox.style.display = 'none';
+                } else {
+                    body.style.display = pieMode ? 'none' : '';
+                    pieBox.style.display = pieMode ? '' : 'none';
+                }
+                foldBtn.textContent = folded ? '展开' : '收起';
+            }
+            foldBtn.addEventListener('click', function () {
+                folded = !folded;
+                localStorage.setItem('exp-cats-fold', folded ? '1' : '0');
+                applyFold();
+            });
+
+            // 条形 ⇄ 饼图
+            var pieMode = localStorage.getItem('exp-cats-pie') === '1';
+            var pieBtn = root.querySelector('.exp-pie-toggle');
+            function drawPie() {
+                if (!pieMode) return;
+                var rows = Array.prototype.filter.call(root.querySelectorAll('.exp-cat-row'), function (r) {
+                    return !active || r.dataset.cat === active;
+                });
+                var total = rows.reduce(function (s, r) { return s + (parseFloat(r.dataset.amt) || 0); }, 0);
+                if (total <= 0) { pieBox.innerHTML = '<p class="hint">没有数据。</p>'; return; }
+                var colors = ['#4f6df5', '#e8833a', '#2e9e6b', '#c0529e', '#d4a017', '#5aa9c9', '#a0522d', '#7c8ba1'];
+                var stops = [], acc = 0;
+                rows.forEach(function (r, i) {
+                    var pct = (parseFloat(r.dataset.amt) || 0) / total * 100;
+                    stops.push(colors[i % colors.length] + ' ' + acc.toFixed(2) + '% ' + (acc + pct).toFixed(2) + '%');
+                    acc += pct;
+                });
+                pieBox.innerHTML = '<div style="display:flex;justify-content:center;padding:8px 0;">' +
+                    '<div style="width:150px;height:150px;border-radius:50%;background:conic-gradient(' + stops.join(',') + ');"></div></div>';
+            }
+            pieBtn.addEventListener('click', function () {
+                pieMode = !pieMode;
+                localStorage.setItem('exp-cats-pie', pieMode ? '1' : '0');
+                pieBtn.textContent = pieMode ? '条形' : '饼图';
+                applyFold();
+                drawPie();
+            });
+            pieBtn.textContent = pieMode ? '条形' : '饼图';
+            applyFold();
         })();
     </script>
 }

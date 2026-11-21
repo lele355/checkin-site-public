@@ -19,6 +19,11 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     /// <summary>近 6 个月支出（月升序）</summary>
     public List<(string Month, decimal Out)> MonthExpense { get; set; } = [];
     public decimal MaxMonthOut { get; set; }
+    /// <summary>近 6 个月收入/支出（趋势视图）</summary>
+    public List<(string Month, decimal In, decimal Out)> MonthFlow { get; set; } = [];
+    public decimal MaxMonthIn { get; set; }
+    /// <summary>本月支出分类分布（饼图/条形）</summary>
+    public List<(string Name, decimal Amount)> ByCategory { get; set; } = [];
 
     public int ScheduleCount { get; set; }
     public int MemoCount { get; set; }
@@ -52,21 +57,34 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
             .Take(5)
             .ToList();
 
-        // 近 6 个月支出
+        // 近 6 个月收支
         var startMonth = new DateTime(today.Year, today.Month, 1).AddMonths(-5);
         var expenses = _db.Expenses
-            .Where(x => x.UserId == uid && x.Type == "out" && x.OccurDate >= startMonth)
-            .Select(x => new { x.OccurDate, x.Amount })
+            .Where(x => x.UserId == uid && x.OccurDate >= startMonth)
+            .Select(x => new { x.OccurDate, x.Amount, x.Type })
             .ToList();
         for (var m = 0; m < 6; m++)
         {
             var month = startMonth.AddMonths(m);
-            var sum = expenses
-                .Where(x => x.OccurDate >= month && x.OccurDate < month.AddMonths(1))
-                .Sum(x => x.Amount);
-            MonthExpense.Add((month.ToString("M月"), sum));
+            var next = month.AddMonths(1);
+            var outSum = expenses.Where(x => x.Type == "out" && x.OccurDate >= month && x.OccurDate < next).Sum(x => x.Amount);
+            var inSum = expenses.Where(x => x.Type == "in" && x.OccurDate >= month && x.OccurDate < next).Sum(x => x.Amount);
+            MonthExpense.Add((month.ToString("M月"), outSum));
+            MonthFlow.Add((month.ToString("M月"), inSum, outSum));
         }
         MaxMonthOut = MonthExpense.Count == 0 ? 0 : MonthExpense.Max(t => t.Out);
+        MaxMonthIn = MonthFlow.Count == 0 ? 0 : MonthFlow.Max(t => t.In);
+
+        // 本月支出分类分布
+        var monthStart = new DateTime(today.Year, today.Month, 1);
+        ByCategory = _db.Expenses
+            .Where(x => x.UserId == uid && x.Type == "out" && x.OccurDate >= monthStart)
+            .GroupBy(x => x.Category)
+            .Select(g => new { Name = g.Key, Amount = g.Sum(x => x.Amount) })
+            .OrderByDescending(x => x.Amount)
+            .ToList()                       // 先物化：表达式树里不能放元组
+            .Select(x => (x.Name, x.Amount))
+            .ToList();
 
         ScheduleCount = _db.Schedules.Count(x => x.UserId == uid);
         MemoCount = _db.Memos.Count(x => x.UserId == uid);

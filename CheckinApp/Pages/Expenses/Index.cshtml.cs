@@ -24,6 +24,8 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     /// <summary>搜索关键字（备注/分类，跨全部月份）</summary>
     public string Query { get; private set; } = "";
     public bool Searching => Query.Length > 0;
+    /// <summary>自定义范围模式的标题（非空 = 范围筛选生效）</summary>
+    public string RangeTitle { get; private set; } = "";
 
     public record MonthRow(DateTime Month, decimal TotalIn, decimal TotalOut, int Count);
     /// <summary>近 12 个月汇总（月度视图用，按月倒序）</summary>
@@ -48,7 +50,7 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
     }
     public List<ExpenseRow> Rows { get; set; } = [];
 
-    public void OnGet(string? m, string? view, string? q)
+    public void OnGet(string? m, string? view, string? q, string? from, string? to)
     {
         Query = (q ?? "").Trim();
         if (Query.Length > 50) Query = Query[..50];
@@ -57,6 +59,32 @@ public class IndexModel(AppDbContext db, CurrentUser me) : PageModel
         if (_me.UserId is not int uid) return;
         if (DateTime.TryParseExact(m, "yyyy-MM", null, System.Globalization.DateTimeStyles.None, out var parsed))
             Month = new DateTime(parsed.Year, parsed.Month, 1);
+
+        // 自定义时间范围（2.13 同步）：起止都解析成功且顺序正确才生效，否则退回按月
+        var okFrom = DateTime.TryParse(from, out var rangeFrom);
+        var okTo = DateTime.TryParse(to, out var rangeTo);
+        var hasRange = okFrom && okTo && rangeFrom <= rangeTo;
+        if (hasRange)
+        {
+            var rf = rangeFrom.Date;
+            var rt = rangeTo.Date.AddDays(1);   // 含当天
+            Items = _db.Expenses
+                .Where(x => x.UserId == uid && x.OccurDate >= rf && x.OccurDate < rt)
+                .OrderByDescending(x => x.OccurDate)
+                .ThenByDescending(x => x.Id)
+                .ToList();
+            TotalOut = Items.Where(x => x.Type == "out").Sum(x => x.Amount);
+            TotalIn = Items.Where(x => x.Type == "in").Sum(x => x.Amount);
+            ByCategory = Items
+                .Where(x => x.Type == "out")
+                .GroupBy(x => x.Category)
+                .Select(g => (g.Key, g.Sum(x => x.Amount)))
+                .OrderByDescending(t => t.Item2)
+                .ToList();
+            RangeTitle = $"{rangeFrom:M月d日} ~ {rangeTo:M月d日}";
+            if (View == "list") BuildRows(uid);
+            return;
+        }
 
         if (Searching)
         {
