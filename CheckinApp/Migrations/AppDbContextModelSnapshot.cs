@@ -752,6 +752,256 @@ namespace CheckinApp.Migrations
                     b.ToTable("HabitCheckins");
                 });
 
+            modelBuilder.Entity("CheckinApp.Models.HealthBinding", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BridgeBindingKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastSyncAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastSyncError")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MiUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OwnerName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SyncCursor")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BridgeBindingKey")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("HealthBindings");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.HealthDaily", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActivityCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActivityMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BindingId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("CaloriesActive")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("CaloriesTotal")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("DistanceM")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("HrAvg")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("HrMax")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("HrMin")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("HrResting")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SleepAwakeMin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SleepDeepMin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("SleepEndAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SleepLightMin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SleepMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SleepRemMin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("SleepScore")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime?>("SleepStartAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Spo2Avg")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("Steps")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("StressAvg")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("StressMildMin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StressModerateMin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StressRelaxedMin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StressSevereMin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("WeightKg")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("WorkoutCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BindingId", "Date")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Date");
+
+                    b.ToTable("HealthDailies");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.HealthHourly", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BindingId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Hour")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("HrAvg")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("HrMax")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("HrMin")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("HrPoints")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Spo2Avg")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Spo2Max")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Spo2Min")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("Spo2Points")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("BindingId", "Date", "Hour")
+                        .IsUnique();
+
+                    b.ToTable("HealthHourlies");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.HealthWeightLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("WeightKg")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("HealthWeightLogs");
+                });
+
             modelBuilder.Entity("CheckinApp.Models.Invitation", b =>
                 {
                     b.Property<int>("Id")
@@ -1488,6 +1738,66 @@ namespace CheckinApp.Migrations
                         .IsRequired();
 
                     b.Navigation("Habit");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.HealthBinding", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.HealthDaily", b =>
+                {
+                    b.HasOne("CheckinApp.Models.HealthBinding", "Binding")
+                        .WithMany()
+                        .HasForeignKey("BindingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Binding");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.HealthHourly", b =>
+                {
+                    b.HasOne("CheckinApp.Models.HealthBinding", "Binding")
+                        .WithMany()
+                        .HasForeignKey("BindingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Binding");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CheckinApp.Models.HealthWeightLog", b =>
+                {
+                    b.HasOne("CheckinApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });

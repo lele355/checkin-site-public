@@ -1,0 +1,100 @@
+@page
+@model CheckinApp.Pages.Health.IndexModel
+@{
+    ViewData["Title"] = "健康";
+}
+<div class="card">
+    <div class="page-head">
+        <h2>健康</h2>
+        <div>
+            <form method="post" asp-page-handler="Sync" class="inline-form" style="margin:0;">
+                <button class="btn secondary" type="submit">手动同步</button>
+            </form>
+        </div>
+    </div>
+    @if (Model.Note is not null)
+    {
+        <p class="hint">@Model.Note</p>
+    }
+</div>
+
+@if (Model.QrPng is not null)
+{
+    <div class="card" style="text-align:center;">
+        <h2>绑定小米账号</h2>
+        <img src="data:image/png;base64,@Model.QrPng" width="220" height="220" alt="绑定二维码" />
+        <p class="hint">用「米家」App 扫码确认登录</p>
+        <script>
+            (function () {
+                var id = @Model.QrBindingId;
+                var n = 0;
+                var t = setInterval(function () {
+                    if (++n > 90) { clearInterval(t); return; }
+                    fetch('/api/v1/health/bindings/' + id + '/status', { credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (j) {
+                            if (j.data && j.data.status === 'active') { clearInterval(t); location.href = '/Health?note=' + encodeURIComponent('绑定成功'); }
+                            if (j.data && (j.data.status === 'expired' || j.data.status === 'failed')) { clearInterval(t); location.href = '/Health?note=' + encodeURIComponent('二维码已过期'); }
+                        })
+                        .catch(function () { });
+                }, 2000);
+            })();
+        </script>
+    </div>
+}
+
+<div class="card">
+    <h2>绑定</h2>
+    @if (Model.Bindings.Count == 0)
+    {
+        <p class="hint">还没有绑定</p>
+    }
+    else
+    {
+        @foreach (var b in Model.Bindings)
+        {
+            <div class="row-item">
+                <div style="flex:1;min-width:0;">
+                    <div>@(string.IsNullOrEmpty(b.DisplayName) ? "绑定 " + b.Id : b.DisplayName)</div>
+                    <div class="hint">
+                        @b.OwnerName@((b.OwnerName.Length > 0 && b.MiUserId.Length > 0) ? " · " : "")@b.MiUserId ·
+                        @(b.Status == "active" ? "已连接" : b.Status)
+                    </div>
+                </div>
+                <form method="post" asp-page-handler="Unbind" onsubmit="return confirm('解绑后该绑定的日汇总会一并删除，确定？');" style="margin:0;">
+                    <input type="hidden" name="id" value="@b.Id" />
+                    <button class="btn secondary" type="submit">解绑</button>
+                </form>
+            </div>
+        }
+    }
+    <form method="post" asp-page-handler="StartBind" style="margin-top:10px;">
+        <button class="btn" type="submit">＋ 绑定小米账号</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>今日</h2>
+    @if (Model.Today.Count == 0)
+    {
+        <p class="hint">今天还没有数据</p>
+    }
+    else
+    {
+        <div class="bar-list">
+            @foreach (var d in Model.Today)
+            {
+                <div class="row-item">
+                    <div style="flex:1;min-width:0;">
+                        <div>@d.Steps 步 · 睡 @(d.SleepMinutes / 60)时@(d.SleepMinutes % 60)分</div>
+                        <div class="hint">
+                            心率 @(d.HrAvg > 0 ? ((int)d.HrAvg).ToString() : "—") ·
+                            体重 @(d.WeightKg > 0 ? d.WeightKg.ToString("0.#") + "kg" : "—") ·
+                            @(d.Date.ToString("M月d日"))
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

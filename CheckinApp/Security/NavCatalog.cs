@@ -36,6 +36,7 @@ public static class NavCatalog
         new("reminders",   "提醒",   "bell",     "/Reminders",   "reminders.use",  GroupTool, true),
         new("stats",       "统计",   "chart",    "/Stats",       "stats.use",      GroupTool, true),
         new("calc",        "计算器", "calculator","/Calculator", "calc.use",       GroupTool, true),
+        new("health",      "健康",   "pulse",    "/Health",      "health.use",     GroupLife, true),
         new("export",      "导出",   "download", "/Export",      "export.use",     GroupTool, true),
         new("admin-users", "用户管理", "users",  "/Admin/Users", "admin.users",    GroupAdmin, true),
         new("admin-invites","邀请码", "ticket", "/Admin/Invitations", "admin.users", GroupAdmin, true),

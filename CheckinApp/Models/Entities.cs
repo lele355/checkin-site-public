@@ -675,3 +675,123 @@ public class CoupleMonthlySummary
     public required string Content { get; set; }
     public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ==================== 健康模块（2026-11-21 站主规划：mi-health-bridge 接入） ====================
+
+/// <summary>
+/// 小米账号绑定 —— 一账号可绑多个（如：自己的手环 + 恬恬的手环）。
+/// 凭据（登录态/长效令牌）只存 bridge 侧 sessions/ 文件（600 权限），本表只有
+/// 无敏感性的 BridgeBindingKey 用于对接 bridge —— 库里绝不存小米凭据（红线）。
+/// </summary>
+public class HealthBinding
+{
+    public int Id { get; set; }
+    /// <summary>越权围栏：谁的账号谁看，账号内所有绑定均可见</summary>
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    /// <summary>bridge 侧的 bindingId（b_xxx，唯一）</summary>
+    public required string BridgeBindingKey { get; set; }
+    /// <summary>用户起的名（如「我的手环」）</summary>
+    public string DisplayName { get; set; } = "";
+    /// <summary>数据归属标签（如「恬恬」）—— 纯展示，区分一账号多绑定</summary>
+    public string OwnerName { get; set; } = "";
+    /// <summary>小米侧账号标识（bridge 回报，辅助辨认）</summary>
+    public string MiUserId { get; set; } = "";
+    /// <summary>pending=扫码中 / active=可用 / expired=二维码过期 / revoked=小米侧失效</summary>
+    public string Status { get; set; } = "pending";
+    public DateTime? LastSyncAt { get; set; }
+    public string LastSyncError { get; set; } = "";
+    /// <summary>增量游标：bridge observations.collected_at 已摄入到的最大值</summary>
+    public string SyncCursor { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// 健康日汇总 —— 一个绑定一天一行（(BindingId, Date) 唯一）。
+/// 只存日粒度：原始采样（逐秒心率等）留在 bridge，2 核 2G 不扛全量明细；
+/// RawJson 存当日各域原始 payload，新指标未建列前先从这取，不用赶迁移。
+/// </summary>
+public class HealthDaily
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    public int BindingId { get; set; }
+    public HealthBinding? Binding { get; set; }
+    /// <summary>统计日（只用日期部分）</summary>
+    public DateTime Date { get; set; }
+    public int Steps { get; set; }
+    public double DistanceM { get; set; }
+    public double CaloriesTotal { get; set; }
+    public double CaloriesActive { get; set; }
+    public int ActivityCount { get; set; }
+    public int ActivityMinutes { get; set; }
+    public double HrAvg { get; set; }
+    public double HrMax { get; set; }
+    public double HrMin { get; set; }
+    public double HrResting { get; set; }
+    public double Spo2Avg { get; set; }
+    public double StressAvg { get; set; }
+    public int SleepMinutes { get; set; }
+    public double SleepScore { get; set; }
+    /// <summary>入睡/醒来时刻（UTC，来自睡眠 sessions 的起止；显示转 +8）</summary>
+    public DateTime? SleepStartAt { get; set; }
+    public DateTime? SleepEndAt { get; set; }
+    /// <summary>睡眠分期（分钟）：深/浅/REM/清醒 —— 二级详情页画堆叠条</summary>
+    public int SleepDeepMin { get; set; }
+    public int SleepLightMin { get; set; }
+    public int SleepRemMin { get; set; }
+    public int SleepAwakeMin { get; set; }
+    /// <summary>压力分档（分钟）：放松/轻度/中度/重度</summary>
+    public int StressRelaxedMin { get; set; }
+    public int StressMildMin { get; set; }
+    public int StressModerateMin { get; set; }
+    public int StressSevereMin { get; set; }
+    /// <summary>当日最新一条体重（kg，0=当日没称）</summary>
+    public double WeightKg { get; set; }
+    public int WorkoutCount { get; set; }
+    /// <summary>当日原始 rows 按 domain 合并（新指标兜底）</summary>
+    public string RawJson { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// 健康小时聚合 —— 心率/血氧的逐点采样按 (绑定, 日期, 小时) 聚合，
+/// 给二级详情页画当日曲线用（逐点留 bridge，这里只存 min/max/avg + 点数做增量加权）。
+/// </summary>
+public class HealthHourly
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    public int BindingId { get; set; }
+    public HealthBinding? Binding { get; set; }
+    public DateTime Date { get; set; }
+    /// <summary>0-23</summary>
+    public int Hour { get; set; }
+    public double HrMin { get; set; }
+    public double HrMax { get; set; }
+    public double HrAvg { get; set; }
+    /// <summary>该小时已摄入的心率点数（加权平均用）</summary>
+    public int HrPoints { get; set; }
+    public double Spo2Min { get; set; }
+    public double Spo2Max { get; set; }
+    public double Spo2Avg { get; set; }
+    public int Spo2Points { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// 手填体重 —— 没有体脂秤也能记。同天手填优先于设备值（手填是用户真值）。
+/// </summary>
+public class HealthWeightLog
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    public DateTime Date { get; set; }
+    public double WeightKg { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

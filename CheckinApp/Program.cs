@@ -184,6 +184,19 @@ if (!LocalMode.Enabled)
     builder.Services.AddHostedService<DailyMailBackgroundService>();
 }
 
+// 健康模块（M9）：bridge（127.0.0.1:8765）增量摄入 + 后台同步。
+// Bridge/Webhook token 放 appsettings.Local.json 或环境变量，绝不进 git。
+builder.Services.Configure<HealthOptions>(builder.Configuration.GetSection("Health"));
+builder.Services.AddScoped<HealthSyncService>();
+builder.Services.AddHttpClient("health-bridge", http =>
+{
+    http.Timeout = TimeSpan.FromSeconds(15);
+});
+if (!LocalMode.Enabled)
+{
+    builder.Services.AddHostedService<HealthSyncBackgroundService>();
+}
+
 var app = builder.Build();
 
 // ---------- 启动初始化：迁移建库 + 播种（幂等） ----------
@@ -270,6 +283,7 @@ CheckinApp.Api.SocialApi.Map(app);
 CheckinApp.Api.CoupleApi.MapCoupleApi(app);   // 情侣大类（心情/排便/统计，2026-11-02）
 CheckinApp.Api.AiApi.Map(app);
 CheckinApp.Api.EmailApi.Map(app);
+CheckinApp.Api.HealthApi.Map(app);   // 健康数据（小米手环云端同步，2026-11-21）
 CheckinApp.Api.AdminApi.Map(app);
 CheckinApp.Api.NotifyApi.Map(app);
 CheckinApp.Api.GamesApi.Map(app);

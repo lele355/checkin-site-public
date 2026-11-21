@@ -44,6 +44,10 @@ public partial class AppDbContext : DbContext
     public DbSet<PoopLog> PoopLogs => Set<PoopLog>();
     public DbSet<CoupleQuestion> CoupleQuestions => Set<CoupleQuestion>();
     public DbSet<CoupleMonthlySummary> CoupleMonthlySummaries => Set<CoupleMonthlySummary>();
+    public DbSet<HealthBinding> HealthBindings => Set<HealthBinding>();
+    public DbSet<HealthDaily> HealthDailies => Set<HealthDaily>();
+    public DbSet<HealthHourly> HealthHourlies => Set<HealthHourly>();
+    public DbSet<HealthWeightLog> HealthWeightLogs => Set<HealthWeightLog>();
 
     protected override void OnModelCreating(ModelBuilder m)
     {
@@ -173,6 +177,35 @@ public partial class AppDbContext : DbContext
         {
             // 组名查重 / 搜索命中组名都要按人扫
             e.HasIndex(x => new { x.UserId, x.Name });
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        m.Entity<HealthBinding>(e =>
+        {
+            // bridge 的 bindingId 全局唯一（跨用户也不能撞，它指向 bridge 侧的 session 文件）
+            e.HasIndex(x => x.BridgeBindingKey).IsUnique();
+            e.HasIndex(x => x.UserId);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        m.Entity<HealthDaily>(e =>
+        {
+            // 幂等 upsert 兜底：同绑定同天只有一行
+            e.HasIndex(x => new { x.BindingId, x.Date }).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.Date });
+            // 解绑连带删日汇总（与邮件模块级联一致）
+            e.HasOne(x => x.Binding).WithMany().HasForeignKey(x => x.BindingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        m.Entity<HealthHourly>(e =>
+        {
+            e.HasIndex(x => new { x.BindingId, x.Date, x.Hour }).IsUnique();
+            e.HasOne(x => x.Binding).WithMany().HasForeignKey(x => x.BindingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        m.Entity<HealthWeightLog>(e =>
+        {
+            // 一天一条手填（再填覆盖）
+            e.HasIndex(x => new { x.UserId, x.Date }).IsUnique();
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
